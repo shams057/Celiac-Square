@@ -1,0 +1,25 @@
+{
+  "name": "celiac-square",
+  "version": "1.0.0",
+  "description": "Celiac Square - Plateforme Tunisienne d'Assistance Cœliaque & Sans Gluten",
+  "scripts": {
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install",
+    "install:all": "npm run install:backend && npm run install:frontend",
+    "seed": "cd backend && npm run seed",
+    "server": "cd backend && npm run dev",
+    "client": "cd frontend && npm run dev",
+    "dev": "node -e \"const { spawn } = require('child_process'); spawn('npm', ['run', 'server'], { stdio: 'inherit', shell: true }); spawn('npm', ['run', 'client'], { stdio: 'inherit', shell: true });\""
+  },
+  "keywords": [
+    "celiac",
+    "gluten-free",
+    "tunisia",
+    "openfoodfacts",
+    "computer-vision",
+    "react",
+    "express"
+  ],
+  "author": "Celiac Square Team",
+  "license": "ISC"
+}

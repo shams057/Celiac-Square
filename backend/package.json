@@ -1,0 +1,21 @@
+{
+  "name": "celiac-square-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Celiac Square - Tunisian Celiac Support Platform",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "seed": "node src/seed/seedData.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.16.0",
+    "axios": "^1.7.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mongoose": "^8.5.1",
+    "multer": "^1.4.5-lts.1"
+  }
+}
