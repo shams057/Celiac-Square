@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import Navbar from './components/Navbar';
 import VisionScanner from './components/VisionScanner';
 import ProductSearch from './components/ProductSearch';
+import AtmcCatalog from './components/AtmcCatalog';
 import TunisiaMap from './components/TunisiaMap';
+import BackofficeSpots from './components/BackofficeSpots';
 import SpotModal from './components/SpotModal';
 import Footer from './components/Footer';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('vision'); // 'vision' | 'search' | 'map'
+  const [activeTab, setActiveTab] = useState('atmc'); // 'atmc' | 'vision' | 'search' | 'map'
   const [searchInitialQuery, setSearchInitialQuery] = useState('');
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [lang, setLang] = useState('fr');
@@ -31,6 +33,10 @@ export default function App() {
 
       {/* Main Content View */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {activeTab === 'atmc' && (
+          <AtmcCatalog lang={lang} />
+        )}
+
         {activeTab === 'vision' && (
           <VisionScanner onSwitchToSearch={handleSwitchToSearch} lang={lang} />
         )}
@@ -41,6 +47,10 @@ export default function App() {
 
         {activeTab === 'map' && (
           <TunisiaMap onOpenSubmitModal={() => setIsSubmitModalOpen(true)} lang={lang} />
+        )}
+
+        {activeTab === 'backoffice' && (
+          <BackofficeSpots lang={lang} />
         )}
       </main>
 

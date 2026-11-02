@@ -1,0 +1,1244 @@
+{
+  "source": {
+    "file": "Guide du Régime sans Gluten- ATMC 2023 2.pdf",
+    "title_fr": "Le guide du régime Sans Gluten",
+    "title_ar": "دليل الحمية الخالية من القلوتين",
+    "organization_fr": "Association Tunisienne de la Maladie Cœliaque",
+    "organization_ar": "الجمعية التونسية لمرضى الأبطن",
+    "edition_fr": "Décembre 2023",
+    "edition_ar": "ديسمبر 2023",
+    "collaboration": "Ce document est conçu en collaboration avec Mme Zeineb Ben Ameur - Nutritionniste - Service de Pédiatrie - La Rabta",
+    "page_count": 6,
+    "languages": [
+      "ar",
+      "fr"
+    ],
+    "extracted_on": "2026-11-02",
+    "transcription_note": "Transcription visuelle du PDF. Les noms de marques et les descriptions de produits sont reproduits tels qu'imprimés dans le guide."
+  },
+  "legend": {
+    "columns": [
+      {
+        "ar": "الصنف",
+        "fr": "Catégorie",
+        "meaning": "Catégorie d'aliment"
+      },
+      {
+        "ar": "المسموح",
+        "fr": "Autorisé",
+        "meaning": "Produits considérés comme autorisés dans le guide"
+      },
+      {
+        "ar": "للتحقّق",
+        "fr": "À vérifier",
+        "meaning": "Produits nécessitant une vérification"
+      },
+      {
+        "ar": "غير مسموح",
+        "fr": "Non autorisé",
+        "meaning": "Produits considérés comme non autorisés dans le guide"
+      }
+    ],
+    "symbols": [
+      {
+        "description": "Épi de blé barré",
+        "meaning": "Produit portant la mention « sans gluten »"
+      }
+    ]
+  },
+  "pages": [
+    {
+      "page": 1,
+      "type": "cover",
+      "content": {
+        "organization_ar": "الجمعية التونسية لمرضى الأبطن",
+        "organization_fr": "Association Tunisienne de la Maladie Cœliaque",
+        "title_ar": "دليل الحمية الخالية من القلوتين",
+        "title_fr": "Le guide du régime Sans Gluten",
+        "date_ar": "ديسمبر 2023",
+        "date_fr": "Décembre 2023",
+        "credit_fr": "Ce document est conçu en collaboration avec Mme Zeineb Ben Ameur - Nutritionniste - Service de Pédiatrie - La Rabta"
+      }
+    },
+    {
+      "page": 2,
+      "sections": [
+        {
+          "category_ar": "الحليب ومشتقاته",
+          "category_fr": "Lait et dérivés",
+          "groups": [
+            {
+              "group_ar": "الحليب",
+              "group_fr": "Lait",
+              "allowed": [
+                {
+                  "lang": "ar",
+                  "text": "الحليب"
+                },
+                {
+                  "lang": "ar",
+                  "text": "حليب الأم"
+                },
+                {
+                  "lang": "ar",
+                  "text": "حليب صبّة (بقري أو ماعز)"
+                },
+                {
+                  "lang": "ar",
+                  "text": "حليب معقّم طبيعي: باكوات دبابز"
+                },
+                {
+                  "lang": "ar",
+                  "text": "نصف دسم - دسم - غير دسم"
+                },
+                {
+                  "lang": "ar",
+                  "text": "لبن رايب"
+                },
+                {
+                  "lang": "ar",
+                  "text": "حليب مركّز بالسكّر - حليب مركّز من غير سكر"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Delisso (nature et arômatisé fraise - Chocolat)"
+                }
+              ],
+              "to_verify": [],
+              "not_allowed": [
+                {
+                  "lang": "ar",
+                  "text": "حليب معطّر"
+                },
+                {
+                  "lang": "ar",
+                  "text": "حليب بالعصير"
+                },
+                {
+                  "lang": "ar",
+                  "text": "لبن معطّر"
+                }
+              ]
+            },
+            {
+              "group_ar": "ياغورت",
+              "group_fr": "Yaourt",
+              "allowed": [
+                {
+                  "lang": "mixed",
+                  "text": "Délice Danone : طبيعي معطّر"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Activia : Activia 0% - Activia Bifidus - Activia aux fruits"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Délice : Dun'up à boire - Danao - Délimix - Twist - petit suisse (naturel et arômatisé) - Jockey nature - Délice creamy - Délice danone à boire - Délice Aux fruits - Délishake"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Vitalait : nature - arômatisé - Mamzouj aux fruits 0% - Dolce le liégeois"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Y'AB : nature - arômatisé - biparfumé - Brassé - Playa-TipTop"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Thelja : tip top brassé - fruit top - Tip top yaourt à boire"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Elben - Chambourcy - Yogo - Emmi : nature et aromatisé"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Sïl : Yaourt nature et aromatisé"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Natilait: Yaourt nature, aromatisé, Yaourt à boire fraise, vanille, Maxi"
+                }
+              ],
+              "to_verify": [],
+              "not_allowed": [
+                {
+                  "lang": "mixed",
+                  "text": "Délice : les Danettes - Brassés - Activia Datte Noix"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Vitalait : Bifi 0% nature et aromatisé - Bifi céréales agrumes 0% - Bifi aromatisé - Vitalio - Brassé - Vitupti à boire"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Dolce : Dolce crème chocolat - Dolce duo noisette - Dolce liégeois chocolat - Dolce crème caramel - Dolce crème de noisette"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Y'AB : liégeois - à boire 0% - mousse au chocolat et vanille - Flan vanille - caramel - Y'ab aux fruits à boire - Baklawa - Brownies - Elben - Chambourcy - Yogo - Emmi"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Natilait : Yaourt brassé"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Thelja : Plaisir Bouza"
+                }
+              ]
+            },
+            {
+              "group_ar": "الجبن",
+              "group_fr": "Fromage",
+              "allowed": [
+                {
+                  "lang": "mixed",
+                  "text": "Président : جبن مطبوخ مثلثات - جبن روندليت - جبن مربّع - Rondlet - les Cuistots maxi fromage fondue - fromage de chèvre - Pizza mozzarella - les slices (pizza mozzarella - croqué emmental - burger cheddar) - spécial tajine"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Fromy : portions triangulaires - barquette - slices - carrés - fromage rapé"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Land’or : carré gourmand / écrémé emmental / Saveur gruyère / emmental fondu / cheddar fondu pour tartine / ma portion / slice"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Délice : DELICE Goutta - Fromage triangle - Ricotte - Milkana p’tit nature - Milkana trésor de lait nature - trésor aux fines herbes - trésor aux poivres - kid’s - Milkana cœur de cuisine - Milkana gourmand - fromage râpé : Pesto - Fondant (préparation alimentaire) - la dosette / crème semi épaisse"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Kaiser : cheesecake - emmental gouda - emmental en cubes - fromages à tartiner"
+                }
+              ],
+              "to_verify": [
+                {
+                  "lang": "mixed",
+                  "text": "DAILY: Fromages à tartiner - Fromages râpés - Slices"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Delice : Fromage tartare - MILKANA DELICE fondu Carré - MILKANA DELICE fondu triangle - TARTI FRAIS DELICE - Fromage Fondu RÂPÉ SAVEUR GRUYÈRE DELICE"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Président : PRESIDENT Fromage fondu triangles - PRESIDENT Fromage fondu carré - PRESIDENT Fromage fondu à tartiner la fondue - PRESIDENT Crème à tartiner cheddar - PRESIDENT Fromage râpé spécial pâte - PRESIDENT Fromage râpé spécial tajine - PRESIDENT Fromage râpé à l'emmental - Fromage Fondu goûter - Fromage Fondu Maxi - Fromage Fondu Famili"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "MADAME LOÏK : PAYSAN BRETON fromages à tartiner - Fromages en portions"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "MERIAH : Fromage à tartiner - Fromages en portions - Fromage Campagne MERIAH - Edam - Affumicato - Gouda - Raclette - Ricotta - Fromage au basilic - Fromage sicilien Cuit - Fromage sans sel meriah - Ricotta MERIAH meriah - Fromage sicilien meriah - Fromage au persil meriah"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "PUCK : Fromage à tartiner"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "TOUS LES JOURS / Koll Youm : Fromage à tartiner"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "ENTREMONT : Fromages en portions"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "FOL EPI : Fromages en portions"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "HOLLANDIA : Fromages en portions"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "LA CAVE A FROMAGE : Fromages en portions"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "MAJESTE : Fromages en portions"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "MERCI CHEF : Fromages en portions"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "SALA CUBE : Fromages en portions"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "SOIGNON : Fromages en portions"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "VERDI PASCOLI : Fromages en portions"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "ZANETTI : Fromages en portions"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "CHEESY : Fromages râpés"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "KAISER : Fromage râpé - Fromage de cuisson - Slices"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "FROMY : Fromage à tartiner - Fromage de cuisson - Slices"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "FROMITO : Fromage Fondu goûter - Préparation alimentaire fondue."
+                }
+              ],
+              "not_allowed": [
+                {
+                  "lang": "mixed",
+                  "text": "Président : Kids, Fraidoux"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Fromy : Cheddar, Gruyère, Mozarella, Goutella aux fines herbes, nature"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Land’or : Désir light"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Délice : Italiano"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Kaiser : Ricotta"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Fromy - Land’or - President : Fromages rapés : préparation alimentaire"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "page": 3,
+      "sections": [
+        {
+          "category_ar": "السكريات و الحلويات",
+          "category_fr": "Sucres et pâtisseries",
+          "groups": [
+            {
+              "group_ar": "السكريات و الحلويات",
+              "group_fr": "Sucres et pâtisseries",
+              "allowed": [
+                {
+                  "lang": "ar",
+                  "text": "شيكوريا"
+                },
+                {
+                  "lang": "ar",
+                  "text": "فريك"
+                },
+                {
+                  "lang": "ar",
+                  "text": "كل الحلويات المصنوعة في المنزل بالنشاء أو فرينة الحبوب المسموحة أو بالفاكية"
+                },
+                {
+                  "lang": "ar",
+                  "text": "مربّبات عليها علامة خالي من القلوتين"
+                },
+                {
+                  "lang": "ar",
+                  "text": "كريمة مصنوعة في المنزل: بوزة - بلوزة رقوقو"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "بسكويت: santiveri - Lorio (Lorizo) - Schar - Gluzen - Felder - Glutella - Gullon Sin Gluten"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "شوكولاطة: M&M’s - Bounty - Toblerone - Kinder chocolat - Kross - Chocolat Nestlé crunch - TORRAS - Chocolat de couverture Vanoise"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "شوكولاطة غبرة: Nesquik - Chocoline (Said) - Chocolat en poudre (Said) - Dokrem"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "شوكولاطة للطلي: Said - Pralinutta - Vanoise - Nouty"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "كرام شانتي: Dokrem"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "خميرة: La pâtissière - Dokrem - Ibn Hayen"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "مثلجات: Glace Selja : Picsou fraise, Chocolat - glace à l’eau fraise Picsou pistache - Tabletto - Sanafer - Magtof - Charlot - Glowen"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Glace en boite : chocolat vanille - Boule d’or - Ola : extase"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "حلوى شامية: تريك (الناعورة) - شهزاد - papillop"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "حلوى و مقصّصة: Le petit moulin : Funny تريك - Florida : la gazelle : Halwa chemia - Bonbon pipo - Bonbon délice Chewingum speed SOTU-CHOC : Bonbon Falfoul Papillon : ellino / ptitpops / happy full"
+                }
+              ],
+              "to_verify": [
+                {
+                  "lang": "mixed",
+                  "text": "شكلاطة: Maestro - Said"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "خميرة: La pâtissière levure Pizza"
+                }
+              ],
+              "not_allowed": [
+                {
+                  "lang": "ar",
+                  "text": "سكّر محمّر"
+                },
+                {
+                  "lang": "ar",
+                  "text": "بسكويت"
+                },
+                {
+                  "lang": "ar",
+                  "text": "قطّو"
+                },
+                {
+                  "lang": "ar",
+                  "text": "بشكوطو مصنوع بالفرينة"
+                },
+                {
+                  "lang": "ar",
+                  "text": "حلّو عربي مشرّي: بقلاوة - كعابر ...."
+                },
+                {
+                  "lang": "ar",
+                  "text": "كريمة باكوات باستثناء المسموحات"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Vanoise : crème chantilly - Flan chocolat* - Préparation pour glace, sauce topping (caramel et fraise) - Crème dessert smart chef"
+                },
+                {
+                  "lang": "ar",
+                  "text": "حلوى"
+                },
+                {
+                  "lang": "ar",
+                  "text": "نوفا"
+                },
+                {
+                  "lang": "ar",
+                  "text": "فلفول"
+                },
+                {
+                  "lang": "ar",
+                  "text": "حلقوم"
+                },
+                {
+                  "lang": "ar",
+                  "text": "علكة"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "رقائق فطور الصباح: Grain d’or - Geop’s : cornflakes - Boom’s rice - Flochoco - Granipop’s Popper’s : miel-chocolat - Emco : crunchy"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "شكلاطة: Said aux céréales - Tris croquant - Millenium au lait - Mars - Kit-Kat - Kinder - Boueno - crunch - tris Maestro* (sauf les permis) Club* galaxy* Nouty* choco Kross au croquant"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "مثلجات: النسيم Glace Selja: Gold - Twister Amigo"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "category_ar": "الغلال و الفواكه الجافة",
+          "category_fr": "Fruits et fruits secs",
+          "groups": [
+            {
+              "group_ar": "الغلال و الفواكه الجافة",
+              "group_fr": "Fruits et fruits secs",
+              "allowed": [
+                {
+                  "lang": "ar",
+                  "text": "كل أنواع الغلال الطازجة و المجمّدة"
+                },
+                {
+                  "lang": "ar",
+                  "text": "عصير غلال مصنوع بالمنزل"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "عصير غلال: Tropicana - Délice - Oasis"
+                },
+                {
+                  "lang": "ar",
+                  "text": "معجون غلال مصنوع بالمنزل"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "معجون غلال: Sicam - Sticap - Cap d’or"
+                },
+                {
+                  "lang": "ar",
+                  "text": "جميع المكسّرات: كاكوية - لوز ..."
+                },
+                {
+                  "lang": "ar",
+                  "text": "جميع الفواكه الجافة: زبيب - تمر -"
+                },
+                {
+                  "lang": "ar",
+                  "text": "عوينة شايحة - كرموش شايح"
+                }
+              ],
+              "to_verify": [],
+              "not_allowed": [
+                {
+                  "lang": "ar",
+                  "text": "معجون غلال معلّب"
+                },
+                {
+                  "lang": "ar",
+                  "text": "عصير غلال معلّب"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Délice confort repas (pomme verte)"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Oh Délice : Jus Oh poire - P’tit délice"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Stil: Jus Stil - Bnino Froutou"
+                },
+                {
+                  "lang": "ar",
+                  "text": "مسحوق عصير غلال"
+                },
+                {
+                  "lang": "ar",
+                  "text": "مكسّرات مرحّبة و معلّبة"
+                },
+                {
+                  "lang": "ar",
+                  "text": "قنفيد، كاكوية أو لوز ملفوف في الحلوى الحمراء"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "page": 4,
+      "sections": [
+        {
+          "category_ar": "الخضر و الخضر الجافة",
+          "category_fr": "Légumes et légumes secs",
+          "groups": [
+            {
+              "group_ar": "الخضر و الخضر الجافة",
+              "group_fr": "Légumes et légumes secs",
+              "allowed": [
+                {
+                  "lang": "ar",
+                  "text": "كل أنواع الخضر الطازجة و المجمّدة"
+                },
+                {
+                  "lang": "ar",
+                  "text": "كل أنواع الخضر الجافة: حمص - فول - عدس"
+                },
+                {
+                  "lang": "ar",
+                  "text": "شريحة طماطم - فلفل شايح - هريسة عربي - كتّار"
+                },
+                {
+                  "lang": "ar",
+                  "text": "بطاطة مقلية بالمنزل"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "مصبّرات (هريسة، طماطم، خضر): ناظور - Cap d’or - Sicam - Tucal - زينة - جودة - Zgholli - Zina - الوطن القبلي - Sticap - Brima"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "سلاطة مشوية: Cap d’or"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Chips: Golden - Joy’s - Franky"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Ketchup: Chovi1 - Remia"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "sauce pizza: Sicam"
+                }
+              ],
+              "to_verify": [],
+              "not_allowed": [
+                {
+                  "lang": "ar",
+                  "text": "خضر مصبّرة و معلّبة"
+                },
+                {
+                  "lang": "ar",
+                  "text": "خضر جافة مصبّرة و معلّبة"
+                },
+                {
+                  "lang": "ar",
+                  "text": "خضر جاهزة مرحّبة في الباكوات"
+                },
+                {
+                  "lang": "ar",
+                  "text": "سلاطة مشوية: مصبّرات"
+                },
+                {
+                  "lang": "ar",
+                  "text": "بطاطة مقلية في ساشي"
+                },
+                {
+                  "lang": "ar",
+                  "text": "أكياس شربة - أكياس برودو"
+                },
+                {
+                  "lang": "ar",
+                  "text": "مكعّبات حساء -"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Chips: Oops - Max pomme de terre"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "category_ar": "المشروبات",
+          "category_fr": "Boissons",
+          "groups": [
+            {
+              "group_ar": "المشروبات",
+              "group_fr": "Boissons",
+              "allowed": [
+                {
+                  "lang": "ar",
+                  "text": "ماء سائغ"
+                },
+                {
+                  "lang": "ar",
+                  "text": "ماء معدني"
+                },
+                {
+                  "lang": "ar",
+                  "text": "المشروبات الغازية: بوقا - كوكا - فانتا ليمون - أبل - أورجينا"
+                },
+                {
+                  "lang": "ar",
+                  "text": "ماء الورد"
+                },
+                {
+                  "lang": "ar",
+                  "text": "العطرشية"
+                },
+                {
+                  "lang": "ar",
+                  "text": "الزهر"
+                },
+                {
+                  "lang": "ar",
+                  "text": "التيري"
+                },
+                {
+                  "lang": "ar",
+                  "text": "قهوة صافية"
+                },
+                {
+                  "lang": "ar",
+                  "text": "شاي"
+                },
+                {
+                  "lang": "ar",
+                  "text": "شاي معطّر"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Délice : Délio eau gazéifiée"
+                }
+              ],
+              "to_verify": [],
+              "not_allowed": [
+                {
+                  "lang": "ar",
+                  "text": "سيرو التّعناع و الرّمان"
+                },
+                {
+                  "lang": "ar",
+                  "text": "المشروبات الغازية"
+                },
+                {
+                  "lang": "ar",
+                  "text": "فانتا برتقال و شوابس"
+                },
+                {
+                  "lang": "ar",
+                  "text": "قهوة مرحّبة مخلّطة بالشعير"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "category_ar": "مواد أخرى",
+          "category_fr": "Autres produits",
+          "groups": [
+            {
+              "group_ar": "مواد أخرى",
+              "group_fr": "Autres produits",
+              "allowed": [
+                {
+                  "lang": "mixed",
+                  "text": "خميرة خبز La pâtissière"
+                },
+                {
+                  "lang": "ar",
+                  "text": "خميرة قاطو باستثناء الممنوعات"
+                },
+                {
+                  "lang": "ar",
+                  "text": "خميرة قاطو"
+                },
+                {
+                  "lang": "ar",
+                  "text": "زعتر"
+                },
+                {
+                  "lang": "ar",
+                  "text": "كليل"
+                },
+                {
+                  "lang": "ar",
+                  "text": "فلفل أسود"
+                },
+                {
+                  "lang": "ar",
+                  "text": "شوش ورد"
+                },
+                {
+                  "lang": "ar",
+                  "text": "سكنجبير"
+                },
+                {
+                  "lang": "ar",
+                  "text": "قرفة"
+                },
+                {
+                  "lang": "ar",
+                  "text": "أفاح خبز"
+                },
+                {
+                  "lang": "ar",
+                  "text": "زعفران"
+                },
+                {
+                  "lang": "ar",
+                  "text": "ثوم"
+                },
+                {
+                  "lang": "ar",
+                  "text": "ملوخية مرحّبة في مكينة خاصة بها"
+                },
+                {
+                  "lang": "ar",
+                  "text": "توابل مرحّبة في المنزل"
+                },
+                {
+                  "lang": "ar",
+                  "text": "خل"
+                }
+              ],
+              "to_verify": [],
+              "not_allowed": [
+                {
+                  "lang": "mixed",
+                  "text": "Vanoise - Smart chef : سكر فانيلا"
+                },
+                {
+                  "lang": "ar",
+                  "text": "خميرة قاطو"
+                },
+                {
+                  "lang": "ar",
+                  "text": "خميرة خبز"
+                },
+                {
+                  "lang": "ar",
+                  "text": "توابل مرحّبة في ساشيات"
+                },
+                {
+                  "lang": "ar",
+                  "text": "كركم مرحّب"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "page": 5,
+      "sections": [
+        {
+          "category_ar": "الخضر و الطماطم المعلّبة",
+          "category_fr": "Légumes et tomates en conserve",
+          "groups": [
+            {
+              "group_ar": "الخضر و الطماطم المعلّبة",
+              "group_fr": "Légumes et tomates en conserve",
+              "allowed": [
+                {
+                  "lang": "mixed",
+                  "text": "طماطم معجونة: SICAM - STICAP - CAP D'OR - JOUDA - SICAM - STICAP"
+                },
+                {
+                  "lang": "ar",
+                  "text": "طماطم مدّهوسة"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "طماطم مقشّرة: JOuda - SICAM - STICAP"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "صلصة طماطم: CARTHAGE - SICAM - STICAP"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "طماطم مجففة: STICAP"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "ذرة: BONDUELLE - SICAM"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "فطر: BONDUELLE - SICAM"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "سلاطة مشوية: CAP D'OR - STICAP"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "جلبانة: BONDUELLE - SICAM"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "جلبانة و جزر: BONDUELLE - SICAM"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "لوبيا: BONDUELLE"
+                }
+              ],
+              "to_verify": [
+                {
+                  "lang": "mixed",
+                  "text": "طماطم معجونة: BNINA - CAP BON - CARTHAGE - LE PEROQUET TUCAL - NEBLIA - PETIT PARIS - RAFIAA - TOUS LES JOURS"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "طماطم مدّهوسة: CARTHAGE - SAFIR"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "صلصة طماطم: BARILLA - JOUDA - PETIT PARIS - SAFIR - TYPIK"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "ذرة: BEESKY - EMPORIUM - JARDIN D'EMMA - MAAM - MAMI GARDEN"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "فطر: AYECUE - EMPORIUM - LE PALAIS VERT - MAAM - MAMI GARDEN"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "سلاطة مشوية: ABIDA - EL KHABIA - KEN YA MA KEN - MOKA - SAFIR"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "عدس و حمّص: DAUCY - REFLET - SAFIR - SAVEURS - TYPIK"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "خضر متنوعة: DAUCY - MAAM - MAMI GARDEN - SAVEURS"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "جلبانة: BEESKY - BNINA - D'AUCHY - JARDIN D'EMMA - LE PALAIS VERT - LE ROITELET - O JARDIN - REINE DES GRAINES - SAVEURS - DAUCY"
+                },
+                {
+                  "lang": "ar",
+                  "text": "جلبانة و جزر"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "لوبيا: CANTINA MEXICANA - D'AUCHY - JARDINS D'EMMA - MAAM - MAMI GARDEN - REINE DES GRAINES - SAVEURS"
+                }
+              ],
+              "not_allowed": []
+            }
+          ]
+        },
+        {
+          "category_ar": "الدهنيات",
+          "category_fr": "Matières grasses",
+          "groups": [
+            {
+              "group_ar": "الدهنيات",
+              "group_fr": "Matières grasses",
+              "allowed": [
+                {
+                  "lang": "mixed",
+                  "text": "كل أنواع الزّيوت: قطانيّا - مخلّط - زيتون - حاكم"
+                },
+                {
+                  "lang": "ar",
+                  "text": "زبدة - كريمة طازجة"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "مرغرين: Goldina - Sol"
+                },
+                {
+                  "lang": "ar",
+                  "text": "زيتون مملّح في المنزل"
+                },
+                {
+                  "lang": "ar",
+                  "text": "ترشي"
+                },
+                {
+                  "lang": "ar",
+                  "text": "سمن مصنوع بالمنزل"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "خردل: Dijon - Chovi - Cap d’or (Moutarde)"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "مايوناز مخفّفة: Heinz bleu"
+                }
+              ],
+              "to_verify": [
+                {
+                  "lang": "mixed",
+                  "text": "مرغرين: Jadida (Moutarde) خردل - Dijona - Dorella"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "مايوناز مخفّفة: Bonna - Dorella"
+                }
+              ],
+              "not_allowed": [
+                {
+                  "lang": "ar",
+                  "text": "خردل"
+                },
+                {
+                  "lang": "ar",
+                  "text": "مايوناز"
+                },
+                {
+                  "lang": "fr",
+                  "text": "Remia Light - Delicio - Ducros - Jadida"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Lesieur : مايوناز بالبيض"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "*Vinaigrette: زيتون مملّح في ساشيات"
+                },
+                {
+                  "lang": "ar",
+                  "text": "صلصة سلاطة في الدّبابز"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Jadida : مرغرين"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "page": 6,
+      "sections": [
+        {
+          "category_ar": "الحبوب و مشتقاتها",
+          "category_fr": "Céréales et dérivés",
+          "groups": [
+            {
+              "group_ar": "الحبوب و مشتقاتها",
+              "group_fr": "Céréales et dérivés",
+              "allowed": [
+                {
+                  "lang": "mixed",
+                  "text": "أرز: Riz étuvé ADDIWEN - Riz basmati - Riz blanc"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "مقرونة: Spiga - IBN Hayan - Felder - DIVELLA - Schär - Ecoposta - Gluzen - Lorizo"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "فارينة: IBN Hayan - Felder - Ecoposta - Glutella - Gluzen - Schär - Lorizo"
+                },
+                {
+                  "lang": "ar",
+                  "text": "قطاني و فرينة هذه الحبوب"
+                },
+                {
+                  "lang": "ar",
+                  "text": "درع"
+                },
+                {
+                  "lang": "ar",
+                  "text": "جلجلان"
+                },
+                {
+                  "lang": "ar",
+                  "text": "رقوقو"
+                },
+                {
+                  "lang": "ar",
+                  "text": "نشاء ذرة معلّب"
+                },
+                {
+                  "lang": "ar",
+                  "text": "مواد غذائية مصنّعة عليها علامة خالي من القلوتين (فرينة - كسكسي - مقرونة - دشيش ...)"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "المكوّنات الآتية: نشاء، نشاء متغيّر دكسترين، زلاليات نباتية ممكّنة، مالت و مستخلص المالت مستخرجة من الحبوب المسموحة E***، ملوي - خبز - بيتزا بيسة مصنوعة بفارينة مسموحة Sinlac"
+                }
+              ],
+              "to_verify": [],
+              "not_allowed": [
+                {
+                  "lang": "ar",
+                  "text": "قمح، شعير، خرطال و فرينة و نشاء هذه الحبوب"
+                },
+                {
+                  "lang": "ar",
+                  "text": "نشاء صيّبة"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Vanoise et Smart chef : نشاء ذرة معلّب"
+                },
+                {
+                  "lang": "ar",
+                  "text": "بسيّسة قمح - شعير - زميطة"
+                },
+                {
+                  "lang": "ar",
+                  "text": "عصيدة بيضة بالقديد أو السكّر"
+                },
+                {
+                  "lang": "ar",
+                  "text": "خبز مطبّقة - ملاوي - فطائر - بيلبوني"
+                },
+                {
+                  "lang": "ar",
+                  "text": "بيتزا-كراب - مسلوقة ملتوّت - برغل - شربة"
+                },
+                {
+                  "lang": "ar",
+                  "text": "كل المواد الغذائية التي تحتوي على المكوّنات الآتية: فرينة نشاء دكسترين - نشاء متغيّر - زلاليات نباتية ممكّنة - مالت و مستخلص المالت مستخرجة من الحبوب الممنوعة E**** - درع - جلجلان رقوقو مرحّبة في الباكوات"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "Céréal : سريلاك"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "category_ar": "اللحوم",
+          "category_fr": "Viandes",
+          "groups": [
+            {
+              "group_ar": "اللحوم",
+              "group_fr": "Viandes",
+              "allowed": [
+                {
+                  "lang": "ar",
+                  "text": "لحم بقري"
+                },
+                {
+                  "lang": "ar",
+                  "text": "علوش"
+                },
+                {
+                  "lang": "ar",
+                  "text": "برشني"
+                },
+                {
+                  "lang": "ar",
+                  "text": "كبدة"
+                },
+                {
+                  "lang": "ar",
+                  "text": "رأس"
+                },
+                {
+                  "lang": "ar",
+                  "text": "كوارع"
+                },
+                {
+                  "lang": "ar",
+                  "text": "كرشة"
+                },
+                {
+                  "lang": "ar",
+                  "text": "دجاج"
+                },
+                {
+                  "lang": "ar",
+                  "text": "إسكالوب"
+                },
+                {
+                  "lang": "ar",
+                  "text": "بيض"
+                },
+                {
+                  "lang": "ar",
+                  "text": "سمك"
+                },
+                {
+                  "lang": "ar",
+                  "text": "غلال البحر"
+                },
+                {
+                  "lang": "ar",
+                  "text": "قديد"
+                },
+                {
+                  "lang": "ar",
+                  "text": "مرقاز مصنوع في المنزل"
+                },
+                {
+                  "lang": "ar",
+                  "text": "عصبان بالرّوز"
+                },
+                {
+                  "lang": "ar",
+                  "text": "سمك مشيح..."
+                },
+                {
+                  "lang": "ar",
+                  "text": "شرمولة"
+                },
+                {
+                  "lang": "ar",
+                  "text": "سلامون"
+                },
+                {
+                  "lang": "ar",
+                  "text": "أنشوة قريط شايح"
+                },
+                {
+                  "lang": "ar",
+                  "text": "سمك أو لحم ملفوف في فرينة مسموحة"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "تن معلّب: سيدي داود - المنار - Cap d’or"
+                },
+                {
+                  "lang": "mixed",
+                  "text": "مرقاز Fumé LMAZRAA"
+                }
+              ],
+              "to_verify": [],
+              "not_allowed": [
+                {
+                  "lang": "ar",
+                  "text": "جميع أنواع السلامي و الجنون"
+                },
+                {
+                  "lang": "ar",
+                  "text": "عصبان بالبرغل"
+                },
+                {
+                  "lang": "ar",
+                  "text": "مرقاز محنّج"
+                },
+                {
+                  "lang": "ar",
+                  "text": "شرائح لحم مفروم معلّب"
+                },
+                {
+                  "lang": "ar",
+                  "text": "بنادق معلّبة"
+                },
+                {
+                  "lang": "ar",
+                  "text": "سمك أو لحم ملفوف في فارينة ممنوعة"
+                },
+                {
+                  "lang": "ar",
+                  "text": "سمك و تن معلّب: Thon El Badr"
+                },
+                {
+                  "lang": "fr",
+                  "text": "Saucisson à l’ail «Mliha»"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

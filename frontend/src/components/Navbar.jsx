@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, MapPin, Search, Camera, PlusCircle, Globe, Heart } from 'lucide-react';
+import { ShieldCheck, MapPin, Search, Camera, PlusCircle, Globe, Heart, BookOpen, SlidersHorizontal } from 'lucide-react';
 
 export default function Navbar({ activeTab, setActiveTab, onOpenSubmitModal, lang, setLang }) {
   return (
@@ -18,9 +18,6 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSubmitModal, lan
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-extrabold tracking-tight text-secondary-dark">
                   Celiac<span className="text-accent">Square</span>
-                </span>
-                <span className="text-[10px] font-bold uppercase tracking-wider bg-primary/15 text-primary-dark px-2 py-0.5 rounded-full border border-primary/20">
-                  Tunisie 🇹🇳
                 </span>
               </div>
               <p className="text-xs text-secondary/80 font-medium">
@@ -47,10 +44,25 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSubmitModal, lan
             </button>
 
             <button
+              onClick={() => setActiveTab('atmc')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ${
+                activeTab === 'atmc'
+                  ? 'bg-primary text-white shadow-md shadow-primary/25 scale-[1.02]'
+                  : 'text-secondary-dark hover:bg-white/80'
+              }`}
+            >
+              <BookOpen className="w-4 h-4" />
+              <span>{lang === 'fr' ? 'Guide ATMC 2023' : 'دليل الجمعية'}</span>
+              <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${activeTab === 'atmc' ? 'bg-white/30 text-white' : 'bg-primary/20 text-primary-dark'}`}>
+                Officiel
+              </span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('search')}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ${
                 activeTab === 'search'
-                  ? 'bg-primary text-white shadow-md shadow-primary/25 scale-[1.02]'
+                  ? 'bg-[#4A5D4E] text-white shadow-md shadow-[#4A5D4E]/25 scale-[1.02]'
                   : 'text-secondary-dark hover:bg-white/80'
               }`}
             >
@@ -68,6 +80,22 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSubmitModal, lan
             >
               <MapPin className="w-4 h-4" />
               <span>{lang === 'fr' ? 'Carte de Tunisie' : 'خريطة تونس'}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('backoffice')}
+              className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ${
+                activeTab === 'backoffice'
+                  ? 'bg-secondary-dark text-white shadow-md scale-[1.02]'
+                  : 'text-secondary-dark hover:bg-white/80'
+              }`}
+              title="Gérer les adresses et points de la base de données"
+            >
+              <SlidersHorizontal className="w-4 h-4 text-accent" />
+              <span>{lang === 'fr' ? 'Backoffice' : 'لوحة التحكم'}</span>
+              <span className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded-full ${activeTab === 'backoffice' ? 'bg-accent text-white' : 'bg-accent/15 text-accent-dark'}`}>
+                DB
+              </span>
             </button>
           </nav>
 
@@ -100,7 +128,7 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSubmitModal, lan
         <div className="flex md:hidden items-center justify-around py-2.5 border-t border-canvas-border/40 text-xs">
           <button
             onClick={() => setActiveTab('vision')}
-            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg font-semibold ${
+            className={`flex flex-col items-center gap-1 py-1 px-2 rounded-lg font-semibold ${
               activeTab === 'vision' ? 'text-accent font-bold' : 'text-secondary'
             }`}
           >
@@ -108,9 +136,18 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSubmitModal, lan
             <span>Vision IA</span>
           </button>
           <button
+            onClick={() => setActiveTab('atmc')}
+            className={`flex flex-col items-center gap-1 py-1 px-2 rounded-lg font-semibold ${
+              activeTab === 'atmc' ? 'text-primary font-bold' : 'text-secondary'
+            }`}
+          >
+            <BookOpen className="w-5 h-5" />
+            <span>Guide ATMC</span>
+          </button>
+          <button
             onClick={() => setActiveTab('search')}
-            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg font-semibold ${
-              activeTab === 'search' ? 'text-primary font-bold' : 'text-secondary'
+            className={`flex flex-col items-center gap-1 py-1 px-2 rounded-lg font-semibold ${
+              activeTab === 'search' ? 'text-primary-dark font-bold' : 'text-secondary'
             }`}
           >
             <Search className="w-5 h-5" />
@@ -118,12 +155,21 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSubmitModal, lan
           </button>
           <button
             onClick={() => setActiveTab('map')}
-            className={`flex flex-col items-center gap-1 py-1 px-3 rounded-lg font-semibold ${
+            className={`flex flex-col items-center gap-1 py-1 px-2 rounded-lg font-semibold ${
               activeTab === 'map' ? 'text-secondary-dark font-bold' : 'text-secondary'
             }`}
           >
             <MapPin className="w-5 h-5" />
             <span>Carte</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('backoffice')}
+            className={`flex flex-col items-center gap-1 py-1 px-2 rounded-lg font-semibold ${
+              activeTab === 'backoffice' ? 'text-accent-dark font-bold' : 'text-secondary'
+            }`}
+          >
+            <SlidersHorizontal className="w-5 h-5" />
+            <span>Admin</span>
           </button>
         </div>
       </div>

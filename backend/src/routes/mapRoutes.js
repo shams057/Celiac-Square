@@ -3,9 +3,6 @@ import { Spot } from '../models/Spot.js';
 
 const router = express.Router();
 
-// Fallback in-memory spots if DB is not populated
-let localSpotsMemory = [];
-
 /**
  * GET /api/map/spots
  * Filters: category, city, isVerified, q (search query)
@@ -23,7 +20,7 @@ router.get('/spots', async (req, res) => {
       filter.city = new RegExp(`^${city}$`, 'i');
     }
 
-    if (isVerified !== undefined && isVerified !== '') {
+    if (isVerified !== undefined && isVerified !== '' && isVerified !== 'ALL') {
       filter.isVerified = isVerified === 'true';
     }
 
@@ -70,11 +67,25 @@ router.get('/spots/:id', async (req, res) => {
 
 /**
  * POST /api/map/spots
- * User submission modal for new gluten-free spots in Tunisia (subject to admin verification)
+ * Create a new gluten-free spot directly in the database
  */
 router.post('/spots', async (req, res) => {
   try {
-    const { name, category, coordinates, city, address, phone, speciality, hours, notes } = req.body;
+    const {
+      name,
+      category,
+      coordinates,
+      city,
+      address,
+      phone,
+      speciality,
+      hours,
+      rating,
+      reviewCount,
+      isVerified,
+      notes,
+      submittedBy,
+    } = req.body;
 
     if (!name || !category || !coordinates || !city || !address) {
       return res.status(400).json({
@@ -95,24 +106,135 @@ router.post('/spots', async (req, res) => {
       phone: phone ? phone.trim() : '',
       speciality: speciality ? speciality.trim() : '',
       hours: hours ? hours.trim() : '',
+      rating: rating !== undefined ? Number(rating) : 4.8,
+      reviewCount: reviewCount !== undefined ? Number(reviewCount) : 1,
+      isVerified: isVerified !== undefined ? Boolean(isVerified) : true, // Default to verified when created via admin/backoffice
       notes: notes ? notes.trim() : '',
-      isVerified: false, // Subject to admin verification
-      submittedBy: req.body.submittedBy || 'Visiteur du site',
+      submittedBy: submittedBy || 'Backoffice Admin',
     });
 
     const savedSpot = await newSpot.save();
     return res.status(201).json({
       success: true,
-      message: 'Votre proposition a été enregistrée avec succès et sera vérifiée par notre équipe.',
+      message: 'Lieu enregistré avec succès dans la base de données.',
       data: savedSpot,
     });
   } catch (error) {
-    console.error(`[Map Routes] Spot submission error: ${error.message}`);
+    console.error(`[Map Routes] Spot creation error: ${error.message}`);
     return res.status(500).json({
       success: false,
-      message: "Erreur lors de l'enregistrement de l'adresse.",
+      message: "Erreur lors de l'enregistrement de l'adresse dans la base de données.",
       error: error.message,
     });
+  }
+});
+
+/**
+ * PUT /api/map/spots/:id
+ * Full modification of any spot details directly in MongoDB
+ */
+router.put('/spots/:id', async (req, res) => {
+  try {
+    const {
+      name,
+      category,
+      coordinates,
+      city,
+      address,
+      phone,
+      speciality,
+      hours,
+      rating,
+      reviewCount,
+      isVerified,
+      notes,
+      submittedBy,
+    } = req.body;
+
+    const spot = await Spot.findById(req.params.id);
+    if (!spot) {
+      return res.status(404).json({ success: false, message: 'Lieu introuvable dans la base de données.' });
+    }
+
+    if (name !== undefined) spot.name = name.trim();
+    if (category !== undefined) spot.category = category.toUpperCase();
+    if (coordinates !== undefined && Array.isArray(coordinates) && coordinates.length === 2) {
+      spot.location = {
+        type: 'Point',
+        coordinates: [Number(coordinates[0]), Number(coordinates[1])],
+      };
+    }
+    if (city !== undefined) spot.city = city.trim();
+    if (address !== undefined) spot.address = address.trim();
+    if (phone !== undefined) spot.phone = phone.trim();
+    if (speciality !== undefined) spot.speciality = speciality.trim();
+    if (hours !== undefined) spot.hours = hours.trim();
+    if (rating !== undefined) spot.rating = Number(rating);
+    if (reviewCount !== undefined) spot.reviewCount = Number(reviewCount);
+    if (isVerified !== undefined) spot.isVerified = Boolean(isVerified);
+    if (notes !== undefined) spot.notes = notes.trim();
+    if (submittedBy !== undefined) spot.submittedBy = submittedBy.trim();
+
+    const updated = await spot.save();
+    return res.json({
+      success: true,
+      message: 'Lieu mis à jour avec succès dans MongoDB.',
+      data: updated,
+    });
+  } catch (error) {
+    console.error(`[Map Routes] Update error: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la modification du lieu.',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/map/spots/:id
+ * Permanently delete a spot from MongoDB
+ */
+router.delete('/spots/:id', async (req, res) => {
+  try {
+    const deleted = await Spot.findByIdAndDelete(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: 'Lieu introuvable.' });
+    }
+    return res.json({
+      success: true,
+      message: 'Lieu supprimé définitivement de la base de données MongoDB.',
+      data: deleted,
+    });
+  } catch (error) {
+    console.error(`[Map Routes] Delete error: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: 'Erreur lors de la suppression du lieu.',
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * PATCH /api/map/spots/:id/verify
+ * Quick toggle verification status
+ */
+router.patch('/spots/:id/verify', async (req, res) => {
+  try {
+    const spot = await Spot.findById(req.params.id);
+    if (!spot) {
+      return res.status(404).json({ success: false, message: 'Lieu introuvable.' });
+    }
+    spot.isVerified = req.body.isVerified !== undefined ? Boolean(req.body.isVerified) : !spot.isVerified;
+    const updated = await spot.save();
+    return res.json({
+      success: true,
+      message: `Statut vérifié mis à jour (${updated.isVerified ? 'Vérifié' : 'En attente'}).`,
+      data: updated,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
   }
 });
 
@@ -123,11 +245,14 @@ router.post('/spots', async (req, res) => {
 router.get('/cities', async (req, res) => {
   try {
     const cities = await Spot.distinct('city');
-    return res.json({ success: true, data: cities.sort() });
+    const validCities = cities.filter((c) => c && c.trim().length > 0).sort();
+    return res.json({ success: true, data: validCities });
   } catch (error) {
-    return res.json({
-      success: true,
-      data: ['Tunis', 'Ariana', 'La Marsa', 'Sousse', 'Sfax', 'Bizerte', 'Nabeul', 'Monastir', 'Djerba'],
+    console.error(`[Map Routes] Error fetching cities: ${error.message}`);
+    return res.status(500).json({
+      success: false,
+      message: 'Erreur lors du chargement des villes.',
+      error: error.message,
     });
   }
 });

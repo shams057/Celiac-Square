@@ -1,0 +1,355 @@
+{
+  "document_title": "Guide du Régime Sans Gluten",
+  "organization": "Association Tunisienne de la Maladie Cœliaque (ATMC)",
+  "publication_date": "Décembre 2023",
+  "collaborators": [
+    {
+      "name": "Mme Zeineb Ben Ameur",
+      "role": "Nutritionniste",
+      "department": "Service de Pédiatrie",
+      "institution": "La Rabta"
+    }
+  ],
+  "categories": [
+    {
+      "category_ar": "الحليب و مشتقاته",
+      "category_fr": "Lait et produits laitiers",
+      "allowed": [
+        "حليب صبة (بقري أو ماعز)",
+        "حليب معقم طبيعي: باكوات دبابز نصف دسم - دسم غير دسم",
+        "لبن رايب",
+        "حليب مركز بالسكر - حليب مركز من غير سكر",
+        "Delisso (nature et arômatisé fraise - Chocolat)",
+        "Délice Danone: طبيعي معطر",
+        "Activia: Activia 0% - Activia Bifidus - Activia aux fruits",
+        "Délice: Dan'up à boire - Danao - Délimix - Twist - petit suisse (naturel et aromatisé) - Jockey nature - Délice creamy - Délice danone à boire - Délice Aux fruits - Délishake",
+        "Vitalait: nature - Mamzouj aux fruits 0%",
+        "Dolce: le liégois - aromatisé",
+        "Yogo",
+        "Y'AB: nature - arômatisé - biparfumé - Brassé - Playa - TipTop",
+        "Thelja: tip top brassé fruit top - Tip top yaourt à boire",
+        "Elben Chambourcy",
+        "Emmi: nature et aromatisé",
+        "Stil: Yaourt nature et aromatisé",
+        "Natilait: Yaourt nature, aromatisé, Yaourt à boire fraise, vanille, Maxi",
+        "الجبن: Président (جبن مطبوخ مثلثات, جبن مربع, جبن مرحى, Rondelet, les Cuistots maxi fromage fondue, fromage de chèvre, Pizza mozzarella, les slices: pizza mozzarella / croqué emmental / burger chedar, spécial tajine)",
+        "Fromy: portions triangulaires, barquette slices carrés, fromage rapé",
+        "Land'or: carré gourmand / écrémé emmental / Saveur gruyère / emmental fondu / cheddar fondu pour tartine / ma portion / slice",
+        "Délice: DELICE Goutta, Fromage triangle, Ricotte Milkana, p'tit nature, Milkana trésor de lait nature, trésor aux fines herbes, trésor aux poivres, kid's Milkana, cœur de cuisine Milkana, gourmand fromage râpé (Pesto - Fondant: préparation alimentaire), la dosette / crème semi épaisse",
+        "Kaiser: cheescake, emmental, gouda, emmental en cubes, fromages à tartiner"
+      ],
+      "to_check": [
+        "DAILY: Fromages à tartiner, Fromages râpés, Slices",
+        "Délice: Fromage tartare, MILKANA DELICE fondu Carré, MILKANA DELICE fondu triangle, TARTI FRAIS DELICE, Fromage Fondu RAPÉ SAVEUR GRUYÈRE DELICE",
+        "Président: PRESIDENT Fromage fondu triangles, PRESIDENT Fromage fondu carré, PRESIDENT Fromage fondu à tartiner la fondue, PRESIDENT Crème à tartiner cheddar, PRESIDENT Fromage râpé spécial pâte, PRESIDENT Fromage râpé spécial tajine, PRESIDENT Fromage râpé à l'emmental, Fromage Fondu goûter, Fromage Fondu Maxi, Fromage Fondu Famili",
+        "MADAME LOÏK PAYSAN BRETON: fromages à tartiner, Fromages en portions",
+        "MERIAH: Fromage à tartiner, Fromages en portions, Fromage Campagne MERIAH, Edam, Affumicato Gouda Raclette, Ricotta Fromage au basilic, Fromage sicilien Cuit, Fromage sans sel meriah, Ricotta MERIAH meriah, Fromage sicilien meriah, Fromage au persil meriah",
+        "PUCK: Fromage à tartiner",
+        "TOUS LES JOURS / Koll Youm: Fromage à tartiner",
+        "ENTREMONT: Fromages en portions",
+        "FOL EPI: Fromages en portions",
+        "HOLLANDIA: Fromages en portions",
+        "LA CAVE A FROMAGE: Fromages en portions",
+        "MAJESTE: Fromages en portions",
+        "MERCI CHEF: Fromages en portions",
+        "SALA CUBE: Fromages en portions",
+        "SOIGNON: Fromages en portions",
+        "VERDI PASCOLI: Fromages en portions",
+        "ZANETTI: Fromages en portions",
+        "CHEESY: Fromages râpés",
+        "KAISER: Fromage râpé, Fromage de cuisson, Slices",
+        "FROMY: Fromage à tartiner, Fromage de cuisson, Slices",
+        "FROMITO: Fromage Fondu goûter Préparation alimentaire fondue"
+      ],
+      "not_allowed": [
+        "حليب معطر",
+        "حليب بالعصير",
+        "لبن معطر",
+        "Délice: les Danettes, Brassés, Activia Datte Noix",
+        "Vitalait: Bifi 0% nature et aromatisé, Bifi céréales agrumes 0%, Bifi aromatisé, Vitalio Brassé, Vitupti à boire",
+        "Dolce: Dolce crème chocolat, Dolce dua noisette, Dolce liégeois chocolat, Dolce crème caramel, Dolce crème de noisette",
+        "Y'AB: liégeois à boire 0%, mousse au chocolat et vanille, Flan vanille/caramel, Y'ab aux fruits à boire",
+        "Brownies Elben",
+        "chambourcy",
+        "yoga",
+        "Emmi",
+        "Natilait: Yaourt brassé",
+        "Thelja: Plaisir Bouza",
+        "الجبن: Président (Kids, Fraidoux)",
+        "Fromy: Cheddar, Gruyère, Mozarella, Goutella aux fines herbes, nature",
+        "Land'or: Désir light",
+        "Délice: Italiano",
+        "Kaiser: Ricotta",
+        "Fromages rapés (Fromy, Land'or, President): préparation alimentaire"
+      ]
+    },
+    {
+      "category_ar": "السكريات و الحلويات",
+      "category_fr": "Sucres et sucreries",
+      "allowed": [
+        "كل الحلويات المصنوعة في المنزل بالنشاء أو فرينة الحبوب المسموحة أو بالفاكية",
+        "مرطبات عليها علامة خالي من القلوتين",
+        "كريمة مصنوعة في المنزل بوزة, بلوزة, زقوقو",
+        "بسكويت، شكلاطة، مرطبات المنتوجات التالية: Santiveri, Lorio (Lorizo), Schär, Gluzen, Felder, Sin Gluten, Glutella, Gullon",
+        "شكلاطة: Maestro, Said",
+        "خميرة: La patissière levure Pizza",
+        "Glace Selja: Picsou fraise, Chocolat, glace à l'eau fraise, Picsou pistache, Tabletto, Sanafer, Magtop, Charlot, Glowen",
+        "Glace en boite: chocolat vanille, Boule d'or, Ola: extase",
+        "حلوى شامية: Papillon, تريكي (الناعورة), شهرزاد",
+        "حلوى و مصاصة: Le petit moulin (Funny), Florida, La gazelle (Halwa chemia), Bonbon pipo, Bonbon délice, Chewingum speed, SOTUCHOC (Bonbon Falfoul), Papillon (ellino / ptitpops / happy full)"
+      ],
+      "to_check": [
+        "شيكوريا",
+        "فريكتوز",
+        "M&M's, Bounty, Toblerone, Kinder chocolat, Kross Chocolat, Nestlé crunch, TORRAS, Chocolat de couverture Vanoise",
+        "Nesquik, Chocoline (Said), Chocolat en poudre (Said), Dokrem",
+        "شكلاطة للطلي: Said, Pralinutta, Vanoise, Nouty, Dakrem",
+        "كرام شانتي: Vanoise crème chantilly",
+        "Flan chocolat",
+        "Préparation pour glace, sauce topping (caramel et fraise)",
+        "Créme dessert smart chef",
+        "خميرة: La patissière, Dokrem, Ibn Hayen",
+        "Glace Selja: Gold, Twister, Amigo"
+      ],
+      "not_allowed": [
+        "سكر محور",
+        "بسكويت غير مسموح",
+        "قطو",
+        "بشكوطو مصنوع بالفرينة",
+        "حلو عربي مشري: بقلاوة, كعابر...",
+        "كريمة باكوات باستثناء المسموحات",
+        "حلوى, نوقا, فلفول, حلقوم, علكة غير المسموحة",
+        "رقائق فطور الصباح: Grain d'or, Geop's cornflakes, Boom's rice, Flochoco, Granipop's, Popper's (miel-chocolat), Emco (crunchy)",
+        "شكلاطة: Said aux céréales, Tris croquant, Millenium au lait, Mars, Kit-Kat, Kinder Bueno, Crunch, Tris Maestro (sauf les permis), Club, Galaxy, Nouty choco, Kross au croquant"
+      ]
+    },
+    {
+      "category_ar": "الغلال و الفواكه الجافة",
+      "category_fr": "Fruits et fruits secs",
+      "allowed": [
+        "كل أنواع الغلال الطازجة و المجمدة",
+        "عصير غلال مصنوع بالمنزل",
+        "معجون غلال مصنوع بالمنزل",
+        "معجون غلال معلب: Sicam, Sticap, Cap d'or",
+        "جميع المكسرات: كاكوية, لوز...",
+        "جميع الفواكه الجافة: زبيب, تمر, عوينة شايحة, كرموس شايح"
+      ],
+      "to_check": [
+        "عصير غلال معلب: Tropicana, Délice, Oasis, Délice confort repas (pomme verte), Oh Délice (Jus Oh poire - P'tit délice), Stil (Jus Stil - Bnino Froutou)"
+      ],
+      "not_allowed": [
+        "مسحوق عصير غلال",
+        "مكسرات مرحية و معلبة",
+        "قنفيد، كاكوية أو لوز ملفوف في الحلوى الحمراء"
+      ]
+    },
+    {
+      "category_ar": "الخضر و الخضر الجافة",
+      "category_fr": "Légumes et Légumineuses",
+      "allowed": [
+        "كل أنواع الخضر الطازجة و المجمدة",
+        "كل أنواع الخضر الجافة: حمص, فول, عدس",
+        "شريحة طماطم, فلفل شايح, هريسة عربي, كبار",
+        "بطاطة مقلية بالمنزل",
+        "مصبرات هريسة، طماطم، خضر: زينة, Cap d'or, Sicam, Tucal, ناظور, جودة, Zgholli, Zina, الوطن القبلي, Sticap, Brima",
+        "سلاطة مشوية: Cap d'or"
+      ],
+      "to_check": [
+        "Chips: Oops, Max pomme de terre, Golden, Joy's, Franky",
+        "Ketchup: Chovi1, Remia",
+        "Sicam: sauce pizza"
+      ],
+      "not_allowed": [
+        "خضر مصيرة و معلبة غير مسموحة",
+        "خضر جافة مصيرة و معلبة غير مسموحة",
+        "خضر جافة مرحية في الباكوات",
+        "سلاطة مشوية: مصبرات غير مسموحة",
+        "بطاطة مقلية في ساشي",
+        "أكياس شربة, أكياس برودو, مكعبات حساء"
+      ]
+    },
+    {
+      "category_ar": "الخضر والطماطم المعلبة",
+      "category_fr": "Légumes et tomates en conserve",
+      "allowed": [],
+      "to_check": [
+        "طماطم معجونة: SICAM, BNINA, CAP BON, CARTHAGE, LE PEROQUET, TUCAL, NEBLIA, PETIT PARIS, RAFIAA, TOUS LES JOURS",
+        "طماطم مدهوسة: SICAM, STICAP, CAP D'OR, JOUDA",
+        "طماطم مقشرة: STICAP, VEGIES",
+        "صلصة طماطم: CAP D'OR, STICAP",
+        "طماطم مجففة: CARTHAGE, SAFIR",
+        "ذرة: BONDUELLE, SICAM",
+        "فطر: BONDUELLE, SICAM",
+        "سلاطة مشوية: BONDUELLE",
+        "جلبانة: BONDUELLE, SICAM",
+        "جلبانة و جزر: D'EMMA, MAAM, MAMI GARDEN, BONDUELLE, SICAM",
+        "لوبيا: D'AUCY, REFLET, SAFIR, SAVEURS, TYPIK",
+        "خضر متنوعة: DAUCY, MA AM, MAMI GARDEN",
+        "عدس و حمص: DAUCY, BNINA, SAVEURS, BEESKY, JARDIN D'EMMA, LE PALAIS VERT, LE ROITELET, JARDIN REINE DES GRAINES, SAVEURS"
+      ],
+      "not_allowed": [
+        "طماطم معجونة: JOUDA, SICAM, STICAP",
+        "طماطم مدهوسة: BARILLA, JOUDA",
+        "صلصة طماطم: PETIT PARIS, CARTHAGE, SICAM, STICAP, SAFIR, TYPIK",
+        "ذرة: STICAP, BEESKY, EMPORIUM, JARDIN",
+        "فطر: AYECUE, EMPORIUM, LE PALAIS VERT, MAAM, MAMI GARDEN",
+        "سلاطة مشوية: ABIDA, EL KHABIA, KEN YA MA KEN, MOKA, SAFIR",
+        "جلبانة: CANTINA MEXICANA, D'AUCY, JARDINS D'EMMA",
+        "جلبانة و جزر: MAAM, MAMI GARDEN, REINE DES GRAINES, SAVEURS"
+      ]
+    },
+    {
+      "category_ar": "الدهنيات",
+      "category_fr": "Matières grasses",
+      "allowed": [
+        "كل أنواع الزيوت: قطانيا, مخلط, زيتون, حاكم",
+        "زبدة كريمة طازجة",
+        "مرقرين: Goldina, Sol",
+        "زيتون مملح في المنزل",
+        "ترشي",
+        "سمن مصنوع بالمنزل",
+        "خردل (Moutarde): Dijon, Chovi, Cap d'or",
+        "مايوناز مخففة: Heinz bleu"
+      ],
+      "to_check": [
+        "مرقرين: Jadida",
+        "خردل (Moutarde): Dijona, Dorella",
+        "مايوناز مخففة: Bonna, Dorella"
+      ],
+      "not_allowed": [
+        "خردل: Remia Light, Delicio, Ducros, Jadida",
+        "مايوناز بالبيض: Lesieur",
+        "زيتون مملح في ساشيات",
+        "Vinaigrette / صالصة سلاطة في الدبابز",
+        "مرقرين: Jadida (غير مسموح)"
+      ]
+    },
+    {
+      "category_ar": "المشروبات",
+      "category_fr": "Boissons",
+      "allowed": [
+        "ماء صافي",
+        "ماء معدني",
+        "المشروبات الغازية SODA: بوقا, كوكا, فانتا ليمون, أبلا, أرنجينا",
+        "ماء الورد",
+        "العطرشية",
+        "الزهر",
+        "النسري",
+        "قهوة صافية",
+        "شاي",
+        "شاي معطر",
+        "سيرو النعناع و الرمان"
+      ],
+      "to_check": [
+        "Délice: Délio eau gazéfiée"
+      ],
+      "not_allowed": [
+        "المشروبات الغازية: فانتا برتقال, شوابس",
+        "قهوة مرحية مخلطة بالشعير"
+      ]
+    },
+    {
+      "category_ar": "الحبوب و مشتقاتها",
+      "category_fr": "Céréales et dérivés",
+      "allowed": [
+        "أرز: Riz étuvé ADDIWEN, Riz basmati, Riz blanc",
+        "مقرونة: Spiga, IBN Hayan, Felder, DIVELLA, Schär, Ecoposta, Gluzen, Lorizo",
+        "فارينة: IBN Hayan, Felder, Ecoposta, Glutella, Gluzen, Schär, Lorizo",
+        "قطانيا و فرينة هذه الحبوب",
+        "درع",
+        "جلجلان",
+        "زقوقو",
+        "نشاء ذرة معلب",
+        "مواد غذائية مصنعة عليها علامة (خالي من القلوتين): فرينة, كسكسي, مقرونة, دشيشة...",
+        "المكونات الآتية: نشاء, نشاء متغير, دكسترين, زلاليات نباتية مفككة, مالط و مستخلص المالط مستخرجة من الحبوب المسموحة",
+        "ملاوي, خبز, بيتزا, بسيسة مصنوعة بفارينة مسموحة",
+        "Sinlac"
+      ],
+      "to_check": [
+        "نشاء ذرة معلب: Vanoise, Smart chef"
+      ],
+      "not_allowed": [
+        "قمح",
+        "شعير",
+        "خرطال",
+        "نشاء صبة",
+        "فرينة و نشاء القمح والشعير والخرطال",
+        "بسيسة قمح, شعير, زميطة",
+        "عصيدة بيضة بالقديد أو السكر",
+        "خبز, مطبقة, ملاوي, فطاير, بليلوني, بيتزا, كراب, ملسوقة, ملثوث, برغل, شربة (المصنوعة من الحبوب الممنوعة)",
+        "كل المواد الغذائية التي تحتوي على المكونات الآتية: فرينة, نشاء, دكسترين, نشاء متغير, زلاليات نباتية مفككة, مالط و مستخلص المالط مستخرجة من الحبوب الممنوعة",
+        "درع, جلجلان, زقوقو مرحية في الباكوات",
+        "سريلاك: Cerelac"
+      ]
+    },
+    {
+      "category_ar": "اللحوم",
+      "category_fr": "Viandes et poissons",
+      "allowed": [
+        "لحم بقري",
+        "علوش",
+        "برشني",
+        "كبدة",
+        "رأس",
+        "كوارع",
+        "كرشة",
+        "دجاج",
+        "إسكالوب",
+        "بيض",
+        "سمك",
+        "غلال البحر",
+        "قديد",
+        "مرقاز مصنوع في المنزل",
+        "عصبان بالروز",
+        "سمك مشيح...",
+        "شرمولة",
+        "سلامون",
+        "أنشوة قرنيط شايح",
+        "سمك أو لحم ملفوف في فرينة مسموحة",
+        "تن معلب: سيدي داود, المنار, Cap d'or",
+        "مرقاز Fumé LMAZRAA"
+      ],
+      "to_check": [
+        "سمك و تن معلب: Thon El Badr",
+        "Saucisson à l'ail 'Mliha'"
+      ],
+      "not_allowed": [
+        "جميع أنواع السلامي و الجنبون",
+        "عصبان بالبرغل",
+        "مرقاز مصنع",
+        "شرائح لحم مفروم معلب",
+        "بنادق معلبة",
+        "سمك أو لحم ملفوف في فارينة ممنوعة"
+      ]
+    },
+    {
+      "category_ar": "مواد أخرى / توابل",
+      "category_fr": "Autres produits / Épices",
+      "allowed": [
+        "زعتر",
+        "كليل",
+        "فلفل أسود",
+        "شوش ورد",
+        "سكنجبير",
+        "قرفة",
+        "أفاح خبز",
+        "زعفران",
+        "ثوم",
+        "ملوخية مرحية في مكينة خاصة بها",
+        "توابل مرحية في المنزل",
+        "خل"
+      ],
+      "to_check": [
+        "خميرة خبز: La patissiere",
+        "خميرة قاطو باستثناء الممنوعات",
+        "سكر فانيليا: Vanoise, Smart chef"
+      ],
+      "not_allowed": [
+        "خميرة قاطو (الممنوعة)",
+        "خميرة خبز (الممنوعة)",
+        "توابل مرحية في ساشيات",
+        "كركم مرحي"
+      ]
+    }
+  ]
+}

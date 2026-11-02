@@ -1,5 +1,6 @@
 import express from 'express';
 import { AssociationProduct } from '../models/AssociationProduct.js';
+import { AtmcProduct } from '../models/AtmcProduct.js';
 import {
   fetchFromOpenFoodFactsByBarcode,
   searchOpenFoodFactsByQuery,
@@ -94,6 +95,38 @@ router.get('/search', async (req, res) => {
       officialDocReference: item.officialDocReference,
       imageUrl: null,
     }));
+
+    // Also query full ATMC 2023 dataset
+    const atmcFilter = {
+      $or: [
+        { name: new RegExp(query, 'i') },
+        { brand: new RegExp(query, 'i') },
+        { rawText: new RegExp(query, 'i') },
+        { items: { $in: [new RegExp(query, 'i')] } },
+        { categoryFr: new RegExp(query, 'i') },
+        { categoryAr: new RegExp(query, 'i') },
+      ],
+    };
+    const matchedAtmc = await AtmcProduct.find(atmcFilter).limit(20);
+    matchedAtmc.forEach((item) => {
+      layerBResults.push({
+        id: item._id,
+        source: 'Guide Officiel ATMC 2023',
+        productNameFr: item.name,
+        productNameAr: item.categoryAr,
+        brand: item.brand || 'Produit Répertorié ATMC',
+        category: item.categoryFr,
+        isGlutenFree: item.status === 'ALLOWED',
+        status: item.status === 'ALLOWED' ? 'SAFE' : item.status === 'NOT_ALLOWED' ? 'UNSAFE' : 'WARNING',
+        badgeText: item.statusLabelFr,
+        badgeTextAr: item.statusLabelAr,
+        barcode: '',
+        notes: item.rawText,
+        notesAr: item.categoryAr,
+        officialDocReference: item.source,
+        imageUrl: null,
+      });
+    });
 
     // --- Layer A: Open Food Facts API (Global barcodes & packaged brands) ---
     try {

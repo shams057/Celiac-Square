@@ -133,7 +133,7 @@ export const identifyProductFromImage = async (file) => {
   if (geminiKey && geminiKey.trim() !== '') {
     try {
       const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
 
       const imageBuffer = fs.readFileSync(file.path);
       const imagePart = {
@@ -147,7 +147,7 @@ export const identifyProductFromImage = async (file) => {
 You are an expert food safety computer vision model tailored for the Tunisian market and celiac disease.
 Analyze this food product, dish, ingredient, or packaging image.
 Identify:
-1. The exact or most probable food product name (in French, with Arabic name if known).
+1. The exact or most probable food product name (As shown in the image if present).
 2. Confidence score between 0.0 and 1.0.
 3. 2-4 key visual descriptors.
 4. Top 3 candidate names if ambiguous.

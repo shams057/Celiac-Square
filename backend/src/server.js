@@ -6,6 +6,7 @@ import { connectDB } from './config/db.js';
 import mapRoutes from './routes/mapRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import visionRoutes from './routes/visionRoutes.js';
+import atmcRoutes from './routes/atmcRoutes.js';
 
 dotenv.config();
 
@@ -33,6 +34,7 @@ app.use('/uploads', express.static(path.resolve('uploads')));
 app.use('/api/map', mapRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/vision', visionRoutes);
+app.use('/api/atmc', atmcRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

@@ -1,7 +1,11 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import { Spot } from '../models/Spot.js';
 import { AssociationProduct } from '../models/AssociationProduct.js';
+import { AtmcProduct } from '../models/AtmcProduct.js';
 
 dotenv.config();
 
@@ -563,6 +567,29 @@ const associationProductsSeed = [
   },
 ];
 
+function slugify(text) {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '');
+}
+
+function parseEntry(text) {
+  let brand = '';
+  let items = [];
+  const colonIdx = text.indexOf(':');
+  if (colonIdx > -1) {
+    brand = text.substring(0, colonIdx).trim();
+    const rest = text.substring(colonIdx + 1).trim();
+    items = rest.split(/[,;\-\/]+/).map((s) => s.trim()).filter(Boolean);
+  } else {
+    items = text.split(/[,;\-\/]+/).map((s) => s.trim()).filter(Boolean);
+  }
+  return { brand, items };
+}
+
 export const seedDatabase = async () => {
   try {
     await mongoose.connect(MONGO_URI);
@@ -571,7 +598,8 @@ export const seedDatabase = async () => {
     // Clear existing collections
     await Spot.deleteMany({});
     await AssociationProduct.deleteMany({});
-    console.log('[Seed] Cleared existing Spot and AssociationProduct collections.');
+    await AtmcProduct.deleteMany({});
+    console.log('[Seed] Cleared existing Spot, AssociationProduct, and AtmcProduct collections.');
 
     // Seed Spots
     const createdSpots = await Spot.insertMany(spotsSeed);
@@ -582,6 +610,75 @@ export const seedDatabase = async () => {
     console.log(
       `[Seed] Successfully inserted ${createdProducts.length} official Tunisian Celiac Association products.`
     );
+
+    // Seed ATMC 2023 JSON Dataset
+    const currentFile = fileURLToPath(import.meta.url);
+    const possiblePaths = [
+      path.resolve(path.dirname(currentFile), '../../../Data/ATMC2023.json'),
+      path.resolve(process.cwd(), '../Data/ATMC2023.json'),
+      path.resolve(process.cwd(), 'Data/ATMC2023.json'),
+    ];
+
+    let atmcFilePath = possiblePaths.find((p) => fs.existsSync(p));
+    if (atmcFilePath) {
+      const rawJson = fs.readFileSync(atmcFilePath, 'utf8');
+      const atmcData = JSON.parse(rawJson);
+      const atmcDocs = [];
+
+      for (const cat of atmcData.categories || []) {
+        const catFr = cat.category_fr;
+        const catAr = cat.category_ar;
+        const catSlug = slugify(catFr);
+
+        const statusMappings = [
+          {
+            key: 'allowed',
+            status: 'ALLOWED',
+            labelFr: 'Sans Gluten (Autorisé ATMC)',
+            labelAr: 'خالٍ من الغلوتين (مرخص ATMC)',
+          },
+          {
+            key: 'to_check',
+            status: 'TO_CHECK',
+            labelFr: 'À vérifier (Attention / Risque)',
+            labelAr: 'للتثبت (حذر / قيد التحقق)',
+          },
+          {
+            key: 'not_allowed',
+            status: 'NOT_ALLOWED',
+            labelFr: 'Contient du Gluten (Interdit ATMC)',
+            labelAr: 'يحتوي على الغلوتين (ممنوع ATMC)',
+          },
+        ];
+
+        for (const mapping of statusMappings) {
+          const list = cat[mapping.key] || [];
+          for (const rawText of list) {
+            const { brand, items } = parseEntry(rawText);
+            atmcDocs.push({
+              categoryFr: catFr,
+              categoryAr: catAr,
+              categorySlug: catSlug,
+              status: mapping.status,
+              statusLabelFr: mapping.labelFr,
+              statusLabelAr: mapping.labelAr,
+              name: rawText,
+              brand: brand || '',
+              items: items,
+              rawText: rawText,
+              source: `${atmcData.organization || 'ATMC'} - ${atmcData.document_title || 'Guide'} (${atmcData.publication_date || '2023'})`,
+            });
+          }
+        }
+      }
+
+      if (atmcDocs.length > 0) {
+        const createdAtmc = await AtmcProduct.insertMany(atmcDocs);
+        console.log(`[Seed] Successfully inserted ${createdAtmc.length} ATMC Guide 2023 products into database.`);
+      }
+    } else {
+      console.warn('[Seed] ATMC2023.json file not found in searched paths:', possiblePaths);
+    }
 
     console.log('[Seed] Seeding completed successfully!');
   } catch (error) {
