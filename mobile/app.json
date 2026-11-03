@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Celiac Square",
+    "slug": "celiac-square",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#DBD5BF",
+    "platforms": ["ios", "android"],
+    "extra": {
+      "siteUrl": "https://celiac-square.vercel.app"
+    },
+    "android": {
+      "package": "com.shams057.celiacsquare",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#DBD5BF"
+      },
+      "permissions": ["CAMERA"],
+      "blockedPermissions": ["android.permission.RECORD_AUDIO"]
+    },
+    "ios": {
+      "bundleIdentifier": "com.shams057.celiacsquare",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Celiac Square utilise l’appareil photo pour scanner les produits.",
+        "NSPhotoLibraryUsageDescription": "Celiac Square ouvre vos photos pour scanner un produit."
+      }
+    },
+    "plugins": [
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "backgroundColor": "#DBD5BF"
+        }
+      ]
+    ]
+  }
+}

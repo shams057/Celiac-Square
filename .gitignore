@@ -1,6 +1,44 @@
+# Dependencies
 node_modules/
+
+# Environment and secrets (never commit keys)
 .env
+.env.*
+!.env.example
 backend/.env
+
+# Build output (Vercel rebuilds frontend/dist on every deploy)
+frontend/dist/
+build/
+*.tsbuildinfo
+
+# Deployment and tooling state
+.vercel/
+.expo/
+supabase/.temp/
+supabase/.branches/
+
+# Mobile (see mobile/.gitignore for the generated native projects)
+*.apk
+*.aab
+*.ipa
+*.keystore
+*.jks
+!debug.keystore
+
+# Logs and runtime files
+*.log
+npm-debug.log*
+backend/uploads/
+backend/data/
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Private notes
 prompt.md
 UserDo.md
-.vercel
