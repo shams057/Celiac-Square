@@ -2,6 +2,18 @@ import axios from 'axios';
 
 const API_BASE = '/api';
 
+// If the API is not deployed, hosts serve index.html with status 200 for /api/* too.
+// Treat that as an error so screens show "could not load" instead of empty results.
+axios.interceptors.response.use((res) => {
+  const type = res.headers?.['content-type'] || '';
+  if (res.config.url?.startsWith(API_BASE) && type.includes('text/html')) {
+    const err = new Error('API indisponible (réponse HTML reçue au lieu de JSON).');
+    err.response = { status: 502, data: { message: err.message } };
+    throw err;
+  }
+  return res;
+});
+
 // Backoffice admin token, kept for the browser session only
 const ADMIN_TOKEN_KEY = 'celiac-square-admin-token';
 export const ADMIN_LOGOUT_EVENT = 'celiac-square-admin-logout';

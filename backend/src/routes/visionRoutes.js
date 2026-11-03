@@ -1,7 +1,5 @@
 import express from 'express';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 import { identifyProductFromImage } from '../services/visionService.js';
 import { AssociationProduct } from '../models/AssociationProduct.js';
 import { containsRegex } from '../utils/regex.js';
@@ -12,25 +10,13 @@ import {
 
 const router = express.Router();
 
-// Configure Multer for image uploads
-const uploadDir = path.resolve('uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
-    cb(null, `vision_${Date.now()}_${Math.random().toString(36).substring(7)}${ext}`);
-  },
-});
+// Images stay in memory: they are only forwarded to the vision model, and Vercel's disk is read-only.
+// Vercel also caps request bodies at 4.5 MB, so the browser shrinks photos before sending them.
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: { fileSize: 4 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
       cb(null, true);
@@ -124,11 +110,6 @@ router.post('/identify', upload.single('image'), async (req, res) => {
     const confidenceScore = Number((visionResult.confidence || 0).toFixed(2));
     const requiresFallback = confidenceScore < 0.7;
 
-    // Clean up temporary uploaded file if needed
-    fs.unlink(req.file.path, (err) => {
-      if (err) console.warn(`[Vision CleanUp] Notice: ${err.message}`);
-    });
-
     return res.json({
       success: true,
       data: {
@@ -161,9 +142,6 @@ router.post('/identify', upload.single('image'), async (req, res) => {
     });
   } catch (error) {
     console.error(`[Vision Error] ${error.message}`);
-    if (req.file && req.file.path) {
-      fs.unlink(req.file.path, () => {});
-    }
     return res.status(500).json({
       success: false,
       message: "Une erreur est survenue lors de l'analyse visuelle du produit.",

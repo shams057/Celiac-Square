@@ -1,0 +1,93 @@
+/**
+ * The Express app, without a listener: used by server.js locally and by api/index.js on Vercel.
+ */
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { connectDB, isDbConfigured } from './config/db.js';
+import mapRoutes from './routes/mapRoutes.js';
+import productRoutes from './routes/productRoutes.js';
+import visionRoutes from './routes/visionRoutes.js';
+import atmcRoutes from './routes/atmcRoutes.js';
+
+dotenv.config();
+
+const app = express();
+
+
+// Middleware
+app.use(
+  cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
+);
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+
+// Every API route except /api/health needs the database
+app.use('/api', async (req, res, next) => {
+  if (req.path === '/health') return next();
+  if (!isDbConfigured()) {
+    return res.status(503).json({ success: false, message: 'Base de données non configurée : définissez MONGO_URI.' });
+  }
+  try {
+    await connectDB();
+    return next();
+  } catch (err) {
+    return res.status(503).json({ success: false, message: 'Base de données injoignable. Réessayez dans un instant.' });
+  }
+});
+
+// Routes
+app.use('/api/map', mapRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/vision', visionRoutes);
+app.use('/api/atmc', atmcRoutes);
+
+// Health check: says what is configured (never the values) and whether MongoDB answers
+app.get('/api/health', async (req, res) => {
+  let database = 'not_configured';
+  if (isDbConfigured()) {
+    try {
+      await connectDB();
+      database = 'connected';
+    } catch {
+      database = 'unreachable';
+    }
+  }
+  res.status(database === 'connected' ? 200 : 503).json({
+    status: database === 'connected' ? 'online' : 'degraded',
+    platform: 'Celiac Square Tunisia',
+    database,
+    config: {
+      mongoUri: Boolean(process.env.MONGO_URI),
+      adminToken: Boolean(process.env.ADMIN_TOKEN),
+      geminiApiKey: Boolean(process.env.GEMINI_API_KEY),
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Root friendly endpoint
+app.get('/', (req, res) => {
+  res.send('Celiac Square Tunisia API is running smoothly.');
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: 'Route non trouvée sur le serveur API.' });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(`[Server Error] ${err.stack || err.message}`);
+  res.status(500).json({
+    success: false,
+    message: err.message || 'Erreur interne du serveur.',
+  });
+});
+
+export default app;

@@ -3,6 +3,24 @@ import { Camera, ImageUp, Video, RotateCcw, LoaderCircle, Search } from 'lucide-
 import { identifyProductVision } from '../services/api';
 import { t, statusKind, STATUS, StatusTile, PageHead, Notice } from './ui';
 
+// Phone photos are often 4–12 MB; the API accepts at most 4.5 MB, and smaller uploads are faster
+const MAX_SIDE = 1600;
+const shrinkImage = async (file) => {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    if (scale === 1 && file.size < 1.5 * 1024 * 1024) return file;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+    return blob ? new File([blob], file.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' }) : file;
+  } catch {
+    return file; // formats the browser cannot decode are sent as they are
+  }
+};
+
 const VERDICT_BLOCK = {
   safe: 'bg-status-safe text-ink',
   warning: 'bg-status-warning text-ink',
@@ -80,7 +98,7 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
     setErrorMsg('');
     setResult(null);
     try {
-      const data = await identifyProductVision(file);
+      const data = await identifyProductVision(await shrinkImage(file));
       if (data?.success) setResult(data.data);
       else setErrorMsg(data?.message || 'failed');
     } catch (err) {

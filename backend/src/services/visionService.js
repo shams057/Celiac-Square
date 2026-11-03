@@ -1,4 +1,3 @@
-import fs from 'fs';
 import { GoogleGenAI } from '@google/genai';
 
 // Override with GEMINI_MODEL in .env
@@ -129,7 +128,7 @@ export const identifyProductFromImage = async (file) => {
     try {
       const ai = new GoogleGenAI({ apiKey: geminiKey, httpOptions: { timeout: GEMINI_TIMEOUT_MS } });
 
-      const imageBuffer = fs.readFileSync(file.path);
+      const imageBuffer = file.buffer;
       const imagePart = {
         inlineData: {
           data: imageBuffer.toString('base64'),
