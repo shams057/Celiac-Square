@@ -576,6 +576,13 @@ function slugify(text) {
     .replace(/(^-|-$)+/g, '');
 }
 
+// French translations of the Arabic entries, keyed by original text
+export function loadAtmcTranslations(dataFilePath) {
+  const frPath = path.join(path.dirname(dataFilePath), 'ATMC2023.fr.json');
+  if (!fs.existsSync(frPath)) return {};
+  return JSON.parse(fs.readFileSync(frPath, 'utf8')).translations || {};
+}
+
 function parseEntry(text) {
   let brand = '';
   let items = [];
@@ -624,6 +631,7 @@ export const seedDatabase = async () => {
       const rawJson = fs.readFileSync(atmcFilePath, 'utf8');
       const atmcData = JSON.parse(rawJson);
       const atmcDocs = [];
+      const translations = loadAtmcTranslations(atmcFilePath);
 
       for (const cat of atmcData.categories || []) {
         const catFr = cat.category_fr;
@@ -663,6 +671,7 @@ export const seedDatabase = async () => {
               statusLabelFr: mapping.labelFr,
               statusLabelAr: mapping.labelAr,
               name: rawText,
+              nameFr: translations[rawText] || rawText,
               brand: brand || '',
               items: items,
               rawText: rawText,

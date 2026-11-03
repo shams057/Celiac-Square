@@ -37,6 +37,12 @@ const atmcProductSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    // French version of the entry (the guide mixes Arabic and French)
+    nameFr: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     brand: {
       type: String,
       trim: true,
@@ -62,7 +68,7 @@ const atmcProductSchema = new mongoose.Schema(
   }
 );
 
-atmcProductSchema.index({ name: 'text', brand: 'text', rawText: 'text', items: 'text' });
+atmcProductSchema.index({ name: 'text', nameFr: 'text', brand: 'text', rawText: 'text', items: 'text' });
 atmcProductSchema.index({ categorySlug: 1, status: 1 });
 
 export const AtmcProduct = mongoose.model('AtmcProduct', atmcProductSchema);

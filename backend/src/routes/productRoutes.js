@@ -1,10 +1,8 @@
 import express from 'express';
 import { AssociationProduct } from '../models/AssociationProduct.js';
 import { AtmcProduct } from '../models/AtmcProduct.js';
-import {
-  fetchFromOpenFoodFactsByBarcode,
-  searchOpenFoodFactsByQuery,
-} from '../services/openFoodFactsService.js';
+import { containsRegex } from '../utils/regex.js';
+import { fetchFromOpenFoodFactsByBarcode, searchOpenFoodFacts } from '../services/openFoodFactsService.js';
 
 const router = express.Router();
 
@@ -17,6 +15,14 @@ const router = express.Router();
  */
 router.get('/search', async (req, res) => {
   const query = (req.query.q || '').trim();
+  // sources=local answers from MongoDB only (fast); sources=off queries Open Food Facts only
+  const sources = (req.query.sources || 'all').toLowerCase();
+  const wantLocal = sources !== 'off';
+  const wantOff = sources !== 'local';
+
+  if (!query && !wantLocal) {
+    return res.json({ success: true, layerA: [], layerB: [], combined: [], totalCount: 0 });
+  }
 
   if (!query) {
     // Return featured / common association staple products
@@ -51,15 +57,16 @@ router.get('/search', async (req, res) => {
   try {
     let layerAResults = [];
     let layerBResults = [];
+    let offStatus = wantOff ? 'ok' : 'skipped';
 
     // --- Layer B: Tunisian Celiac Association Dataset (High Priority for local foods) ---
     const associationFilter = {
       $or: [
-        { productNameFr: new RegExp(query, 'i') },
-        { productNameAr: new RegExp(query, 'i') },
-        { brand: new RegExp(query, 'i') },
-        { notes: new RegExp(query, 'i') },
-        { keywords: { $in: [new RegExp(query, 'i')] } },
+        { productNameFr: containsRegex(query) },
+        { productNameAr: containsRegex(query) },
+        { brand: containsRegex(query) },
+        { notes: containsRegex(query) },
+        { keywords: { $in: [containsRegex(query)] } },
       ],
     };
 
@@ -67,7 +74,7 @@ router.get('/search', async (req, res) => {
       associationFilter.$or.push({ barcode: query });
     }
 
-    const matchedAssociation = await AssociationProduct.find(associationFilter).limit(15);
+    const matchedAssociation = wantLocal ? await AssociationProduct.find(associationFilter).limit(15) : [];
     layerBResults = matchedAssociation.map((item) => ({
       id: item._id,
       source: 'Association Tunisienne de la Cœliaque',
@@ -99,20 +106,21 @@ router.get('/search', async (req, res) => {
     // Also query full ATMC 2023 dataset
     const atmcFilter = {
       $or: [
-        { name: new RegExp(query, 'i') },
-        { brand: new RegExp(query, 'i') },
-        { rawText: new RegExp(query, 'i') },
-        { items: { $in: [new RegExp(query, 'i')] } },
-        { categoryFr: new RegExp(query, 'i') },
-        { categoryAr: new RegExp(query, 'i') },
+        { name: containsRegex(query) },
+        { nameFr: containsRegex(query) },
+        { brand: containsRegex(query) },
+        { rawText: containsRegex(query) },
+        { items: { $in: [containsRegex(query)] } },
+        { categoryFr: containsRegex(query) },
+        { categoryAr: containsRegex(query) },
       ],
     };
-    const matchedAtmc = await AtmcProduct.find(atmcFilter).limit(20);
+    const matchedAtmc = wantLocal ? await AtmcProduct.find(atmcFilter).limit(20) : [];
     matchedAtmc.forEach((item) => {
       layerBResults.push({
         id: item._id,
         source: 'Guide Officiel ATMC 2023',
-        productNameFr: item.name,
+        productNameFr: item.nameFr || item.name,
         productNameAr: item.categoryAr,
         brand: item.brand || 'Produit Répertorié ATMC',
         category: item.categoryFr,
@@ -130,16 +138,21 @@ router.get('/search', async (req, res) => {
 
     // --- Layer A: Open Food Facts API (Global barcodes & packaged brands) ---
     try {
-      if (isBarcode) {
+      if (!wantOff) {
+        // skipped on request
+      } else if (isBarcode) {
         const offProduct = await fetchFromOpenFoodFactsByBarcode(query);
         if (offProduct) {
           layerAResults.push(offProduct);
         }
       } else {
-        layerAResults = await searchOpenFoodFactsByQuery(query);
+        const off = await searchOpenFoodFacts(query);
+        layerAResults = off.products;
+        if (!off.ok) offStatus = 'unavailable';
       }
     } catch (apiErr) {
       console.warn(`[Product Routes] Layer A Open Food Facts warning: ${apiErr.message}`);
+      offStatus = 'unavailable';
       // Graceful degradation in case of low connectivity
     }
 
@@ -148,6 +161,7 @@ router.get('/search', async (req, res) => {
       success: true,
       query,
       isBarcode,
+      offStatus,
       totalCount: layerBResults.length + layerAResults.length,
       layerB: layerBResults,
       layerA: layerAResults,

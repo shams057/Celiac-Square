@@ -2,6 +2,47 @@ import axios from 'axios';
 
 const API_BASE = '/api';
 
+// Backoffice admin token, kept for the browser session only
+const ADMIN_TOKEN_KEY = 'celiac-square-admin-token';
+export const ADMIN_LOGOUT_EVENT = 'celiac-square-admin-logout';
+
+export const getAdminToken = () => {
+  try {
+    return sessionStorage.getItem(ADMIN_TOKEN_KEY) || '';
+  } catch {
+    return '';
+  }
+};
+
+export const setAdminToken = (token) => {
+  try {
+    if (token) sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
+    else sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+  } catch {
+    // Storage unavailable: the token simply won't persist
+  }
+};
+
+const adminRequest = async (config) => {
+  try {
+    const res = await axios({ ...config, headers: { Authorization: `Bearer ${getAdminToken()}` } });
+    return res.data;
+  } catch (err) {
+    if (err.response?.status === 401) {
+      setAdminToken('');
+      window.dispatchEvent(new Event(ADMIN_LOGOUT_EVENT));
+    }
+    throw err;
+  }
+};
+
+export const checkAdminToken = async (token) => {
+  const res = await axios.get(`${API_BASE}/map/admin/check`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.data;
+};
+
 export const fetchSpots = async (filters = {}) => {
   const params = new URLSearchParams();
   if (filters.category && filters.category !== 'ALL') params.append('category', filters.category);
@@ -18,33 +59,36 @@ export const fetchCities = async () => {
   return res.data;
 };
 
+// Public suggestion: lands in the admin inbox, not on the map
 export const submitSpot = async (spotData) => {
-  const res = await axios.post(`${API_BASE}/map/spots`, spotData);
+  const res = await axios.post(`${API_BASE}/map/proposals`, spotData);
   return res.data;
 };
 
-export const createSpot = async (spotData) => {
-  const res = await axios.post(`${API_BASE}/map/spots`, spotData);
-  return res.data;
-};
+export const fetchProposals = (status = 'PENDING') =>
+  adminRequest({ method: 'get', url: `${API_BASE}/map/proposals?status=${status}` });
 
-export const updateSpot = async (id, spotData) => {
-  const res = await axios.put(`${API_BASE}/map/spots/${id}`, spotData);
-  return res.data;
-};
+export const approveProposal = (id, overrides = {}) =>
+  adminRequest({ method: 'post', url: `${API_BASE}/map/proposals/${id}/approve`, data: overrides });
 
-export const deleteSpot = async (id) => {
-  const res = await axios.delete(`${API_BASE}/map/spots/${id}`);
-  return res.data;
-};
+export const rejectProposal = (id) =>
+  adminRequest({ method: 'post', url: `${API_BASE}/map/proposals/${id}/reject` });
 
-export const toggleSpotVerification = async (id, isVerified) => {
-  const res = await axios.patch(`${API_BASE}/map/spots/${id}/verify`, { isVerified });
-  return res.data;
-};
+export const createSpot = (spotData) =>
+  adminRequest({ method: 'post', url: `${API_BASE}/map/spots`, data: spotData });
 
-export const searchProducts = async (query = '') => {
-  const res = await axios.get(`${API_BASE}/products/search?q=${encodeURIComponent(query)}`);
+export const updateSpot = (id, spotData) =>
+  adminRequest({ method: 'put', url: `${API_BASE}/map/spots/${id}`, data: spotData });
+
+export const deleteSpot = (id) =>
+  adminRequest({ method: 'delete', url: `${API_BASE}/map/spots/${id}` });
+
+export const toggleSpotVerification = (id, isVerified) =>
+  adminRequest({ method: 'patch', url: `${API_BASE}/map/spots/${id}/verify`, data: { isVerified } });
+
+// sources: 'local' (MongoDB, instant), 'off' (Open Food Facts, slow and rate limited) or 'all'
+export const searchProducts = async (query = '', sources = 'all') => {
+  const res = await axios.get(`${API_BASE}/products/search?q=${encodeURIComponent(query)}&sources=${sources}`);
   return res.data;
 };
 

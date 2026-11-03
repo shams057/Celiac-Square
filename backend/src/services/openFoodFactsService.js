@@ -1,6 +1,8 @@
 import axios from 'axios';
 
 const OFF_BASE_URL = 'https://world.openfoodfacts.org';
+// Open Food Facts asks for "AppName/Version (contact)"; set OFF_USER_AGENT in .env to add your contact
+const offUserAgent = () => process.env.OFF_USER_AGENT || 'CeliacSquare/1.0 (Tunisia celiac platform)';
 
 /**
  * Analyzes Open Food Facts product data for gluten presence
@@ -102,7 +104,7 @@ export const fetchFromOpenFoodFactsByBarcode = async (barcode) => {
     const response = await axios.get(url, {
       timeout: 4500,
       headers: {
-        'User-Agent': 'CeliacSquareTunisia - Web - Version 1.0',
+        'User-Agent': offUserAgent(),
       },
     });
 
@@ -135,51 +137,64 @@ export const fetchFromOpenFoodFactsByBarcode = async (barcode) => {
   }
 };
 
-/**
- * Search products by query term in Open Food Facts
- */
-export const searchOpenFoodFactsByQuery = async (query) => {
-  if (!query || query.trim().length < 2) return [];
-  try {
-    const url = `${OFF_BASE_URL}/cgi/search.pl?search_terms=${encodeURIComponent(
-      query.trim()
-    )}&search_simple=1&action=process&json=1&page_size=8`;
+// Open Food Facts rate-limits its search API (a few requests per minute) and answers 503
+// when exceeded, so answers are cached and failures are reported instead of looking like "no result".
+const SEARCH_CACHE_TTL_MS = 60 * 60 * 1000;
+const searchCache = new Map();
 
-    const response = await axios.get(url, {
-      timeout: 4500,
-      headers: {
-        'User-Agent': 'CeliacSquareTunisia - Web - Version 1.0',
-      },
+const mapSearchProducts = (products) =>
+  products
+    .filter((p) => p.product_name || p.product_name_fr)
+    .map((p) => {
+      const safety = analyzeGlutenSafety(p);
+      return {
+        id: `off_${p.code || Math.random()}`,
+        source: 'Open Food Facts',
+        productNameFr: p.product_name_fr || p.product_name || 'Produit',
+        productNameAr: p.product_name_ar || '',
+        brand: p.brands || 'Marque inconnue',
+        category: 'PROCESSED',
+        barcode: p.code || '',
+        isGlutenFree: safety.isGlutenFree,
+        status: safety.status,
+        badgeText: safety.badgeText,
+        badgeTextAr: safety.badgeTextAr,
+        notes: safety.reason,
+        notesAr: safety.reasonAr,
+        imageUrl: p.image_url || p.image_front_small_url || '',
+        ingredientsText: p.ingredients_text_fr || p.ingredients_text || '',
+        officialDocReference: 'Base internationale Open Food Facts',
+      };
     });
 
-    if (response.data && Array.isArray(response.data.products)) {
-      return response.data.products
-        .filter((p) => p.product_name || p.product_name_fr)
-        .map((p) => {
-          const safety = analyzeGlutenSafety(p);
-          return {
-            id: `off_${p.code || Math.random()}`,
-            source: 'Open Food Facts',
-            productNameFr: p.product_name_fr || p.product_name || 'Produit',
-            productNameAr: p.product_name_ar || '',
-            brand: p.brands || 'Marque inconnue',
-            category: 'PROCESSED',
-            barcode: p.code || '',
-            isGlutenFree: safety.isGlutenFree,
-            status: safety.status,
-            badgeText: safety.badgeText,
-            badgeTextAr: safety.badgeTextAr,
-            notes: safety.reason,
-            notesAr: safety.reasonAr,
-            imageUrl: p.image_url || p.image_front_small_url || '',
-            ingredientsText: p.ingredients_text_fr || p.ingredients_text || '',
-            officialDocReference: 'Base internationale Open Food Facts',
-          };
-        });
-    }
-    return [];
+/**
+ * Search Open Food Facts by text. Returns { ok, products }: ok is false when the
+ * service could not be reached or refused the request (rate limit, outage).
+ */
+export const searchOpenFoodFacts = async (query) => {
+  const term = (query || '').trim().toLowerCase();
+  if (term.length < 2) return { ok: true, products: [] };
+
+  const cached = searchCache.get(term);
+  if (cached && Date.now() - cached.at < SEARCH_CACHE_TTL_MS) return { ok: true, products: cached.products };
+
+  try {
+    const url = `${OFF_BASE_URL}/cgi/search.pl?search_terms=${encodeURIComponent(term)}&search_simple=1&action=process&json=1&page_size=8`;
+    const response = await axios.get(url, {
+      timeout: 4500,
+      headers: { 'User-Agent': offUserAgent() },
+    });
+    const products = Array.isArray(response.data?.products) ? mapSearchProducts(response.data.products) : [];
+    searchCache.set(term, { at: Date.now(), products });
+    if (searchCache.size > 500) searchCache.delete(searchCache.keys().next().value);
+    return { ok: true, products };
   } catch (err) {
     console.warn(`[OpenFoodFacts] Search notice: ${err.message}`);
-    return [];
+    return { ok: false, products: [] };
   }
 };
+
+/**
+ * Search products by query term in Open Food Facts (products only)
+ */
+export const searchOpenFoodFactsByQuery = async (query) => (await searchOpenFoodFacts(query)).products;

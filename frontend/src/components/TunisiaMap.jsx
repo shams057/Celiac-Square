@@ -1,393 +1,321 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import {
-  MapPin,
-  Stethoscope,
-  Croissant,
-  UtensilsCrossed,
-  Coffee,
-  ShoppingBag,
-  Star,
-  Clock,
-  Phone,
-  CheckCircle2,
-  Filter,
-  PlusCircle,
-  Search,
-  Navigation,
-} from 'lucide-react';
+import { Stethoscope, Croissant, UtensilsCrossed, Coffee, ShoppingBag, Phone, Clock, Search, BadgeCheck, LocateFixed, Plus } from 'lucide-react';
 import { fetchSpots, fetchCities } from '../services/api';
+import { t, PageHead, EmptyState, FilterSheet, SPOT_CATEGORIES, spotCategory } from './ui';
 
-// Create custom DOM / SVG marker icons for each category
-const createCategoryIcon = (category, isVerified) => {
-  let bgColor = '#8BA850'; // Default Sage Green
-  let iconHtml = '📍';
-
-  if (category === 'DOCTOR') {
-    bgColor = '#2B6CB0'; // Medical Blue
-    iconHtml = '🩺';
-  } else if (category === 'ARTISAN') {
-    bgColor = '#756452'; // Earthy Brown Bakery
-    iconHtml = '🥐';
-  } else if (category === 'RESTAURANT') {
-    bgColor = '#FF8A41'; // Vibrant Orange Restaurant
-    iconHtml = '🍽️';
-  } else if (category === 'CAFE') {
-    bgColor = '#D97706'; // Amber Cafe
-    iconHtml = '☕';
-  } else if (category === 'SUPERMARKET') {
-    bgColor = '#059669'; // Emerald Supermarket
-    iconHtml = '🛒';
-  }
-
-  const borderClass = isVerified ? 'border-2 border-white ring-2 ring-primary' : 'border border-white/80';
-
-  return L.divIcon({
-    className: 'custom-leaflet-marker',
-    html: `
-      <div style="background-color: ${bgColor};" class="w-9 h-9 rounded-full flex items-center justify-center text-white text-base shadow-lg ${borderClass} transform -translate-x-1/2 -translate-y-1/2 hover:scale-110 transition-transform">
-        <span>${iconHtml}</span>
-        ${isVerified ? '<span style="position:absolute; bottom:-2px; right:-2px; background:#8BA850; border-radius:50%; width:12px; height:12px; border:2px solid white;"></span>' : ''}
-      </div>
-    `,
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
-    popupAnchor: [0, -20],
-  });
+const CATEGORY_ICONS = {
+  DOCTOR: Stethoscope,
+  ARTISAN: Croissant,
+  RESTAURANT: UtensilsCrossed,
+  CAFE: Coffee,
+  SUPERMARKET: ShoppingBag,
 };
 
-// Map controller component to pan and zoom programmatically
-function ChangeMapView({ center, zoom }) {
+const TUNISIA_CENTER = [34.8, 9.9];
+// The whole country fits at 7 on a desktop-sized map, 6 on phones
+const TUNISIA_ZOOM = typeof window !== 'undefined' && window.innerWidth >= 1024 ? 7 : 6;
+
+// Square markers anchored at their centre; Leaflet handles the offset
+const iconCache = {};
+const markerIcon = (category, isVerified, active) => {
+  const key = `${category}-${isVerified}-${active}`;
+  if (iconCache[key]) return iconCache[key];
+  const cat = spotCategory(category);
+  const Icon = CATEGORY_ICONS[cat.value];
+  const size = active ? 38 : 30;
+  const glyph = renderToStaticMarkup(<Icon size={active ? 20 : 16} color="#F3F0E6" strokeWidth={2.25} />);
+  const badge = isVerified
+    ? '<span style="position:absolute;top:-5px;inset-inline-end:-5px;width:12px;height:12px;border-radius:2px;background:#8BA850;border:2px solid #F3F0E6"></span>'
+    : '';
+  const html = `<div style="position:relative;width:${size}px;height:${size}px;border-radius:5px;background:${cat.color};border:2px solid #F3F0E6;box-shadow:0 2px 6px rgba(47,38,29,.35);display:flex;align-items:center;justify-content:center">${glyph}${badge}</div>`;
+  iconCache[key] = L.divIcon({
+    className: 'cs-marker',
+    html,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2],
+  });
+  return iconCache[key];
+};
+
+function FlyTo({ target }) {
   const map = useMap();
   useEffect(() => {
-    if (center) {
-      map.flyTo(center, zoom, { duration: 1.2 });
-    }
-  }, [center, zoom, map]);
+    if (target) map.flyTo(target.center, target.zoom, { duration: 0.8 });
+  }, [target, map]);
   return null;
 }
 
 export default function TunisiaMap({ onOpenSubmitModal, lang }) {
+  const tr = t(lang);
   const [spots, setSpots] = useState([]);
   const [cities, setCities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [selectedCity, setSelectedCity] = useState('ALL');
   const [verifiedOnly, setVerifiedOnly] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeSpot, setActiveSpot] = useState(null);
-  const [mapCenter, setMapCenter] = useState([35.8, 10.2]); // Center of Tunisia
-  const [mapZoom, setMapZoom] = useState(7);
+  const [activeId, setActiveId] = useState(null);
+  const [flyTarget, setFlyTarget] = useState(null);
 
-  // Load spots & cities
   useEffect(() => {
-    loadData();
+    const timer = setTimeout(() => setSearchQuery(searchInput.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    fetchCities()
+      .then((res) => res?.data && setCities(res.data))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetchSpots({
+      category: selectedCategory,
+      city: selectedCity,
+      isVerified: verifiedOnly ? 'true' : '',
+      q: searchQuery,
+    })
+      .then((res) => {
+        if (cancelled) return;
+        setSpots(res?.data || []);
+        setLoadError(false);
+      })
+      .catch(() => !cancelled && setLoadError(true))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
   }, [selectedCategory, selectedCity, verifiedOnly, searchQuery]);
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const res = await fetchSpots({
-        category: selectedCategory,
-        city: selectedCity,
-        isVerified: verifiedOnly ? 'true' : '',
-        q: searchQuery,
-      });
+  const counts = useMemo(() => {
+    const c = {};
+    spots.forEach((s) => {
+      c[s.category] = (c[s.category] || 0) + 1;
+    });
+    return c;
+  }, [spots]);
 
-      if (res && res.data) {
-        setSpots(res.data);
-      }
+  const activeFilterCount = (selectedCategory !== 'ALL' ? 1 : 0) + (selectedCity !== 'ALL' ? 1 : 0) + (verifiedOnly ? 1 : 0);
 
-      const cityRes = await fetchCities();
-      if (cityRes && cityRes.data) {
-        setCities(cityRes.data);
-      }
-    } catch (err) {
-      console.error('Failed to load map data:', err);
-    } finally {
-      setLoading(false);
-    }
+  const categoryChips = (
+    <>
+      <button type="button" className="chip" aria-pressed={selectedCategory === 'ALL'} onClick={() => setSelectedCategory('ALL')}>
+        {tr('Tout', 'الكل')}
+      </button>
+      {SPOT_CATEGORIES.map((c) => (
+        <button
+          key={c.value}
+          type="button"
+          className="chip"
+          aria-pressed={selectedCategory === c.value}
+          onClick={() => setSelectedCategory(selectedCategory === c.value ? 'ALL' : c.value)}
+        >
+          <span className="h-3 w-3 rounded-[2px]" style={{ background: c.color }} aria-hidden="true" />
+          {tr(c.fr, c.ar)}
+          {selectedCategory === 'ALL' && counts[c.value] ? <span className="tabular-nums opacity-70">{counts[c.value]}</span> : null}
+        </button>
+      ))}
+    </>
+  );
+
+  const citySelect = (
+    <select value={selectedCity} onChange={(e) => setSelectedCity(e.target.value)} className="field lg:w-48" aria-label={tr('Ville', 'المدينة')}>
+      <option value="ALL">{tr('Toutes les villes', 'كل المدن')}</option>
+      {cities.map((c) => (
+        <option key={c} value={c}>
+          {c}
+        </option>
+      ))}
+    </select>
+  );
+
+  const verifiedToggle = (
+    <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-canvas-line bg-canvas-paper px-3.5 py-2.5 text-[15px]">
+      <input type="checkbox" checked={verifiedOnly} onChange={(e) => setVerifiedOnly(e.target.checked)} className="h-4 w-4 accent-[#4E6127]" />
+      {tr('Vérifiées seulement', 'الموثقة فقط')}
+    </label>
+  );
+
+  const focusSpot = (spot) => {
+    setActiveId(spot._id);
+    const [lng, lat] = spot.location?.coordinates || [];
+    if (lat !== undefined) setFlyTarget({ center: [lat, lng], zoom: 14 });
   };
 
-  // Center on clicked spot
-  const handleSpotClick = (spot) => {
-    setActiveSpot(spot);
-    if (spot.location && spot.location.coordinates) {
-      const [lng, lat] = spot.location.coordinates;
-      setMapCenter([lat, lng]);
-      setMapZoom(14);
-    }
-  };
-
-  // Reset view to all Tunisia
-  const handleResetView = () => {
-    setMapCenter([35.8, 10.2]);
-    setMapZoom(7);
-    setActiveSpot(null);
+  const resetView = () => {
+    setActiveId(null);
+    setFlyTarget({ center: TUNISIA_CENTER, zoom: TUNISIA_ZOOM });
   };
 
   return (
-    <div className="space-y-8 animate-fadeIn">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-canvas-card via-[#FAF8F2] to-canvas/60 rounded-3xl p-6 sm:p-8 border border-canvas-border shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div className="max-w-2xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary/15 text-secondary-dark text-xs font-extrabold mb-3">
-            <MapPin className="w-4 h-4 text-secondary" />
-            <span>RÉSEAU NATIONAL TUNISIEN VÉRIFIÉ</span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-secondary-dark tracking-tight leading-tight">
-            Carte Interactive des Bonnes Adresses
-          </h1>
-          <p className="mt-2 text-base text-secondary/90 leading-relaxed">
-            Trouvez les médecins gastro-entérologues et nutritionnistes spécialisés cœliaque ainsi que les boulangeries, pâtisseries, restaurants et rayons certifiés sans gluten à travers toute la Tunisie.
-          </p>
-        </div>
+    <div className="space-y-6">
+      <PageHead
+        title={tr('Où manger, où consulter', 'أين تأكل، أين تستشير')}
+        lede={tr(
+          'Médecins qui suivent la maladie cœliaque, boulangeries sans gluten, restaurants et rayons dédiés, partout en Tunisie. Les adresses marquées d’un carré vert ont été vérifiées.',
+          'أطباء يتابعون مرض الأبطن، مخابز بدون غلوتين، مطاعم وأجنحة مخصصة في كامل تونس. العناوين ذات المربع الأخضر تم التحقق منها.'
+        )}
+        action={
+          <button type="button" onClick={onOpenSubmitModal} className="btn-quiet">
+            <Plus className="h-4 w-4" />
+            {tr('Proposer une adresse', 'اقترح عنوانا')}
+          </button>
+        }
+      />
 
-        <button
-          onClick={onOpenSubmitModal}
-          className="shrink-0 flex items-center gap-2.5 px-5 py-3.5 bg-primary text-white font-bold rounded-2xl shadow-md hover:bg-primary-dark transition-all duration-200 active:scale-95"
-        >
-          <PlusCircle className="w-5 h-5" />
-          <span>Proposer une Adresse</span>
-        </button>
+      {/* Category chips double as the map legend; on mobile they live in the filters sheet */}
+      <div className="hidden flex-wrap gap-2 lg:flex" role="group" aria-label={tr('Catégories', 'الأصناف')}>
+        {categoryChips}
       </div>
 
-      {/* Filter Toolbar */}
-      <div className="bg-[#FAF8F2] rounded-3xl p-6 border border-canvas-border shadow-sm space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Search text filter */}
-          <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary/50" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Rechercher nom, spécialité..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-canvas-border text-sm font-medium placeholder:text-secondary/50 focus:outline-none focus:ring-2 focus:ring-secondary text-secondary-dark"
-            />
-          </div>
-
-          {/* Category Filter */}
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-xl bg-white border border-canvas-border text-sm font-medium text-secondary-dark focus:outline-none focus:ring-2 focus:ring-secondary"
-          >
-            <option value="ALL">Toutes les catégories</option>
-            <option value="DOCTOR">🩺 Médecins Spécialistes Cœliaque</option>
-            <option value="ARTISAN">🥐 Boulangeries & Pâtisseries Sans Gluten</option>
-            <option value="RESTAURANT">🍽️ Restaurants & Pizzerias GF</option>
-            <option value="CAFE">☕ Cafés & Salons de thé certifiés</option>
-            <option value="SUPERMARKET">🛒 Supermarchés & Rayons Dédiés</option>
-          </select>
-
-          {/* City Filter */}
-          <select
-            value={selectedCity}
-            onChange={(e) => setSelectedCity(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-xl bg-white border border-canvas-border text-sm font-medium text-secondary-dark focus:outline-none focus:ring-2 focus:ring-secondary"
-          >
-            <option value="ALL">Toutes les villes de Tunisie</option>
-            {cities.map((c) => (
-              <option key={c} value={c}>
-                📍 {c}
-              </option>
-            ))}
-          </select>
-
-          {/* Verified Toggle & Reset */}
-          <div className="flex items-center justify-between gap-2">
-            <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-2 rounded-xl border border-canvas-border w-full">
-              <input
-                type="checkbox"
-                checked={verifiedOnly}
-                onChange={(e) => setVerifiedOnly(e.target.checked)}
-                className="w-4 h-4 rounded text-primary focus:ring-primary accent-primary"
-              />
-              <span className="text-xs font-bold text-secondary-dark">
-                Vérifié ATC uniquement
-              </span>
-            </label>
-
-            <button
-              onClick={handleResetView}
-              className="p-2.5 bg-white border border-canvas-border rounded-xl hover:bg-canvas/50 text-secondary transition-colors"
-              title="Recentrer sur la Tunisie"
-            >
-              <Navigation className="w-4 h-4" />
-            </button>
-          </div>
+      <div className="flex gap-2 lg:grid lg:grid-cols-[1fr_auto_auto] lg:gap-3">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder={tr('Nom, spécialité, quartier…', 'الاسم، الاختصاص، الحي…')}
+            aria-label={tr('Rechercher une adresse', 'ابحث عن عنوان')}
+            className="field ps-10"
+          />
         </div>
+        <div className="hidden lg:block">{citySelect}</div>
+        <div className="hidden lg:block">{verifiedToggle}</div>
+        <FilterSheet lang={lang} activeCount={activeFilterCount} className="shrink-0">
+          <div className="space-y-5">
+            <div>
+              <p className="mb-2 text-sm font-medium">{tr('Type de lieu', 'نوع المكان')}</p>
+              <div className="flex flex-wrap gap-2">{categoryChips}</div>
+            </div>
+            <div>
+              <p className="mb-2 text-sm font-medium">{tr('Ville', 'المدينة')}</p>
+              {citySelect}
+            </div>
+            {verifiedToggle}
+          </div>
+        </FilterSheet>
       </div>
 
-      {/* Main Map & Spot List View */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Map Container (7 cols) */}
-        <div className="lg:col-span-7 bg-[#FAF8F2] rounded-3xl p-4 border border-canvas-border shadow-sm overflow-hidden h-[580px] relative">
-          <MapContainer
-            center={mapCenter}
-            zoom={mapZoom}
-            scrollWheelZoom={true}
-            className="w-full h-full rounded-2xl"
-          >
-            <ChangeMapView center={mapCenter} zoom={mapZoom} />
+      <div className="grid items-start gap-4 lg:grid-cols-[1.5fr_1fr]">
+        <div className="relative z-0 h-[55vh] min-h-[340px] overflow-hidden rounded-xl border border-canvas-line lg:sticky lg:top-24 lg:h-[620px]">
+          <MapContainer center={TUNISIA_CENTER} zoom={TUNISIA_ZOOM} scrollWheelZoom className="h-full w-full">
+            <FlyTo target={flyTarget} />
             <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-
             {spots.map((spot) => {
-              if (!spot.location || !spot.location.coordinates) return null;
-              const [lng, lat] = spot.location.coordinates;
-              const icon = createCategoryIcon(spot.category, spot.isVerified);
-
+              const [lng, lat] = spot.location?.coordinates || [];
+              if (lat === undefined) return null;
               return (
                 <Marker
                   key={spot._id}
                   position={[lat, lng]}
-                  icon={icon}
-                  eventHandlers={{
-                    click: () => setActiveSpot(spot),
-                  }}
+                  icon={markerIcon(spot.category, spot.isVerified, activeId === spot._id)}
+                  eventHandlers={{ click: () => setActiveId(spot._id) }}
                 >
                   <Popup>
-                    <div className="p-3 max-w-xs space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-canvas text-secondary-dark">
-                          {spot.category}
-                        </span>
-                        {spot.isVerified && (
-                          <span className="text-[10px] font-bold text-primary flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> Vérifié ATC
-                          </span>
-                        )}
-                      </div>
-                      <h4 className="font-extrabold text-sm text-secondary-dark leading-snug">
-                        {spot.name}
-                      </h4>
-                      <p className="text-xs text-secondary/80">{spot.address}</p>
-                      {spot.speciality && (
-                        <p className="text-[11px] font-medium text-primary-dark">
-                          {spot.speciality}
-                        </p>
-                      )}
-                      {spot.phone && (
-                        <p className="text-xs font-semibold text-secondary flex items-center gap-1">
-                          <Phone className="w-3 h-3 text-accent" /> {spot.phone}
-                        </p>
-                      )}
-                    </div>
+                    <p className="font-medium">{spot.name}</p>
+                    <p className="text-ink-soft">{spot.address}</p>
+                    {spot.phone && (
+                      <a href={`tel:${spot.phone.replace(/\s/g, '')}`} className="mt-1 inline-block text-status-safe-ink underline">
+                        {spot.phone}
+                      </a>
+                    )}
                   </Popup>
                 </Marker>
               );
             })}
           </MapContainer>
-
-          {/* Map Legend overlay */}
-          <div className="absolute bottom-6 left-6 z-[400] bg-white/95 backdrop-blur-md p-3 rounded-2xl border border-canvas-border shadow-md text-[11px] space-y-1.5 hidden sm:block">
-            <span className="font-bold text-secondary-dark block mb-1">Légende :</span>
-            <div className="flex items-center gap-2 text-secondary">
-              <span className="w-3 h-3 rounded-full bg-[#2B6CB0]"></span> Médecin Spécialiste
-            </div>
-            <div className="flex items-center gap-2 text-secondary">
-              <span className="w-3 h-3 rounded-full bg-[#756452]"></span> Boulangerie / Pâtisserie
-            </div>
-            <div className="flex items-center gap-2 text-secondary">
-              <span className="w-3 h-3 rounded-full bg-[#FF8A41]"></span> Restaurant Sans Gluten
-            </div>
-            <div className="flex items-center gap-2 text-secondary">
-              <span className="w-3 h-3 rounded-full bg-[#059669]"></span> Rayon Supermarché
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={resetView}
+            className="absolute end-3 top-3 z-[500] rounded-lg border border-canvas-line bg-canvas-paper p-2 text-ink shadow-sm hover:bg-white"
+            aria-label={tr('Revoir toute la Tunisie', 'عرض كامل تونس')}
+            title={tr('Revoir toute la Tunisie', 'عرض كامل تونس')}
+          >
+            <LocateFixed className="h-5 w-5" />
+          </button>
         </div>
 
-        {/* Spot List Column (5 cols) */}
-        <div className="lg:col-span-5 space-y-4 max-h-[580px] overflow-y-auto pr-1">
-          <div className="flex items-center justify-between pb-2 border-b border-canvas-border/50">
-            <span className="text-xs font-bold uppercase tracking-wider text-secondary">
-              Adresses Répertoriées ({spots.length})
-            </span>
-            <span className="text-xs text-secondary/70">Cliquez pour situer sur la carte</span>
-          </div>
-
-          {spots.length > 0 ? (
-            spots.map((spot) => {
-              const isSelected = activeSpot && activeSpot._id === spot._id;
-              return (
-                <div
-                  key={spot._id}
-                  onClick={() => handleSpotClick(spot)}
-                  className={`p-5 rounded-2xl border transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-white border-primary shadow-md ring-2 ring-primary/20 scale-[1.01]'
-                      : 'bg-[#FAF8F2] border-canvas-border hover:bg-white hover:border-secondary/40'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-canvas/80 text-secondary-dark uppercase tracking-wider">
-                          {spot.category}
-                        </span>
-                        <span className="text-xs font-bold text-accent">📍 {spot.city}</span>
+        <div>
+          <p className="mb-2 text-sm text-ink-soft" aria-live="polite">
+            {loading ? tr('Chargement…', 'جاري التحميل…') : `${spots.length} ${tr(spots.length > 1 ? 'adresses' : 'adresse', 'عنوان')}`}
+          </p>
+          {loadError ? (
+            <EmptyState title={tr('Les adresses n’ont pas pu être chargées', 'تعذر تحميل العناوين')}>
+              {tr('Vérifiez votre connexion, puis changez un filtre pour réessayer.', 'تحقق من الاتصال ثم غيّر أحد المرشحات لإعادة المحاولة.')}
+            </EmptyState>
+          ) : !loading && spots.length === 0 ? (
+            <EmptyState
+              title={tr('Aucune adresse ici pour l’instant', 'لا توجد عناوين هنا حاليا')}
+              action={
+                <button type="button" onClick={onOpenSubmitModal} className="btn-primary">
+                  {tr('Proposer une adresse', 'اقترح عنوانا')}
+                </button>
+              }
+            >
+              {tr('Vous connaissez un lieu sûr ? Signalez-le à la communauté.', 'هل تعرف مكانا آمنا؟ شاركه مع المجتمع.')}
+            </EmptyState>
+          ) : (
+            <ul className="space-y-2">
+              {spots.map((spot) => {
+                const cat = spotCategory(spot.category);
+                const active = activeId === spot._id;
+                return (
+                  <li key={spot._id}>
+                    <button
+                      type="button"
+                      onClick={() => focusSpot(spot)}
+                      aria-pressed={active}
+                      className={`w-full rounded-xl border p-4 text-start transition-colors ${
+                        active ? 'border-ink bg-white ring-1 ring-ink' : 'border-canvas-line bg-white hover:border-ink-faint'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2 text-sm text-ink-soft">
+                        <span className="h-3 w-3 shrink-0 rounded-[2px]" style={{ background: cat.color }} aria-hidden="true" />
+                        {tr(cat.fr, cat.ar)}, {spot.city}
                         {spot.isVerified && (
-                          <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/15 text-primary-dark border border-primary/20">
-                            <CheckCircle2 className="w-3 h-3 text-primary" /> Vérifié ATC
+                          <span className="ms-auto inline-flex items-center gap-1 text-status-safe-ink">
+                            <BadgeCheck className="h-4 w-4" />
+                            {tr('Vérifiée', 'موثق')}
                           </span>
                         )}
-                      </div>
-                      <h3 className="font-extrabold text-base text-secondary-dark mt-1.5">
-                        {spot.name}
-                      </h3>
-                    </div>
-
-                    <div className="flex items-center gap-1 bg-accent/10 px-2 py-1 rounded-xl text-xs font-bold text-accent-dark shrink-0">
-                      <Star className="w-3.5 h-3.5 fill-accent text-accent" />
-                      <span>{spot.rating || 4.8}</span>
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-secondary mt-2 leading-relaxed">{spot.address}</p>
-
-                  {spot.speciality && (
-                    <p className="text-xs font-semibold text-primary-dark mt-1">
-                      ✨ {spot.speciality}
-                    </p>
-                  )}
-
-                  {spot.notes && (
-                    <div className="mt-3 p-2.5 rounded-xl bg-canvas/40 border border-canvas-border/50 text-xs text-secondary-dark">
-                      {spot.notes}
-                    </div>
-                  )}
-
-                  <div className="mt-3 pt-3 border-t border-canvas-border/50 flex flex-wrap items-center justify-between gap-2 text-xs text-secondary">
-                    {spot.phone ? (
-                      <span className="flex items-center gap-1 font-semibold text-secondary-dark">
-                        <Phone className="w-3.5 h-3.5 text-accent" /> {spot.phone}
                       </span>
-                    ) : (
-                      <span></span>
-                    )}
-
-                    {spot.hours && (
-                      <span className="flex items-center gap-1 text-[11px]">
-                        <Clock className="w-3 h-3 text-secondary/60" /> {spot.hours}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="bg-[#FAF8F2] rounded-2xl p-8 text-center border border-canvas-border">
-              <MapPin className="w-8 h-8 text-secondary/40 mx-auto mb-2" />
-              <p className="text-sm font-bold text-secondary-dark">Aucune adresse trouvée</p>
-              <p className="text-xs text-secondary mt-1">
-                Modifiez vos filtres ou proposez une nouvelle adresse via le bouton en haut.
-              </p>
-            </div>
+                      <span className="mt-1.5 block font-medium leading-snug">{spot.name}</span>
+                      <span className="mt-0.5 block text-sm text-ink-soft">{spot.address}</span>
+                      {spot.speciality && <span className="mt-2 block text-sm">{spot.speciality}</span>}
+                      {active && spot.notes && <span className="mt-2 block border-s-2 border-status-safe ps-3 text-sm text-ink-soft">{spot.notes}</span>}
+                      {(spot.phone || spot.hours) && (
+                        <span className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-soft">
+                          {spot.phone && (
+                            <span className="inline-flex items-center gap-1.5 tabular-nums" dir="ltr">
+                              <Phone className="h-3.5 w-3.5" />
+                              {spot.phone}
+                            </span>
+                          )}
+                          {spot.hours && (
+                            <span className="inline-flex items-center gap-1.5">
+                              <Clock className="h-3.5 w-3.5" />
+                              {spot.hours}
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
       </div>

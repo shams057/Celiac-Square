@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Navbar from './components/Navbar';
 import VisionScanner from './components/VisionScanner';
 import ProductSearch from './components/ProductSearch';
@@ -9,62 +9,59 @@ import SpotModal from './components/SpotModal';
 import Footer from './components/Footer';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('atmc'); // 'atmc' | 'vision' | 'search' | 'map'
+  const [activeTab, setActiveTab] = useState('atmc'); // 'atmc' | 'vision' | 'search' | 'map' | 'backoffice'
   const [searchInitialQuery, setSearchInitialQuery] = useState('');
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const [mapRefreshKey, setMapRefreshKey] = useState(0);
   const [lang, setLang] = useState('fr');
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+  }, [lang]);
+
+  const goTo = (tab) => {
+    setActiveTab(tab);
+    window.scrollTo({ top: 0 });
+  };
 
   const handleSwitchToSearch = (query) => {
     setSearchInitialQuery(query);
-    setActiveTab('search');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    goTo('search');
   };
 
   return (
-    <div className={`min-h-screen flex flex-col bg-canvas text-secondary-dark ${lang === 'ar' ? 'font-arabic' : 'font-sans'}`} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-      {/* Top Navigation */}
+    <div className="flex min-h-screen flex-col">
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-[2000] focus:rounded-lg focus:bg-ink focus:px-4 focus:py-2 focus:text-canvas-paper">
+        {lang === 'ar' ? 'انتقل إلى المحتوى' : 'Aller au contenu'}
+      </a>
+
       <Navbar
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={goTo}
         onOpenSubmitModal={() => setIsSubmitModalOpen(true)}
         lang={lang}
         setLang={setLang}
       />
 
-      {/* Main Content View */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'atmc' && (
-          <AtmcCatalog lang={lang} />
-        )}
-
-        {activeTab === 'vision' && (
-          <VisionScanner onSwitchToSearch={handleSwitchToSearch} lang={lang} />
-        )}
-
-        {activeTab === 'search' && (
-          <ProductSearch initialQuery={searchInitialQuery} lang={lang} />
-        )}
-
+      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 pb-28 pt-6 sm:px-6 sm:pt-10 lg:pb-16">
+        {activeTab === 'atmc' && <AtmcCatalog lang={lang} />}
+        {activeTab === 'vision' && <VisionScanner onSwitchToSearch={handleSwitchToSearch} lang={lang} />}
+        {activeTab === 'search' && <ProductSearch initialQuery={searchInitialQuery} lang={lang} />}
         {activeTab === 'map' && (
-          <TunisiaMap onOpenSubmitModal={() => setIsSubmitModalOpen(true)} lang={lang} />
+          <TunisiaMap key={mapRefreshKey} onOpenSubmitModal={() => setIsSubmitModalOpen(true)} lang={lang} />
         )}
-
-        {activeTab === 'backoffice' && (
-          <BackofficeSpots lang={lang} />
-        )}
+        {activeTab === 'backoffice' && <BackofficeSpots lang={lang} />}
       </main>
 
-      {/* Community Spot Submission Modal */}
       <SpotModal
         isOpen={isSubmitModalOpen}
         onClose={() => setIsSubmitModalOpen(false)}
-        onSuccess={() => {
-          // If on map tab, user will see the reload
-        }}
+        onSuccess={() => setMapRefreshKey((k) => k + 1)}
+        lang={lang}
       />
 
-      {/* Site Footer */}
-      <Footer lang={lang} />
+      <Footer lang={lang} onOpenBackoffice={() => goTo('backoffice')} />
     </div>
   );
 }

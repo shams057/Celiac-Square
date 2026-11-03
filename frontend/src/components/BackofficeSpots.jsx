@@ -1,30 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  Plus,
-  Trash2,
-  Edit3,
-  CheckCircle2,
-  Clock,
-  MapPin,
-  Phone,
-  Star,
-  Search,
-  Filter,
-  Check,
-  X,
-  ExternalLink,
-  ShieldCheck,
-  AlertCircle,
-  Save,
-  RefreshCw,
-  SlidersHorizontal,
-  Navigation,
-  Stethoscope,
-  Croissant,
-  UtensilsCrossed,
-  Coffee,
-  ShoppingBag,
-} from 'lucide-react';
+import { Plus, Search, LogOut, RotateCw, Pencil, Trash2, BadgeCheck, Clock, ExternalLink, Lock, Check, X } from 'lucide-react';
 import {
   fetchSpots,
   fetchCities,
@@ -32,25 +7,25 @@ import {
   updateSpot,
   deleteSpot,
   toggleSpotVerification,
+  fetchProposals,
+  approveProposal,
+  rejectProposal,
+  getAdminToken,
+  setAdminToken,
+  checkAdminToken,
+  ADMIN_LOGOUT_EVENT,
 } from '../services/api';
-
-const CATEGORIES = [
-  { value: 'DOCTOR', labelFr: 'Médecin / Gastro / Pédiatre', labelAr: 'طبيب / اختصاصي', icon: Stethoscope, color: 'text-blue-600 bg-blue-50 border-blue-200' },
-  { value: 'ARTISAN', labelFr: 'Boulangerie / Pâtisserie', labelAr: 'مخبزة / حلويات', icon: Croissant, color: 'text-amber-700 bg-amber-50 border-amber-200' },
-  { value: 'RESTAURANT', labelFr: 'Restaurant Sans Gluten', labelAr: 'مطعم بدون غلوتين', icon: UtensilsCrossed, color: 'text-orange-600 bg-orange-50 border-orange-200' },
-  { value: 'CAFE', labelFr: 'Café / Salon de thé', labelAr: 'مقهى / قاعة شاي', icon: Coffee, color: 'text-amber-600 bg-amber-50 border-amber-200' },
-  { value: 'SUPERMARKET', labelFr: 'Épicerie / Supermarché', labelAr: 'مغازة / متجر صحي', icon: ShoppingBag, color: 'text-emerald-600 bg-emerald-50 border-emerald-200' },
-];
+import { t, PageHead, Spinner, Notice, EmptyState, Modal, SPOT_CATEGORIES, spotCategory } from './ui';
 
 const PRESET_COORDINATES = [
-  { name: 'Tunis Centre', coords: [10.1815, 36.8065] },
+  { name: 'Tunis', coords: [10.1815, 36.8065] },
   { name: 'Ariana', coords: [10.1972, 36.8522] },
   { name: 'La Marsa', coords: [10.3255, 36.8782] },
   { name: 'Sousse', coords: [10.6369, 35.8256] },
   { name: 'Sfax', coords: [10.7602, 34.7405] },
   { name: 'Bizerte', coords: [9.8739, 37.2744] },
   { name: 'Nabeul', coords: [10.7376, 36.4561] },
-  { name: 'Djerba (Houmt Souk)', coords: [10.8572, 33.875] },
+  { name: 'Djerba', coords: [10.8572, 33.875] },
 ];
 
 const EMPTY_SPOT_FORM = {
@@ -62,7 +37,7 @@ const EMPTY_SPOT_FORM = {
   longitude: '10.1815',
   phone: '',
   speciality: '',
-  hours: 'Lun-Sam: 09:00 - 19:00',
+  hours: '',
   rating: 4.8,
   reviewCount: 1,
   isVerified: true,
@@ -70,60 +45,135 @@ const EMPTY_SPOT_FORM = {
   submittedBy: 'Backoffice Admin',
 };
 
+// Login gate: the backend rejects edits without a valid ADMIN_TOKEN
 export default function BackofficeSpots({ lang = 'fr' }) {
+  const tr = t(lang);
+  const [isAuthed, setIsAuthed] = useState(Boolean(getAdminToken()));
+  const [tokenInput, setTokenInput] = useState('');
+  const [checking, setChecking] = useState(false);
+  const [loginError, setLoginError] = useState('');
+
+  useEffect(() => {
+    const onLogout = () => setIsAuthed(false);
+    window.addEventListener(ADMIN_LOGOUT_EVENT, onLogout);
+    return () => window.removeEventListener(ADMIN_LOGOUT_EVENT, onLogout);
+  }, []);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setChecking(true);
+    setLoginError('');
+    try {
+      await checkAdminToken(tokenInput.trim());
+      setAdminToken(tokenInput.trim());
+      setTokenInput('');
+      setIsAuthed(true);
+    } catch (err) {
+      setLoginError(err.response?.data?.message || tr('Le jeton n’a pas pu être vérifié.', 'تعذر التحقق من الرمز.'));
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setAdminToken('');
+    setIsAuthed(false);
+  };
+
+  if (isAuthed) return <BackofficeManager lang={lang} onLogout={handleLogout} />;
+
+  return (
+    <div className="mx-auto max-w-md pt-6">
+      <div className="panel p-6 sm:p-8">
+        <Lock className="h-6 w-6 text-ink-soft" />
+        <h1 className="mt-4 text-2xl font-semibold">{tr('Espace administrateur', 'فضاء الإدارة')}</h1>
+        <p className="mt-1 text-sm text-ink-soft">
+          {tr('Saisissez le jeton ADMIN_TOKEN défini dans backend/.env.', 'أدخل الرمز ADMIN_TOKEN المحدد في backend/.env.')}
+        </p>
+        <form onSubmit={handleLogin} className="mt-6 space-y-3">
+          <label htmlFor="admin-token" className="field-label">{tr('Jeton administrateur', 'رمز الإدارة')}</label>
+          <input
+            id="admin-token"
+            type="password"
+            value={tokenInput}
+            onChange={(e) => setTokenInput(e.target.value)}
+            autoComplete="current-password"
+            className="field"
+          />
+          {loginError && <Notice tone="error">{loginError}</Notice>}
+          <button type="submit" disabled={checking || !tokenInput.trim()} className="btn-primary w-full">
+            {checking ? tr('Vérification…', 'جاري التحقق…') : tr('Se connecter', 'تسجيل الدخول')}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function BackofficeManager({ lang = 'fr', onLogout }) {
+  const tr = t(lang);
   const [spots, setSpots] = useState([]);
   const [cities, setCities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [toast, setToast] = useState(null);
 
-  // Filters
   const [filterQuery, setFilterQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState('ALL');
   const [filterCity, setFilterCity] = useState('ALL');
-  const [filterVerified, setFilterVerified] = useState('ALL'); // 'ALL' | 'VERIFIED' | 'PENDING'
+  const [filterVerified, setFilterVerified] = useState('ALL');
 
-  // Edit / Add Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState('create'); // 'create' | 'edit'
+  const [modalMode, setModalMode] = useState('create');
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState(EMPTY_SPOT_FORM);
   const [formSubmitting, setFormSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
 
-  // Delete Confirmation Modal
   const [spotToDelete, setSpotToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Show auto-dismissing toast
-  const showToast = (message, type = 'success') => {
-    setToast({ message, type });
-    setTimeout(() => {
-      setToast(null);
-    }, 4000);
+  // Community proposals inbox
+  const [view, setView] = useState('inbox'); // 'inbox' | 'spots'
+  const [proposals, setProposals] = useState([]);
+  const [proposalFilter, setProposalFilter] = useState('PENDING');
+  const [pendingProposals, setPendingProposals] = useState(0);
+  const [proposalsLoading, setProposalsLoading] = useState(true);
+  const [proposalToReject, setProposalToReject] = useState(null);
+  const [isRejecting, setIsRejecting] = useState(false);
+
+  const showToast = (message, tone = 'success') => {
+    setToast({ message, tone });
+    setTimeout(() => setToast(null), 4000);
   };
 
-  // Load spots directly from MongoDB
   const loadSpots = async () => {
     setLoading(true);
     setErrorMsg('');
     try {
-      const res = await fetchSpots({
-        category: 'ALL',
-        city: 'ALL',
-        isVerified: 'ALL',
-      });
-      if (res && res.data) {
-        setSpots(res.data);
-      }
-      const cityRes = await fetchCities();
-      if (cityRes && cityRes.data) {
-        setCities(cityRes.data);
-      }
+      const [res, cityRes] = await Promise.all([fetchSpots({ category: 'ALL', city: 'ALL', isVerified: 'ALL' }), fetchCities()]);
+      if (res?.data) setSpots(res.data);
+      if (cityRes?.data) setCities(cityRes.data);
     } catch (err) {
-      console.error('Failed to load spots from database:', err);
-      setErrorMsg('Erreur lors du chargement des adresses depuis la base de données MongoDB.');
+      console.error('Failed to load spots:', err);
+      setErrorMsg('load');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadProposals = async (status = proposalFilter) => {
+    setProposalsLoading(true);
+    try {
+      const res = await fetchProposals(status);
+      if (res?.success) {
+        setProposals(res.data);
+        setPendingProposals(res.pendingCount);
+      }
+    } catch (err) {
+      console.error('Failed to load proposals:', err);
+    } finally {
+      setProposalsLoading(false);
     }
   };
 
@@ -131,43 +181,78 @@ export default function BackofficeSpots({ lang = 'fr' }) {
     loadSpots();
   }, []);
 
-  // Filtered view
-  const filteredSpots = useMemo(() => {
-    return spots.filter((spot) => {
-      // Query filter
-      if (filterQuery.trim()) {
-        const q = filterQuery.toLowerCase();
-        const matchName = spot.name?.toLowerCase().includes(q);
-        const matchAddress = spot.address?.toLowerCase().includes(q);
-        const matchNotes = spot.notes?.toLowerCase().includes(q);
-        const matchSpeciality = spot.speciality?.toLowerCase().includes(q);
-        if (!matchName && !matchAddress && !matchNotes && !matchSpeciality) return false;
+  useEffect(() => {
+    loadProposals(proposalFilter);
+  }, [proposalFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Approving goes through the full form so the admin can set the exact position
+  const handleOpenApprove = (proposal) => {
+    const coords = proposal.coordinates?.length === 2 ? proposal.coordinates : [10.1815, 36.8065];
+    setModalMode('approve');
+    setEditingId(proposal._id);
+    setFormError('');
+    setFormData({
+      ...EMPTY_SPOT_FORM,
+      name: proposal.name,
+      category: proposal.category,
+      city: proposal.city,
+      address: proposal.address,
+      longitude: String(coords[0]),
+      latitude: String(coords[1]),
+      phone: proposal.phone || '',
+      speciality: proposal.speciality || '',
+      hours: proposal.hours || '',
+      notes: proposal.notes || '',
+      submittedBy: proposal.submittedBy || 'Communauté',
+      isVerified: true,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleConfirmReject = async () => {
+    if (!proposalToReject) return;
+    setIsRejecting(true);
+    try {
+      const res = await rejectProposal(proposalToReject._id);
+      if (res?.success) {
+        showToast(tr(`« ${proposalToReject.name} » refusée`, `تم رفض «${proposalToReject.name}»`));
+        setProposalToReject(null);
+        loadProposals();
       }
-      // Category filter
+    } catch (err) {
+      showToast(err.response?.data?.message || tr('Le refus n’a pas été enregistré.', 'لم يتم تسجيل الرفض.'), 'error');
+    } finally {
+      setIsRejecting(false);
+    }
+  };
+
+  const pendingCount = spots.filter((s) => !s.isVerified).length;
+
+  const filteredSpots = useMemo(() => {
+    const q = filterQuery.trim().toLowerCase();
+    return spots.filter((spot) => {
+      if (q && ![spot.name, spot.address, spot.notes, spot.speciality].some((v) => v?.toLowerCase().includes(q))) return false;
       if (filterCategory !== 'ALL' && spot.category !== filterCategory) return false;
-      // City filter
       if (filterCity !== 'ALL' && spot.city?.toLowerCase() !== filterCity.toLowerCase()) return false;
-      // Verified filter
       if (filterVerified === 'VERIFIED' && !spot.isVerified) return false;
       if (filterVerified === 'PENDING' && spot.isVerified) return false;
-
       return true;
     });
   }, [spots, filterQuery, filterCategory, filterCity, filterVerified]);
 
-  // Open Create Modal
   const handleOpenCreate = () => {
     setModalMode('create');
     setEditingId(null);
     setFormData(EMPTY_SPOT_FORM);
+    setFormError('');
     setIsModalOpen(true);
   };
 
-  // Open Edit Modal with full prefilled details
   const handleOpenEdit = (spot) => {
+    const coords = spot.location?.coordinates || [10.1815, 36.8065];
     setModalMode('edit');
     setEditingId(spot._id);
-    const coords = spot.location?.coordinates || [10.1815, 36.8065];
+    setFormError('');
     setFormData({
       name: spot.name || '',
       category: spot.category || 'RESTAURANT',
@@ -178,8 +263,8 @@ export default function BackofficeSpots({ lang = 'fr' }) {
       phone: spot.phone || '',
       speciality: spot.speciality || '',
       hours: spot.hours || '',
-      rating: spot.rating !== undefined ? spot.rating : 4.8,
-      reviewCount: spot.reviewCount !== undefined ? spot.reviewCount : 1,
+      rating: spot.rating ?? 4.8,
+      reviewCount: spot.reviewCount ?? 1,
       isVerified: Boolean(spot.isVerified),
       notes: spot.notes || '',
       submittedBy: spot.submittedBy || 'Backoffice Admin',
@@ -187,765 +272,612 @@ export default function BackofficeSpots({ lang = 'fr' }) {
     setIsModalOpen(true);
   };
 
-  // Handle Form Submission (Create or Update directly in MongoDB)
   const handleSubmitForm = async (e) => {
     e.preventDefault();
-    if (!formData.name.trim() || !formData.address.trim() || !formData.city.trim()) {
-      alert('Veuillez remplir au moins le nom, la ville et l’adresse.');
-      return;
-    }
-
     const lng = parseFloat(formData.longitude);
     const lat = parseFloat(formData.latitude);
-    if (isNaN(lng) || isNaN(lat)) {
-      alert('Veuillez fournir des coordonnées GPS valides (Latitude et Longitude).');
+    if (Number.isNaN(lng) || Number.isNaN(lat)) {
+      setFormError(tr('Saisissez une latitude et une longitude valides.', 'أدخل خط عرض وخط طول صحيحين.'));
       return;
     }
-
     setFormSubmitting(true);
+    setFormError('');
+    const payload = {
+      name: formData.name.trim(),
+      category: formData.category,
+      city: formData.city.trim(),
+      address: formData.address.trim(),
+      coordinates: [lng, lat],
+      phone: formData.phone.trim(),
+      speciality: formData.speciality.trim(),
+      hours: formData.hours.trim(),
+      rating: Number(formData.rating) || 4.8,
+      reviewCount: Number(formData.reviewCount) || 1,
+      isVerified: Boolean(formData.isVerified),
+      notes: formData.notes.trim(),
+      submittedBy: formData.submittedBy.trim(),
+    };
     try {
-      const payload = {
-        name: formData.name.trim(),
-        category: formData.category,
-        city: formData.city.trim(),
-        address: formData.address.trim(),
-        coordinates: [lng, lat],
-        phone: formData.phone.trim(),
-        speciality: formData.speciality.trim(),
-        hours: formData.hours.trim(),
-        rating: Number(formData.rating) || 4.8,
-        reviewCount: Number(formData.reviewCount) || 1,
-        isVerified: Boolean(formData.isVerified),
-        notes: formData.notes.trim(),
-        submittedBy: formData.submittedBy.trim(),
-      };
-
-      if (modalMode === 'create') {
-        const res = await createSpot(payload);
-        if (res && res.success) {
-          showToast(`Lieu "${res.data.name}" ajouté directement dans MongoDB !`);
-          setIsModalOpen(false);
-          loadSpots();
-        } else {
-          alert(res.message || "Erreur lors de l'ajout.");
-        }
+      const res =
+        modalMode === 'create'
+          ? await createSpot(payload)
+          : modalMode === 'approve'
+          ? await approveProposal(editingId, payload)
+          : await updateSpot(editingId, payload);
+      if (res?.success) {
+        const toastText = {
+          create: tr(`« ${res.data.name} » ajoutée`, `تمت إضافة «${res.data.name}»`),
+          approve: tr(`« ${res.data.name} » validée et publiée`, `تم توثيق «${res.data.name}» ونشره`),
+          edit: tr(`« ${res.data.name} » enregistrée`, `تم حفظ «${res.data.name}»`),
+        };
+        showToast(toastText[modalMode]);
+        setIsModalOpen(false);
+        loadSpots();
+        if (modalMode === 'approve') loadProposals();
       } else {
-        const res = await updateSpot(editingId, payload);
-        if (res && res.success) {
-          showToast(`Lieu "${res.data.name}" modifié avec succès dans MongoDB !`);
-          setIsModalOpen(false);
-          loadSpots();
-        } else {
-          alert(res.message || 'Erreur lors de la mise à jour.');
-        }
+        setFormError(res?.message || tr('L’enregistrement a échoué.', 'فشل الحفظ.'));
       }
     } catch (err) {
-      console.error('Submission error:', err);
-      alert("Erreur de communication avec le serveur lors de l'enregistrement.");
+      setFormError(err.response?.data?.message || tr('Le serveur ne répond pas. Réessayez.', 'الخادم لا يستجيب. أعد المحاولة.'));
     } finally {
       setFormSubmitting(false);
     }
   };
 
-  // Quick 1-click toggle for verification status
   const handleToggleVerify = async (spot) => {
+    const newStatus = !spot.isVerified;
     try {
-      const newStatus = !spot.isVerified;
       const res = await toggleSpotVerification(spot._id, newStatus);
-      if (res && res.success) {
-        showToast(
-          `Lieu "${spot.name}" marqué comme ${newStatus ? 'Vérifié ✅' : 'En attente ⏳'}.`
-        );
-        setSpots((prev) =>
-          prev.map((s) => (s._id === spot._id ? { ...s, isVerified: newStatus } : s))
-        );
+      if (res?.success) {
+        setSpots((prev) => prev.map((s) => (s._id === spot._id ? { ...s, isVerified: newStatus } : s)));
+        showToast(newStatus ? tr(`« ${spot.name} » vérifiée`, `تم توثيق «${spot.name}»`) : tr(`« ${spot.name} » remise en attente`, `أعيد «${spot.name}» إلى الانتظار`));
       }
     } catch (err) {
-      console.error('Verify toggle error:', err);
-      alert('Erreur lors de la modification du statut.');
+      showToast(tr('Le statut n’a pas pu être modifié.', 'تعذر تغيير الحالة.'), 'error');
     }
   };
 
-  // Delete spot directly from MongoDB
   const handleConfirmDelete = async () => {
     if (!spotToDelete) return;
     setIsDeleting(true);
     try {
       const res = await deleteSpot(spotToDelete._id);
-      if (res && res.success) {
-        showToast(`Lieu "${spotToDelete.name}" supprimé définitivement de MongoDB.`, 'error');
+      if (res?.success) {
         setSpots((prev) => prev.filter((s) => s._id !== spotToDelete._id));
+        showToast(tr(`« ${spotToDelete.name} » supprimée`, `تم حذف «${spotToDelete.name}»`));
         setSpotToDelete(null);
-      } else {
-        alert(res.message || 'Erreur lors de la suppression.');
       }
     } catch (err) {
-      console.error('Delete error:', err);
-      alert('Erreur lors de la suppression dans la base de données.');
+      showToast(tr('La suppression a échoué.', 'فشل الحذف.'), 'error');
     } finally {
       setIsDeleting(false);
     }
   };
 
+  const set = (key) => (e) => setFormData({ ...formData, [key]: e.target.value });
+  const hasFilters = filterQuery || filterCategory !== 'ALL' || filterCity !== 'ALL' || filterVerified !== 'ALL';
+
   return (
-    <div className="space-y-6 animate-fadeIn pb-12">
-      {/* Toast Notification */}
+    <div className="space-y-6">
       {toast && (
         <div
-          className={`fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-2xl shadow-xl flex items-center gap-3 text-sm font-bold text-white transition-all transform duration-300 ${
-            toast.type === 'error' ? 'bg-red-600' : 'bg-emerald-600'
+          role="status"
+          className={`fixed bottom-24 left-1/2 z-[1100] -translate-x-1/2 rounded-lg px-4 py-3 text-sm font-medium shadow-lg lg:bottom-6 ${
+            toast.tone === 'error' ? 'bg-status-unsafe text-white' : 'bg-ink text-canvas-paper'
           }`}
         >
-          {toast.type === 'error' ? (
-            <AlertCircle className="w-5 h-5 shrink-0" />
-          ) : (
-            <Check className="w-5 h-5 shrink-0" />
-          )}
-          <span>{toast.message}</span>
+          {toast.message}
         </div>
       )}
 
-      {/* Backoffice Header & Stats */}
-      <div className="bg-gradient-to-r from-secondary-dark via-[#2d3a30] to-primary rounded-3xl p-6 sm:p-8 text-white shadow-lg">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-wider text-accent-light">
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>Backoffice Administratif</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-              Gestion Directe de la Base de Données (Spots & Adresses)
-            </h1>
-            <p className="text-sm sm:text-base text-canvas/80 max-w-2xl leading-relaxed">
-              Ajoutez, modifiez ou supprimez n'importe quelle adresse répertoriée en Tunisie. Chaque
-              action met à jour directement la collection <code className="bg-black/30 px-1.5 py-0.5 rounded text-accent-light font-mono">spots</code> de MongoDB.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            <button
-              onClick={handleOpenCreate}
-              className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-5 py-3 bg-accent text-white font-extrabold rounded-2xl shadow-lg hover:bg-accent-dark transition-all duration-200 active:scale-95"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Ajouter un Nouveau Lieu</span>
+      <PageHead
+        title={tr('Gérer les adresses', 'إدارة العناوين')}
+        lede={
+          pendingProposals > 0
+            ? tr(`${pendingProposals} proposition${pendingProposals > 1 ? 's' : ''} à traiter. ${spots.length} adresses publiées.`, `${pendingProposals} اقتراحات للمعالجة. ${spots.length} عنوانا منشورا.`)
+            : tr(`Aucune proposition à traiter. ${spots.length} adresses publiées.`, `لا توجد اقتراحات للمعالجة. ${spots.length} عنوانا منشورا.`)
+        }
+        action={
+          <div className="flex gap-2">
+            <button type="button" onClick={handleOpenCreate} className="btn-primary">
+              <Plus className="h-4 w-4" />
+              {tr('Ajouter une adresse', 'أضف عنوانا')}
             </button>
             <button
-              onClick={loadSpots}
-              title="Rafraîchir depuis la base"
-              className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl text-white transition-colors"
-            >
-              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-        </div>
-
-        {/* Live Counters */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-white/15 text-center">
-          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3">
-            <span className="text-2xl font-black">{spots.length}</span>
-            <p className="text-xs text-white/80 font-bold uppercase mt-0.5">Total Adresses</p>
-          </div>
-          <div className="bg-emerald-500/20 backdrop-blur-sm rounded-2xl p-3 border border-emerald-400/30">
-            <span className="text-2xl font-black text-emerald-300">
-              {spots.filter((s) => s.isVerified).length}
-            </span>
-            <p className="text-xs text-emerald-200 font-bold uppercase mt-0.5">Vérifiées</p>
-          </div>
-          <div className="bg-amber-500/20 backdrop-blur-sm rounded-2xl p-3 border border-amber-400/30">
-            <span className="text-2xl font-black text-amber-300">
-              {spots.filter((s) => !s.isVerified).length}
-            </span>
-            <p className="text-xs text-amber-200 font-bold uppercase mt-0.5">En Attente</p>
-          </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-3">
-            <span className="text-2xl font-black">{cities.length}</span>
-            <p className="text-xs text-white/80 font-bold uppercase mt-0.5">Gouvernorats / Villes</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-canvas-border shadow-sm space-y-4">
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          {/* Keyword search */}
-          <div className="relative flex-1">
-            <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-secondary/60" />
-            <input
-              type="text"
-              value={filterQuery}
-              onChange={(e) => setFilterQuery(e.target.value)}
-              placeholder="Rechercher par nom, adresse, médecin, notes..."
-              className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-canvas-border bg-canvas/30 text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-            />
-            {filterQuery && (
-              <button
-                onClick={() => setFilterQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-secondary/60 hover:text-secondary-dark text-xs font-bold"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-
-          {/* Category Filter */}
-          <select
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-            className="px-3.5 py-2.5 rounded-xl border border-canvas-border bg-canvas/30 text-sm font-semibold text-secondary-dark focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="ALL">Toutes Catégories</option>
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.labelFr}
-              </option>
-            ))}
-          </select>
-
-          {/* City Filter */}
-          <select
-            value={filterCity}
-            onChange={(e) => setFilterCity(e.target.value)}
-            className="px-3.5 py-2.5 rounded-xl border border-canvas-border bg-canvas/30 text-sm font-semibold text-secondary-dark focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="ALL">Toutes les Villes</option>
-            {cities.map((city) => (
-              <option key={city} value={city}>
-                {city}
-              </option>
-            ))}
-          </select>
-
-          {/* Verification Status */}
-          <select
-            value={filterVerified}
-            onChange={(e) => setFilterVerified(e.target.value)}
-            className="px-3.5 py-2.5 rounded-xl border border-canvas-border bg-canvas/30 text-sm font-semibold text-secondary-dark focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="ALL">Tous Statuts</option>
-            <option value="VERIFIED">Vérifiés uniquement</option>
-            <option value="PENDING">En attente de vérification</option>
-          </select>
-        </div>
-
-        <div className="flex items-center justify-between text-xs text-secondary pt-2 border-t border-canvas-border/50">
-          <span>
-            Affichage de <strong className="text-secondary-dark">{filteredSpots.length}</strong> sur{' '}
-            {spots.length} lieux enregistrés
-          </span>
-          {(filterQuery || filterCategory !== 'ALL' || filterCity !== 'ALL' || filterVerified !== 'ALL') && (
-            <button
+              type="button"
               onClick={() => {
-                setFilterQuery('');
-                setFilterCategory('ALL');
-                setFilterCity('ALL');
-                setFilterVerified('ALL');
+                loadSpots();
+                loadProposals();
               }}
-              className="text-primary hover:text-primary-dark font-bold underline"
-            >
-              Réinitialiser les filtres
+              className="btn-quiet px-3" aria-label={tr('Actualiser', 'تحديث')} title={tr('Actualiser', 'تحديث')}>
+              <RotateCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
-          )}
-        </div>
+            <button type="button" onClick={onLogout} className="btn-quiet px-3" aria-label={tr('Se déconnecter', 'تسجيل الخروج')} title={tr('Se déconnecter', 'تسجيل الخروج')}>
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        }
+      />
+
+      {/* View switch */}
+      <div className="flex gap-6 border-b border-canvas-line" role="tablist">
+        {[
+          ['inbox', tr('Boîte de réception', 'صندوق الوارد'), pendingProposals],
+          ['spots', tr('Adresses publiées', 'العناوين المنشورة'), spots.length],
+        ].map(([id, label, count]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={view === id}
+            onClick={() => setView(id)}
+            className={`-mb-px flex items-center gap-2 border-b-[3px] pb-3 text-[15px] ${view === id ? 'border-accent font-medium text-ink' : 'border-transparent text-ink-soft hover:text-ink'}`}
+          >
+            {label}
+            {count > 0 && (
+              <span className={`rounded-md px-1.5 text-sm tabular-nums ${id === 'inbox' ? 'bg-accent text-ink' : 'bg-canvas-sunk text-ink-soft'}`}>{count}</span>
+            )}
+          </button>
+        ))}
       </div>
 
-      {/* Spots List / Table */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 text-secondary">
-          <RefreshCw className="w-8 h-8 animate-spin text-primary mb-3" />
-          <p className="font-semibold text-sm">Chargement des données MongoDB...</p>
-        </div>
-      ) : errorMsg ? (
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center text-red-800">
-          <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
-          <p className="font-bold">{errorMsg}</p>
-        </div>
-      ) : filteredSpots.length === 0 ? (
-        <div className="bg-white rounded-2xl p-12 text-center border border-canvas-border">
-          <MapPin className="w-10 h-10 text-secondary/40 mx-auto mb-3" />
-          <h3 className="text-lg font-bold text-secondary-dark mb-1">Aucun lieu correspondant</h3>
-          <p className="text-sm text-secondary mb-4">
-            Aucune adresse ne correspond aux critères de filtre sélectionnés.
-          </p>
-          <button
-            onClick={handleOpenCreate}
-            className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl shadow hover:bg-primary-dark"
-          >
-            Créer un nouveau lieu
-          </button>
-        </div>
+      {view === 'inbox' ? (
+        <InboxView
+          lang={lang}
+          proposals={proposals}
+          loading={proposalsLoading}
+          filter={proposalFilter}
+          setFilter={setProposalFilter}
+          onApprove={handleOpenApprove}
+          onReject={setProposalToReject}
+        />
       ) : (
-        <div className="grid grid-cols-1 gap-4">
-          {filteredSpots.map((spot) => {
-            const catObj = CATEGORIES.find((c) => c.value === spot.category) || CATEGORIES[2];
-            const IconComponent = catObj.icon;
-            const coords = spot.location?.coordinates || [0, 0];
-            const googleMapsUrl = `https://www.google.com/maps?q=${coords[1]},${coords[0]}`;
+      <>
+      <div className="flex flex-wrap gap-2" role="group" aria-label={tr('Statut', 'الحالة')}>
+        {[
+          ['ALL', tr('Toutes', 'الكل'), spots.length],
+          ['PENDING', tr('En attente', 'في الانتظار'), pendingCount],
+          ['VERIFIED', tr('Vérifiées', 'موثقة'), spots.length - pendingCount],
+        ].map(([id, label, count]) => (
+          <button key={id} type="button" className="chip" aria-pressed={filterVerified === id} onClick={() => setFilterVerified(id)}>
+            {label} <span className="tabular-nums opacity-70">{count}</span>
+          </button>
+        ))}
+      </div>
 
-            return (
-              <div
-                key={spot._id}
-                className={`bg-white rounded-2xl p-5 border shadow-sm transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
-                  spot.isVerified
-                    ? 'border-canvas-border hover:border-primary/50'
-                    : 'border-amber-200 bg-amber-50/20'
-                }`}
+      <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
+        <div className="relative">
+          <Search className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
+          <input
+            type="search"
+            value={filterQuery}
+            onChange={(e) => setFilterQuery(e.target.value)}
+            placeholder={tr('Nom, adresse, notes…', 'الاسم، العنوان، الملاحظات…')}
+            aria-label={tr('Filtrer les adresses', 'تصفية العناوين')}
+            className="field ps-10"
+          />
+        </div>
+        <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="field sm:w-52" aria-label={tr('Catégorie', 'الصنف')}>
+          <option value="ALL">{tr('Toutes les catégories', 'كل الأصناف')}</option>
+          {SPOT_CATEGORIES.map((c) => (
+            <option key={c.value} value={c.value}>
+              {tr(c.fr, c.ar)}
+            </option>
+          ))}
+        </select>
+        <select value={filterCity} onChange={(e) => setFilterCity(e.target.value)} className="field sm:w-44" aria-label={tr('Ville', 'المدينة')}>
+          <option value="ALL">{tr('Toutes les villes', 'كل المدن')}</option>
+          {cities.map((city) => (
+            <option key={city} value={city}>
+              {city}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {loading && spots.length === 0 ? (
+        <Spinner label={tr('Chargement des adresses…', 'جاري تحميل العناوين…')} />
+      ) : errorMsg ? (
+        <Notice
+          tone="error"
+          title={tr('Les adresses n’ont pas pu être chargées.', 'تعذر تحميل العناوين.')}
+          action={
+            <button type="button" className="btn-quiet" onClick={loadSpots}>
+              {tr('Réessayer', 'إعادة المحاولة')}
+            </button>
+          }
+        >
+          {tr('Vérifiez que le serveur et MongoDB sont démarrés.', 'تحقق من تشغيل الخادم وقاعدة البيانات.')}
+        </Notice>
+      ) : filteredSpots.length === 0 ? (
+        <EmptyState
+          title={tr('Aucune adresse ne correspond', 'لا يوجد عنوان مطابق')}
+          action={
+            hasFilters ? (
+              <button
+                type="button"
+                className="btn-quiet"
+                onClick={() => {
+                  setFilterQuery('');
+                  setFilterCategory('ALL');
+                  setFilterCity('ALL');
+                  setFilterVerified('ALL');
+                }}
               >
-                {/* Spot Details */}
-                <div className="space-y-2 flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {/* Category pill */}
-                    <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-extrabold border ${catObj.color}`}
-                    >
-                      <IconComponent className="w-3.5 h-3.5" />
-                      {catObj.labelFr}
+                {tr('Effacer les filtres', 'مسح المرشحات')}
+              </button>
+            ) : (
+              <button type="button" className="btn-primary" onClick={handleOpenCreate}>
+                {tr('Ajouter une adresse', 'أضف عنوانا')}
+              </button>
+            )
+          }
+        />
+      ) : (
+        <ul className="divide-y divide-canvas-line overflow-hidden rounded-xl border border-canvas-line bg-white">
+          {filteredSpots.map((spot) => {
+            const cat = spotCategory(spot.category);
+            const coords = spot.location?.coordinates || [0, 0];
+            return (
+              <li key={spot._id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:gap-5">
+                <div className="min-w-0 flex-1">
+                  <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-3 w-3 rounded-[2px]" style={{ background: cat.color }} aria-hidden="true" />
+                      {tr(cat.fr, cat.ar)}
                     </span>
-
-                    {/* City pill */}
-                    <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-canvas text-secondary-dark border border-canvas-border">
-                      📍 {spot.city}
-                    </span>
-
-                    {/* Verification Badge with 1-click toggle */}
+                    <span>{spot.city}</span>
                     <button
+                      type="button"
                       onClick={() => handleToggleVerify(spot)}
-                      title="Cliquer pour changer le statut"
-                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-extrabold transition-all ${
+                      title={tr('Changer le statut', 'تغيير الحالة')}
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-medium ${
                         spot.isVerified
-                          ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                          : 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                          ? 'bg-status-safe/20 text-status-safe-ink hover:bg-status-safe/30'
+                          : 'bg-status-warning/20 text-status-warning-ink hover:bg-status-warning/30'
                       }`}
                     >
-                      {spot.isVerified ? (
-                        <>
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Vérifié</span>
-                        </>
-                      ) : (
-                        <>
-                          <Clock className="w-3.5 h-3.5 text-amber-600" />
-                          <span>En attente de vérification</span>
-                        </>
-                      )}
+                      {spot.isVerified ? <BadgeCheck className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
+                      {spot.isVerified ? tr('Vérifiée', 'موثقة') : tr('En attente', 'في الانتظار')}
                     </button>
+                  </p>
+                  <p className="mt-1.5 font-medium">{spot.name}</p>
+                  <p className="text-sm text-ink-soft">{spot.address}</p>
+                  {spot.notes && <p className="mt-2 max-w-[70ch] text-sm text-ink-soft">{spot.notes}</p>}
+                  <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-faint">
+                    {spot.phone && <span dir="ltr">{spot.phone}</span>}
+                    <span className="tabular-nums" dir="ltr">
+                      {coords[1]?.toFixed(4)}, {coords[0]?.toFixed(4)}
+                    </span>
+                    <a
+                      href={`https://www.google.com/maps?q=${coords[1]},${coords[0]}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 underline underline-offset-2 hover:text-ink"
+                    >
+                      {tr('Ouvrir dans Google Maps', 'افتح في خرائط Google')}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                    {spot.submittedBy && <span>{tr(`Proposée par ${spot.submittedBy}`, `اقترحها ${spot.submittedBy}`)}</span>}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button type="button" onClick={() => handleOpenEdit(spot)} className="btn-quiet px-3 py-2">
+                    <Pencil className="h-4 w-4" />
+                    {tr('Modifier', 'تعديل')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSpotToDelete(spot)}
+                    className="btn-ghost px-3 py-2 text-status-unsafe-ink hover:bg-status-unsafe/10 hover:text-status-unsafe-ink"
+                    aria-label={tr(`Supprimer ${spot.name}`, `حذف ${spot.name}`)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
-                    {/* Rating */}
-                    {spot.rating && (
-                      <span className="flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-lg">
-                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                        {spot.rating} ({spot.reviewCount || 1} avis)
+      </>
+      )}
+
+      {/* Add / edit / approve */}
+      <Modal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        lang={lang}
+        width="max-w-2xl"
+        title={
+          modalMode === 'create'
+            ? tr('Ajouter une adresse', 'أضف عنوانا')
+            : modalMode === 'approve'
+            ? tr('Valider la proposition', 'توثيق الاقتراح')
+            : tr('Modifier l’adresse', 'تعديل العنوان')
+        }
+        subtitle={
+          modalMode === 'approve'
+            ? tr('Vérifiez les informations et corrigez la position : elle a été placée au centre de la ville.', 'تحقق من المعلومات وصحح الموقع: تم وضعه في وسط المدينة.')
+            : undefined
+        }
+      >
+        <form onSubmit={handleSubmitForm} className="space-y-4">
+          {formError && <Notice tone="error">{formError}</Notice>}
+
+          <div>
+            <label htmlFor="bo-name" className="field-label">{tr('Nom', 'الاسم')}</label>
+            <input id="bo-name" required value={formData.name} onChange={set('name')} className="field" />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="bo-category" className="field-label">{tr('Catégorie', 'الصنف')}</label>
+              <select id="bo-category" value={formData.category} onChange={set('category')} className="field">
+                {SPOT_CATEGORIES.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {tr(c.fr, c.ar)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="bo-city" className="field-label">{tr('Ville', 'المدينة')}</label>
+              <input id="bo-city" required value={formData.city} onChange={set('city')} className="field" />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="bo-address" className="field-label">{tr('Adresse', 'العنوان')}</label>
+            <input id="bo-address" required value={formData.address} onChange={set('address')} className="field" />
+          </div>
+
+          <fieldset className="rounded-lg border border-canvas-line p-4">
+            <legend className="px-1 text-sm font-medium">{tr('Position sur la carte', 'الموقع على الخريطة')}</legend>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="bo-lat" className="field-label">Latitude</label>
+                <input id="bo-lat" type="number" step="any" required dir="ltr" value={formData.latitude} onChange={set('latitude')} className="field tabular-nums" />
+              </div>
+              <div>
+                <label htmlFor="bo-lng" className="field-label">Longitude</label>
+                <input id="bo-lng" type="number" step="any" required dir="ltr" value={formData.longitude} onChange={set('longitude')} className="field tabular-nums" />
+              </div>
+            </div>
+            <p className="mt-3 text-sm text-ink-soft">{tr('Centrer sur une ville :', 'التمركز على مدينة:')}</p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {PRESET_COORDINATES.map((preset) => (
+                <button
+                  type="button"
+                  key={preset.name}
+                  className="chip px-2.5 py-1"
+                  onClick={() =>
+                    setFormData({
+                      ...formData,
+                      longitude: String(preset.coords[0]),
+                      latitude: String(preset.coords[1]),
+                      city: preset.name,
+                    })
+                  }
+                >
+                  {preset.name}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="bo-phone" className="field-label">{tr('Téléphone', 'الهاتف')}</label>
+              <input id="bo-phone" type="tel" dir="ltr" value={formData.phone} onChange={set('phone')} className="field" />
+            </div>
+            <div>
+              <label htmlFor="bo-speciality" className="field-label">{tr('Spécialité', 'الاختصاص')}</label>
+              <input id="bo-speciality" value={formData.speciality} onChange={set('speciality')} className="field" />
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-[2fr_1fr_1fr]">
+            <div>
+              <label htmlFor="bo-hours" className="field-label">{tr('Horaires', 'التوقيت')}</label>
+              <input id="bo-hours" value={formData.hours} onChange={set('hours')} className="field" />
+            </div>
+            <div>
+              <label htmlFor="bo-rating" className="field-label">{tr('Note sur 5', 'التقييم من 5')}</label>
+              <input id="bo-rating" type="number" step="0.1" min="1" max="5" value={formData.rating} onChange={set('rating')} className="field tabular-nums" />
+            </div>
+            <div>
+              <label htmlFor="bo-reviews" className="field-label">{tr('Avis', 'الآراء')}</label>
+              <input id="bo-reviews" type="number" min="0" value={formData.reviewCount} onChange={set('reviewCount')} className="field tabular-nums" />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="bo-notes" className="field-label">{tr('Précautions contre la contamination', 'احتياطات ضد التلوث')}</label>
+            <textarea id="bo-notes" rows={3} value={formData.notes} onChange={set('notes')} className="field" />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 sm:items-end">
+            <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-canvas-line bg-canvas-paper px-3.5 py-2.5">
+              <input
+                type="checkbox"
+                checked={formData.isVerified}
+                onChange={(e) => setFormData({ ...formData, isVerified: e.target.checked })}
+                className="h-4 w-4 accent-[#4E6127]"
+              />
+              <span className="text-[15px]">{tr('Adresse vérifiée', 'عنوان موثق')}</span>
+            </label>
+            <div>
+              <label htmlFor="bo-author" className="field-label">{tr('Proposée par', 'اقترحها')}</label>
+              <input id="bo-author" value={formData.submittedBy} onChange={set('submittedBy')} className="field" />
+            </div>
+          </div>
+
+          <div className="flex flex-col-reverse gap-2 border-t border-canvas-line pt-4 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setIsModalOpen(false)} className="btn-ghost">
+              {tr('Annuler', 'إلغاء')}
+            </button>
+            <button type="submit" disabled={formSubmitting} className="btn-primary">
+              {formSubmitting
+                ? tr('Enregistrement…', 'جاري الحفظ…')
+                : modalMode === 'create'
+                ? tr('Ajouter l’adresse', 'أضف العنوان')
+                : modalMode === 'approve'
+                ? tr('Valider et publier', 'وثّق وانشر')
+                : tr('Enregistrer', 'احفظ')}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Delete confirmation */}
+      <Modal
+        open={Boolean(spotToDelete)}
+        onClose={() => setSpotToDelete(null)}
+        lang={lang}
+        width="max-w-md"
+        title={tr('Supprimer cette adresse ?', 'حذف هذا العنوان؟')}
+      >
+        <p className="text-[15px]">
+          {tr(
+            `« ${spotToDelete?.name} » (${spotToDelete?.city}) sera retirée de la carte. Cette action est définitive.`,
+            `سيتم حذف «${spotToDelete?.name}» (${spotToDelete?.city}) من الخريطة نهائيا.`
+          )}
+        </p>
+        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button type="button" onClick={() => setSpotToDelete(null)} className="btn-ghost">
+            {tr('Annuler', 'إلغاء')}
+          </button>
+          <button type="button" disabled={isDeleting} onClick={handleConfirmDelete} className="btn-danger">
+            {isDeleting ? tr('Suppression…', 'جاري الحذف…') : tr('Supprimer', 'احذف')}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Reject proposal confirmation */}
+      <Modal
+        open={Boolean(proposalToReject)}
+        onClose={() => setProposalToReject(null)}
+        lang={lang}
+        width="max-w-md"
+        title={tr('Refuser cette proposition ?', 'رفض هذا الاقتراح؟')}
+      >
+        <p className="text-[15px]">
+          {tr(
+            `« ${proposalToReject?.name} » ne sera pas publiée. Elle restera visible dans les propositions refusées.`,
+            `لن يُنشر «${proposalToReject?.name}». سيبقى ظاهرا في الاقتراحات المرفوضة.`
+          )}
+        </p>
+        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button type="button" onClick={() => setProposalToReject(null)} className="btn-ghost">
+            {tr('Annuler', 'إلغاء')}
+          </button>
+          <button type="button" disabled={isRejecting} onClick={handleConfirmReject} className="btn-danger">
+            {isRejecting ? tr('Refus…', 'جاري الرفض…') : tr('Refuser', 'ارفض')}
+          </button>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+const PROPOSAL_FILTERS = [
+  { id: 'PENDING', fr: 'À traiter', ar: 'للمعالجة' },
+  { id: 'APPROVED', fr: 'Validées', ar: 'موثقة' },
+  { id: 'REJECTED', fr: 'Refusées', ar: 'مرفوضة' },
+];
+
+function InboxView({ lang, proposals, loading, filter, setFilter, onApprove, onReject }) {
+  const tr = t(lang);
+  const dateFmt = new Intl.DateTimeFormat(lang === 'ar' ? 'ar-TN' : 'fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2" role="group" aria-label={tr('Statut des propositions', 'حالة الاقتراحات')}>
+        {PROPOSAL_FILTERS.map((f) => (
+          <button key={f.id} type="button" className="chip" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
+            {tr(f.fr, f.ar)}
+          </button>
+        ))}
+      </div>
+
+      {loading && proposals.length === 0 ? (
+        <Spinner label={tr('Chargement des propositions…', 'جاري تحميل الاقتراحات…')} />
+      ) : proposals.length === 0 ? (
+        <EmptyState title={filter === 'PENDING' ? tr('Rien à traiter', 'لا شيء للمعالجة') : tr('Aucune proposition', 'لا توجد اقتراحات')}>
+          {filter === 'PENDING'
+            ? tr('Les adresses proposées par les visiteurs arriveront ici avant d’être publiées.', 'العناوين التي يقترحها الزوار ستصل هنا قبل نشرها.')
+            : null}
+        </EmptyState>
+      ) : (
+        <ul className="space-y-3">
+          {proposals.map((p) => {
+            const cat = spotCategory(p.category);
+            return (
+              <li key={p._id} className="rounded-xl border border-canvas-line bg-white p-4 sm:p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-3 w-3 rounded-[2px]" style={{ background: cat.color }} aria-hidden="true" />
+                        {tr(cat.fr, cat.ar)}
                       </span>
+                      <span>{p.city}</span>
+                      <span>{tr('Reçue le', 'وصلت يوم')} {dateFmt.format(new Date(p.createdAt))}</span>
+                    </p>
+                    <p className="mt-1.5 text-lg font-medium leading-snug">{p.name}</p>
+                    <p className="text-sm text-ink-soft">{p.address}</p>
+                    {(p.speciality || p.hours || p.phone) && (
+                      <dl className="mt-3 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
+                        {p.speciality && (
+                          <>
+                            <dt className="text-ink-faint">{tr('Ce qu’on y trouve', 'ماذا يوجد')}</dt>
+                            <dd>{p.speciality}</dd>
+                          </>
+                        )}
+                        {p.hours && (
+                          <>
+                            <dt className="text-ink-faint">{tr('Horaires', 'التوقيت')}</dt>
+                            <dd>{p.hours}</dd>
+                          </>
+                        )}
+                        {p.phone && (
+                          <>
+                            <dt className="text-ink-faint">{tr('Téléphone', 'الهاتف')}</dt>
+                            <dd dir="ltr" className="text-start">{p.phone}</dd>
+                          </>
+                        )}
+                      </dl>
                     )}
-                  </div>
-
-                  <div>
-                    <h3 className="text-base sm:text-lg font-extrabold text-secondary-dark truncate">
-                      {spot.name}
-                    </h3>
-                    <p className="text-xs sm:text-sm text-secondary font-medium">
-                      {spot.address}
+                    {p.notes && <p className="mt-3 max-w-[70ch] border-s-2 border-canvas-line ps-3 text-sm text-ink-soft">{p.notes}</p>}
+                    <p className="mt-3 text-xs text-ink-faint">
+                      {p.submittedBy ? tr(`Proposée par ${p.submittedBy}`, `اقترحها ${p.submittedBy}`) : tr('Proposée anonymement', 'اقتراح مجهول')}
                     </p>
                   </div>
 
-                  {/* Speciality and Notes */}
-                  {(spot.speciality || spot.notes) && (
-                    <div className="text-xs text-secondary-dark/80 bg-canvas/40 p-2.5 rounded-xl border border-canvas-border/50 space-y-1">
-                      {spot.speciality && (
-                        <p>
-                          <strong>Spécialité :</strong> {spot.speciality}
-                        </p>
-                      )}
-                      {spot.notes && (
-                        <p className="text-secondary italic">
-                          "{spot.notes}"
-                        </p>
-                      )}
+                  {p.status === 'PENDING' ? (
+                    <div className="flex shrink-0 gap-2">
+                      <button type="button" onClick={() => onApprove(p)} className="btn-primary">
+                        <Check className="h-4 w-4" />
+                        {tr('Valider', 'وثّق')}
+                      </button>
+                      <button type="button" onClick={() => onReject(p)} className="btn-quiet">
+                        <X className="h-4 w-4" />
+                        {tr('Refuser', 'ارفض')}
+                      </button>
                     </div>
+                  ) : (
+                    <p className={`shrink-0 text-sm font-medium ${p.status === 'APPROVED' ? 'text-status-safe-ink' : 'text-status-unsafe-ink'}`}>
+                      {p.status === 'APPROVED' ? tr('Validée', 'موثقة') : tr('Refusée', 'مرفوضة')}
+                      {p.reviewedAt && <span className="block text-xs font-normal text-ink-faint">{dateFmt.format(new Date(p.reviewedAt))}</span>}
+                    </p>
                   )}
-
-                  {/* Metadata Bar */}
-                  <div className="flex items-center gap-4 text-xs text-secondary flex-wrap pt-1">
-                    {spot.phone && (
-                      <span className="flex items-center gap-1 font-semibold text-secondary-dark">
-                        <Phone className="w-3 h-3 text-primary" />
-                        {spot.phone}
-                      </span>
-                    )}
-                    {spot.hours && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-secondary" />
-                        {spot.hours}
-                      </span>
-                    )}
-                    <span className="font-mono text-[11px] text-secondary/70">
-                      GPS: [{coords[1]?.toFixed(4)}, {coords[0]?.toFixed(4)}]
-                    </span>
-                    <a
-                      href={googleMapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-primary hover:text-primary-dark font-semibold text-[11px]"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      Voir sur Maps
-                    </a>
-                  </div>
                 </div>
-
-                {/* Action Buttons */}
-                <div className="flex md:flex-col items-center gap-2 shrink-0 w-full md:w-auto justify-end pt-3 md:pt-0 border-t md:border-t-0 border-canvas-border/50">
-                  <button
-                    onClick={() => handleOpenEdit(spot)}
-                    className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-xl text-xs font-bold transition-all"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span>Modifier</span>
-                  </button>
-                  <button
-                    onClick={() => setSpotToDelete(spot)}
-                    className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white rounded-xl text-xs font-bold transition-all"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Supprimer</span>
-                  </button>
-                </div>
-              </div>
+              </li>
             );
           })}
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* ADD / EDIT SPOT MODAL (FULL DETAILS) */}
-      {/* ========================================================================= */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-canvas-border my-8 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-canvas-border mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center">
-                  {modalMode === 'create' ? <Plus className="w-5 h-5" /> : <Edit3 className="w-5 h-5" />}
-                </div>
-                <div>
-                  <h2 className="text-xl font-extrabold text-secondary-dark">
-                    {modalMode === 'create' ? 'Ajouter un Lieu dans MongoDB' : 'Modifier les Détails du Lieu'}
-                  </h2>
-                  <p className="text-xs text-secondary font-medium">
-                    Toutes les modifications sont immédiatement appliquées dans la base de données.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-canvas flex items-center justify-center text-secondary hover:text-secondary-dark font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmitForm} className="space-y-4 text-xs sm:text-sm">
-              {/* Name */}
-              <div>
-                <label className="block font-bold text-secondary-dark mb-1">
-                  Nom du lieu / Établissement <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="ex: Maison Sans Gluten, Dr. Trabelsi, Restaurant Safir..."
-                  className="w-full px-4 py-2.5 rounded-xl border border-canvas-border focus:ring-2 focus:ring-primary focus:outline-none"
-                />
-              </div>
-
-              {/* Category & City */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-bold text-secondary-dark mb-1">
-                    Catégorie <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl border border-canvas-border focus:ring-2 focus:ring-primary focus:outline-none font-semibold"
-                  >
-                    {CATEGORIES.map((c) => (
-                      <option key={c.value} value={c.value}>
-                        {c.labelFr}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-secondary-dark mb-1">
-                    Gouvernorat / Ville <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    placeholder="ex: Tunis, Ariana, Sousse, Sfax..."
-                    className="w-full px-4 py-2.5 rounded-xl border border-canvas-border focus:ring-2 focus:ring-primary focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Address */}
-              <div>
-                <label className="block font-bold text-secondary-dark mb-1">
-                  Adresse complète <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  placeholder="ex: 15 Rue Ibn Khaldoun, Centre Urbain Nord..."
-                  className="w-full px-4 py-2.5 rounded-xl border border-canvas-border focus:ring-2 focus:ring-primary focus:outline-none"
-                />
-              </div>
-
-              {/* Coordinates GPS [Lng, Lat] with presets */}
-              <div className="bg-canvas/40 p-4 rounded-2xl border border-canvas-border space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="font-bold text-secondary-dark flex items-center gap-1.5">
-                    <Navigation className="w-4 h-4 text-primary" />
-                    <span>Coordonnées GPS [Longitude, Latitude]</span>
-                  </label>
-                  <span className="text-[11px] text-secondary">Requis pour l'affichage Leaflet</span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <span className="text-[11px] font-bold text-secondary block mb-0.5">Latitude (Nord)</span>
-                    <input
-                      type="number"
-                      step="any"
-                      required
-                      value={formData.latitude}
-                      onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
-                      placeholder="36.8065"
-                      className="w-full px-3 py-2 rounded-lg border border-canvas-border bg-white font-mono text-xs focus:ring-2 focus:ring-primary focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-bold text-secondary block mb-0.5">Longitude (Est)</span>
-                    <input
-                      type="number"
-                      step="any"
-                      required
-                      value={formData.longitude}
-                      onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
-                      placeholder="10.1815"
-                      className="w-full px-3 py-2 rounded-lg border border-canvas-border bg-white font-mono text-xs focus:ring-2 focus:ring-primary focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                {/* Quick Presets */}
-                <div>
-                  <span className="text-[11px] font-bold text-secondary block mb-1">
-                    Préréglages rapides de villes :
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {PRESET_COORDINATES.map((preset) => (
-                      <button
-                        type="button"
-                        key={preset.name}
-                        onClick={() =>
-                          setFormData({
-                            ...formData,
-                            longitude: String(preset.coords[0]),
-                            latitude: String(preset.coords[1]),
-                            city: preset.name.split(' ')[0],
-                          })
-                        }
-                        className="px-2 py-0.5 bg-white hover:bg-primary hover:text-white text-secondary-dark rounded-md text-[11px] font-medium border border-canvas-border transition-colors"
-                      >
-                        {preset.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Phone & Speciality */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block font-bold text-secondary-dark mb-1">
-                    Téléphone
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="+216 71 000 000"
-                    className="w-full px-4 py-2.5 rounded-xl border border-canvas-border focus:ring-2 focus:ring-primary focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-secondary-dark mb-1">
-                    Spécialité / Sous-titre
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.speciality}
-                    onChange={(e) => setFormData({ ...formData, speciality: e.target.value })}
-                    placeholder="ex: Pains & Pâtisseries certifiés, Gastro-entérologie..."
-                    className="w-full px-4 py-2.5 rounded-xl border border-canvas-border focus:ring-2 focus:ring-primary focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Hours, Rating, ReviewCount */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-bold text-secondary-dark mb-1">Horaires</label>
-                  <input
-                    type="text"
-                    value={formData.hours}
-                    onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
-                    placeholder="Lun-Sam: 09:00 - 18:00"
-                    className="w-full px-3 py-2 rounded-xl border border-canvas-border focus:ring-2 focus:ring-primary focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-secondary-dark mb-1">Note (1-5)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="1"
-                    max="5"
-                    value={formData.rating}
-                    onChange={(e) => setFormData({ ...formData, rating: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-canvas-border focus:ring-2 focus:ring-primary focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-secondary-dark mb-1">Nombre d'avis</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.reviewCount}
-                    onChange={(e) => setFormData({ ...formData, reviewCount: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-canvas-border focus:ring-2 focus:ring-primary focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block font-bold text-secondary-dark mb-1">
-                  Notes & Conseils de sécurité cœliaque
-                </label>
-                <textarea
-                  rows={2}
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Protocole de non-contamination, farine certifiée, laboratoire dédié..."
-                  className="w-full px-4 py-2.5 rounded-xl border border-canvas-border focus:ring-2 focus:ring-primary focus:outline-none"
-                />
-              </div>
-
-              {/* Verification Toggle & Author */}
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-canvas/30 rounded-2xl border border-canvas-border">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.isVerified}
-                    onChange={(e) => setFormData({ ...formData, isVerified: e.target.checked })}
-                    className="w-5 h-5 rounded border-canvas-border text-primary focus:ring-primary"
-                  />
-                  <div>
-                    <span className="font-extrabold text-secondary-dark block">
-                      Marquer comme Vérifié
-                    </span>
-                    <span className="text-[11px] text-secondary">
-                      Les adresses vérifiées affichent le badge vert officiel sur la carte.
-                    </span>
-                  </div>
-                </label>
-
-                <div className="w-full sm:w-auto">
-                  <span className="text-[11px] text-secondary font-bold block mb-0.5">Auteur</span>
-                  <input
-                    type="text"
-                    value={formData.submittedBy}
-                    onChange={(e) => setFormData({ ...formData, submittedBy: e.target.value })}
-                    className="px-3 py-1.5 rounded-lg border border-canvas-border bg-white text-xs"
-                  />
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-canvas-border">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-5 py-2.5 bg-canvas hover:bg-canvas-border text-secondary-dark font-bold rounded-xl transition-colors"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={formSubmitting}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-primary hover:bg-primary-dark text-white font-extrabold rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-50"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>{formSubmitting ? 'Enregistrement...' : 'Enregistrer dans MongoDB'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* DELETE CONFIRMATION MODAL */}
-      {/* ========================================================================= */}
-      {spotToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-canvas-border text-center space-y-4">
-            <div className="w-14 h-14 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
-              <Trash2 className="w-7 h-7" />
-            </div>
-            <div>
-              <h3 className="text-lg font-black text-secondary-dark">
-                Supprimer définitivement ce lieu ?
-              </h3>
-              <p className="text-xs text-secondary mt-1">
-                Êtes-vous sûr de vouloir supprimer{' '}
-                <strong className="text-secondary-dark">"{spotToDelete.name}"</strong> ({spotToDelete.city}) ?
-                Cette action supprimera l'enregistrement directement de la base MongoDB.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setSpotToDelete(null)}
-                className="flex-1 py-2.5 bg-canvas hover:bg-canvas-border text-secondary-dark font-bold rounded-xl text-xs"
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={handleConfirmDelete}
-                className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white font-extrabold rounded-xl text-xs shadow-md transition-all active:scale-95 disabled:opacity-50"
-              >
-                {isDeleting ? 'Suppression...' : 'Oui, Supprimer de MongoDB'}
-              </button>
-            </div>
-          </div>
-        </div>
+        </ul>
       )}
     </div>
   );

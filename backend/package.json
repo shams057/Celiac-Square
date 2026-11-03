@@ -9,10 +9,11 @@
     "dev": "node --watch src/server.js",
     "seed": "node src/seed/seedData.js",
     "db:start": "GLIBC_TUNABLES=glibc.pthread.rseq=1 mongod --dbpath ./data/db --bind_ip 127.0.0.1 --port 27017 --logpath ./data/mongod.log --fork",
-    "db:status": "mongosh --eval \"db.adminCommand('ping')\" --quiet"
+    "db:status": "mongosh --eval \"db.adminCommand('ping')\" --quiet",
+    "atmc:fr": "node src/seed/applyAtmcFrench.js"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.16.0",
+    "@google/genai": "^2.32.0",
     "axios": "^1.7.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

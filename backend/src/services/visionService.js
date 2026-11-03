@@ -1,5 +1,10 @@
 import fs from 'fs';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
+
+// Override with GEMINI_MODEL in .env
+const DEFAULT_GEMINI_MODEL = 'gemini-3.8-flash';
+// Stay under the frontend's 30s request timeout so the fallback can still answer
+const GEMINI_TIMEOUT_MS = 20000;
 
 /**
  * Knowledge base of common Tunisian food items for intelligent fallback & heuristics
@@ -77,63 +82,52 @@ const TUNISIAN_FOOD_PATTERNS = [
   },
 ];
 
+// Capped below the 70% threshold so the UI always asks the user to confirm
+const FILENAME_MATCH_CONFIDENCE = 0.5;
+
 /**
- * Intelligent local image recognition heuristic when external LLM API is unavailable
+ * Fallback used when no vision AI is available. It does NOT analyse the image pixels:
+ * it can only suggest candidates when the file name contains a known keyword
+ * (e.g. the sample buttons). Otherwise it reports the product as unidentified.
  */
 export const identifyLocally = (file) => {
   const originalName = (file.originalname || '').toLowerCase();
-  const mimeType = file.mimetype || '';
 
-  // Check matching against known patterns
-  for (const item of TUNISIAN_FOOD_PATTERNS) {
-    if (item.keywords.some((k) => originalName.includes(k))) {
-      return {
-        identifiedProduct: item.name,
-        confidence: item.confidence,
-        visualDescriptors: item.descriptors,
-        candidateNames: item.candidates,
-        isFallback: false,
-        engine: 'Local Feature Classifier (Tunisia Food Vision Model)',
-      };
-    }
+  const item = TUNISIAN_FOOD_PATTERNS.find((p) => p.keywords.some((k) => originalName.includes(k)));
+  if (item) {
+    return {
+      identifiedProduct: item.name,
+      confidence: FILENAME_MATCH_CONFIDENCE,
+      visualDescriptors: [],
+      candidateNames: item.candidates,
+      isFallback: true,
+      aiAvailable: false,
+      engine: "Correspondance par nom de fichier (aucune analyse d'image)",
+    };
   }
 
-  // If filename doesn't have an obvious keyword, choose an intelligent candidate set or low-confidence fallback
-  // This simulates visual recognition with candidate choices:
-  const randomSet = TUNISIAN_FOOD_PATTERNS[Math.floor(Math.random() * TUNISIAN_FOOD_PATTERNS.length)];
-
-  // If the file looks like a generic photo (e.g. image.jpg, photo.png), return moderate confidence to test fallback
-  const isGeneric = originalName.includes('image') || originalName.includes('photo') || originalName.includes('cam') || originalName.includes('blob');
-
   return {
-    identifiedProduct: isGeneric ? randomSet.name : (originalName.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ') || 'Aliment traditionnel tunisien'),
-    confidence: isGeneric ? 0.65 : 0.84, // If generic, < 70% to test candidate prompt!
-    visualDescriptors: isGeneric
-      ? ['Texture alimentaire artisanale', 'Épices ou céréales locales', 'Emballage non standardisé']
-      : ['Étiquette alimentaire locale', 'Ingrédients traditionnels', 'Produit de consommation courante'],
-    candidateNames: [
-      randomSet.name,
-      'Couscous de Blé Dur Traditionnel',
-      'Feuilles de Brik Traditionnelles (Malsouka)',
-      'Harissa Artisanale',
-    ].slice(0, 3),
+    identifiedProduct: null,
+    confidence: 0,
+    visualDescriptors: [],
+    candidateNames: [],
     isFallback: true,
-    engine: 'Vision Feature Classifier & Candidate Ranking Engine',
+    aiAvailable: false,
+    engine: 'Aucun moteur de vision IA disponible',
   };
 };
 
 /**
  * Main Visual Identification Handler
- * Integrates Gemini Vision / OpenAI Vision with local heuristic fallback
+ * Uses Gemini Vision when GEMINI_API_KEY is set, otherwise the local fallback
  */
 export const identifyProductFromImage = async (file) => {
   const geminiKey = process.env.GEMINI_API_KEY;
-  const openaiKey = process.env.OPENAI_API_KEY;
+  const modelName = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
 
   if (geminiKey && geminiKey.trim() !== '') {
     try {
-      const genAI = new GoogleGenerativeAI(geminiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-3-flash-preview' });
+      const ai = new GoogleGenAI({ apiKey: geminiKey, httpOptions: { timeout: GEMINI_TIMEOUT_MS } });
 
       const imageBuffer = fs.readFileSync(file.path);
       const imagePart = {
@@ -161,8 +155,12 @@ Return STRICTLY valid JSON with no markdown formatting:
 }
 `;
 
-      const result = await model.generateContent([prompt, imagePart]);
-      const text = result.response.text().trim();
+      const response = await ai.models.generateContent({
+        model: modelName,
+        contents: [{ role: 'user', parts: [{ text: prompt }, imagePart] }],
+        config: { responseMimeType: 'application/json' },
+      });
+      const text = (response.text || '').trim();
       const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleanJson);
 
@@ -172,7 +170,8 @@ Return STRICTLY valid JSON with no markdown formatting:
         visualDescriptors: Array.isArray(parsed.visualDescriptors) ? parsed.visualDescriptors : [],
         candidateNames: Array.isArray(parsed.candidateNames) ? parsed.candidateNames : [parsed.identifiedProduct],
         isFallback: false,
-        engine: 'Google Gemini 1.5 Flash Vision API',
+        aiAvailable: true,
+        engine: `Google Gemini Vision (${modelName})`,
       };
     } catch (err) {
       console.warn(`[Vision Service] Gemini API call failed: ${err.message}. Falling back to local classifier.`);

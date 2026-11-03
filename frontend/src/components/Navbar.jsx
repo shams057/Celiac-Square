@@ -1,178 +1,95 @@
 import React from 'react';
-import { ShieldCheck, MapPin, Search, Camera, PlusCircle, Globe, Heart, BookOpen, SlidersHorizontal } from 'lucide-react';
+import { BookOpen, Camera, Search, MapPin, Plus, Languages } from 'lucide-react';
+import { BrandMark, t } from './ui';
+
+const TABS = [
+  { id: 'atmc', icon: BookOpen, fr: 'Guide ATMC', ar: 'دليل الجمعية' },
+  { id: 'vision', icon: Camera, fr: 'Scanner', ar: 'الماسح' },
+  { id: 'search', icon: Search, fr: 'Recherche', ar: 'بحث' },
+  { id: 'map', icon: MapPin, fr: 'Carte', ar: 'الخريطة' },
+];
 
 export default function Navbar({ activeTab, setActiveTab, onOpenSubmitModal, lang, setLang }) {
+  const tr = t(lang);
+
   return (
-    <header className="sticky top-0 z-50 bg-[#FAF8F2] border-b border-canvas-border/60 shadow-sm backdrop-blur-md bg-opacity-95">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
-          {/* Brand Logo */}
-          <div 
-            onClick={() => setActiveTab('vision')} 
-            className="flex items-center gap-3 cursor-pointer group"
+    <>
+      <header className="sticky top-0 z-[900] border-b border-canvas-line bg-canvas/95 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
+          <button
+            type="button"
+            onClick={() => setActiveTab('vision')}
+            className="flex shrink-0 items-center gap-2.5 rounded-lg"
+            aria-label="Celiac Square"
           >
-            <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center text-white shadow-md shadow-primary/30 group-hover:scale-105 transition-transform duration-300">
-              <ShieldCheck className="w-7 h-7" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-extrabold tracking-tight text-secondary-dark">
-                  Celiac<span className="text-accent">Square</span>
-                </span>
-              </div>
-              <p className="text-xs text-secondary/80 font-medium">
-                {lang === 'fr' ? 'Plateforme Cœliaque & Sans Gluten' : 'المنصة التونسية لمرضى حساسية الغلوتين'}
-              </p>
-            </div>
-          </div>
+            <BrandMark className="h-8 w-8" />
+            <span className="text-lg font-semibold tracking-[-0.01em]">Celiac Square</span>
+          </button>
 
-          {/* Navigation Tabs */}
-          <nav className="hidden md:flex items-center gap-1.5 bg-canvas/40 p-1.5 rounded-2xl border border-canvas-border/40">
-            <button
-              onClick={() => setActiveTab('vision')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ${
-                activeTab === 'vision'
-                  ? 'bg-accent text-white shadow-md shadow-accent/25 scale-[1.02]'
-                  : 'text-secondary-dark hover:bg-white/80'
-              }`}
-            >
-              <Camera className="w-4 h-4" />
-              <span>{lang === 'fr' ? 'Scanner Vision IA' : 'الماسح الذكي'}</span>
-              <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${activeTab === 'vision' ? 'bg-white/30 text-white' : 'bg-accent/20 text-accent-dark'}`}>
-                Principal
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('atmc')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ${
-                activeTab === 'atmc'
-                  ? 'bg-primary text-white shadow-md shadow-primary/25 scale-[1.02]'
-                  : 'text-secondary-dark hover:bg-white/80'
-              }`}
-            >
-              <BookOpen className="w-4 h-4" />
-              <span>{lang === 'fr' ? 'Guide ATMC 2023' : 'دليل الجمعية'}</span>
-              <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${activeTab === 'atmc' ? 'bg-white/30 text-white' : 'bg-primary/20 text-primary-dark'}`}>
-                Officiel
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('search')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ${
-                activeTab === 'search'
-                  ? 'bg-[#4A5D4E] text-white shadow-md shadow-[#4A5D4E]/25 scale-[1.02]'
-                  : 'text-secondary-dark hover:bg-white/80'
-              }`}
-            >
-              <Search className="w-4 h-4" />
-              <span>{lang === 'fr' ? 'Recherche Hybride' : 'دليل المنتجات'}</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('map')}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ${
-                activeTab === 'map'
-                  ? 'bg-secondary text-white shadow-md shadow-secondary/25 scale-[1.02]'
-                  : 'text-secondary-dark hover:bg-white/80'
-              }`}
-            >
-              <MapPin className="w-4 h-4" />
-              <span>{lang === 'fr' ? 'Carte de Tunisie' : 'خريطة تونس'}</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('backoffice')}
-              className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl font-semibold text-sm transition-all duration-200 ${
-                activeTab === 'backoffice'
-                  ? 'bg-secondary-dark text-white shadow-md scale-[1.02]'
-                  : 'text-secondary-dark hover:bg-white/80'
-              }`}
-              title="Gérer les adresses et points de la base de données"
-            >
-              <SlidersHorizontal className="w-4 h-4 text-accent" />
-              <span>{lang === 'fr' ? 'Backoffice' : 'لوحة التحكم'}</span>
-              <span className={`text-[10px] font-extrabold px-1.5 py-0.2 rounded-full ${activeTab === 'backoffice' ? 'bg-accent text-white' : 'bg-accent/15 text-accent-dark'}`}>
-                DB
-              </span>
-            </button>
+          {/* Desktop tabs */}
+          <nav className="ms-4 hidden items-center gap-1 lg:flex" aria-label={tr('Navigation principale', 'التنقل الرئيسي')}>
+            {TABS.map(({ id, fr, ar }) => {
+              const active = activeTab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setActiveTab(id)}
+                  aria-current={active ? 'page' : undefined}
+                  className={`relative rounded-md px-3 py-2 text-[15px] transition-colors ${
+                    active ? 'font-medium text-ink' : 'text-ink-soft hover:text-ink'
+                  }`}
+                >
+                  {tr(fr, ar)}
+                  {active && <span className="absolute inset-x-3 -bottom-[13px] h-[3px] rounded-full bg-accent" />}
+                </button>
+              );
+            })}
           </nav>
 
-          {/* Right Action Buttons */}
-          <div className="flex items-center gap-3">
-            {/* Language Toggle */}
+          <div className="ms-auto flex items-center gap-2">
             <button
+              type="button"
               onClick={() => setLang(lang === 'fr' ? 'ar' : 'fr')}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border border-canvas-border/70 hover:bg-white transition-colors text-secondary-dark"
-              title="Changer de langue"
+              className="btn-ghost px-3"
+              lang={lang === 'fr' ? 'ar' : 'fr'}
             >
-              <Globe className="w-3.5 h-3.5 text-accent" />
+              <Languages className="h-4 w-4" />
               <span>{lang === 'fr' ? 'العربية' : 'Français'}</span>
             </button>
-
-            {/* Propose a spot modal trigger */}
-            <button
-              onClick={onOpenSubmitModal}
-              className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-semibold shadow hover:bg-primary-dark transition-all duration-200 active:scale-95"
-            >
-              <PlusCircle className="w-4 h-4" />
-              <span className="hidden sm:inline">
-                {lang === 'fr' ? 'Proposer une Adresse' : 'إضافة عنوان'}
-              </span>
+            <button type="button" onClick={onOpenSubmitModal} className="btn-primary px-3 sm:px-4">
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">{tr('Proposer une adresse', 'اقترح عنوانا')}</span>
             </button>
           </div>
         </div>
+      </header>
 
-        {/* Mobile Navigation Bar */}
-        <div className="flex md:hidden items-center justify-around py-2.5 border-t border-canvas-border/40 text-xs">
-          <button
-            onClick={() => setActiveTab('vision')}
-            className={`flex flex-col items-center gap-1 py-1 px-2 rounded-lg font-semibold ${
-              activeTab === 'vision' ? 'text-accent font-bold' : 'text-secondary'
-            }`}
-          >
-            <Camera className="w-5 h-5" />
-            <span>Vision IA</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('atmc')}
-            className={`flex flex-col items-center gap-1 py-1 px-2 rounded-lg font-semibold ${
-              activeTab === 'atmc' ? 'text-primary font-bold' : 'text-secondary'
-            }`}
-          >
-            <BookOpen className="w-5 h-5" />
-            <span>Guide ATMC</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('search')}
-            className={`flex flex-col items-center gap-1 py-1 px-2 rounded-lg font-semibold ${
-              activeTab === 'search' ? 'text-primary-dark font-bold' : 'text-secondary'
-            }`}
-          >
-            <Search className="w-5 h-5" />
-            <span>Recherche</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('map')}
-            className={`flex flex-col items-center gap-1 py-1 px-2 rounded-lg font-semibold ${
-              activeTab === 'map' ? 'text-secondary-dark font-bold' : 'text-secondary'
-            }`}
-          >
-            <MapPin className="w-5 h-5" />
-            <span>Carte</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('backoffice')}
-            className={`flex flex-col items-center gap-1 py-1 px-2 rounded-lg font-semibold ${
-              activeTab === 'backoffice' ? 'text-accent-dark font-bold' : 'text-secondary'
-            }`}
-          >
-            <SlidersHorizontal className="w-5 h-5" />
-            <span>Admin</span>
-          </button>
+      {/* Mobile and tablet bottom tab bar */}
+      <nav
+        className="fixed inset-x-0 bottom-0 z-[900] border-t border-canvas-line bg-canvas-raised pb-[env(safe-area-inset-bottom)] lg:hidden"
+        aria-label={tr('Navigation principale', 'التنقل الرئيسي')}
+      >
+        <div className="mx-auto grid max-w-lg grid-cols-4">
+          {TABS.map(({ id, icon: Icon, fr, ar }) => {
+            const active = activeTab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveTab(id)}
+                aria-current={active ? 'page' : undefined}
+                className={`flex flex-col items-center gap-1 py-2.5 text-xs ${active ? 'font-medium text-ink' : 'text-ink-soft'}`}
+              >
+                <span className={`flex h-8 w-12 items-center justify-center rounded-md ${active ? 'bg-accent' : ''}`}>
+                  <Icon className="h-5 w-5" />
+                </span>
+                {tr(fr, ar)}
+              </button>
+            );
+          })}
         </div>
-      </div>
-    </header>
+      </nav>
+    </>
   );
 }

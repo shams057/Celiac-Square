@@ -1,264 +1,190 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Search,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  HelpCircle,
-  Barcode,
-  Layers,
-  Filter,
-  RefreshCw,
-  ExternalLink,
-  BookOpen,
-} from 'lucide-react';
+import { Search, LoaderCircle, X } from 'lucide-react';
 import { searchProducts } from '../services/api';
+import { t, statusKind, STATUS, StatusTile, PageHead, Notice, EmptyState } from './ui';
+
+const SOURCE_LOCAL = ['Association Tunisienne de la Cœliaque', 'Guide Officiel ATMC 2023'];
+const isLocal = (item) => SOURCE_LOCAL.includes(item.source);
+
 
 export default function ProductSearch({ initialQuery = '', lang }) {
+  const tr = t(lang);
   const [query, setQuery] = useState(initialQuery);
-  const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
+  const [localQuery, setLocalQuery] = useState(initialQuery.trim());
+  const [offQuery, setOffQuery] = useState(initialQuery.trim());
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState({ layerA: [], layerB: [], combined: [] });
-  const [activeFilter, setActiveFilter] = useState('ALL'); // 'ALL' | 'ATC' | 'OFF' | 'SAFE' | 'UNSAFE' | 'RISK'
+  const [localItems, setLocalItems] = useState([]);
+  const [offItems, setOffItems] = useState([]);
+  const [offState, setOffState] = useState('idle'); // 'idle' | 'loading' | 'ok' | 'unavailable'
+  const [offRetry, setOffRetry] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Handle external initial query changes
   useEffect(() => {
     if (initialQuery) {
       setQuery(initialQuery);
-      setDebouncedQuery(initialQuery);
+      setLocalQuery(initialQuery.trim());
+      setOffQuery(initialQuery.trim());
     }
   }, [initialQuery]);
 
-  // Debounce search input (350ms)
+  // Local guides answer instantly; Open Food Facts is rate limited, so it waits for a real pause
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedQuery(query);
-    }, 350);
-    return () => clearTimeout(timer);
+    const local = setTimeout(() => setLocalQuery(query.trim()), 250);
+    const off = setTimeout(() => setOffQuery(query.trim()), 900);
+    return () => {
+      clearTimeout(local);
+      clearTimeout(off);
+    };
   }, [query]);
 
-  // Execute search whenever debouncedQuery changes
   useEffect(() => {
-    const doSearch = async () => {
-      setLoading(true);
-      setErrorMsg('');
-      try {
-        const res = await searchProducts(debouncedQuery);
-        if (res && res.success) {
-          setData(res);
-        } else {
-          setErrorMsg('Impossible de charger les données produits.');
-        }
-      } catch (err) {
-        console.error('Search error:', err);
-        setErrorMsg('Erreur de connexion. Vérifiez votre réseau ou le serveur.');
-      } finally {
-        setLoading(false);
-      }
+    let cancelled = false;
+    setLoading(true);
+    setErrorMsg('');
+    searchProducts(localQuery, 'local')
+      .then((res) => {
+        if (cancelled) return;
+        if (res?.success) setLocalItems(res.layerB || []);
+        else setErrorMsg('failed');
+      })
+      .catch(() => !cancelled && setErrorMsg('network'))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
     };
+  }, [localQuery]);
 
-    doSearch();
-  }, [debouncedQuery]);
+  useEffect(() => {
+    setOffItems([]);
+    if (offQuery.length < 3) {
+      setOffState('idle');
+      return undefined;
+    }
+    let cancelled = false;
+    setOffState('loading');
+    searchProducts(offQuery, 'off')
+      .then((res) => {
+        if (cancelled) return;
+        setOffItems(res?.layerA || []);
+        setOffState(res?.offStatus === 'unavailable' ? 'unavailable' : 'ok');
+      })
+      .catch(() => !cancelled && setOffState('unavailable'));
+    return () => {
+      cancelled = true;
+    };
+  }, [offQuery, offRetry]);
 
-  // Filter items
-  const allItems = data.combined || [...(data.layerB || []), ...(data.layerA || [])];
-
-  const filteredItems = allItems.filter((item) => {
-    if (activeFilter === 'ATC') return item.source === 'Association Tunisienne de la Cœliaque';
-    if (activeFilter === 'OFF') return item.source === 'Open Food Facts';
-    if (activeFilter === 'SAFE') return item.status === 'SAFE';
-    if (activeFilter === 'UNSAFE') return item.status === 'UNSAFE';
-    if (activeFilter === 'RISK') return item.status === 'CROSS_CONTAMINATION_RISK' || item.status === 'WARNING';
-    return true;
-  });
+  // Results for the previous text stay on screen until the new ones arrive
+  const stale = query.trim() !== localQuery;
+  const items = [...localItems, ...offItems];
 
   return (
-    <div className="space-y-8 animate-fadeIn">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-canvas-card via-[#FAF8F2] to-canvas/60 rounded-3xl p-6 sm:p-8 border border-canvas-border shadow-sm">
-        <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/15 text-primary-dark text-xs font-extrabold mb-3">
-            <Layers className="w-4 h-4 text-primary" />
-            <span>DOUBLE COUCHE DE VÉRIFICATION : ATC + OPEN FOOD FACTS</span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-secondary-dark tracking-tight leading-tight">
-            Recherche Hybride & Vérification des Étiquettes
-          </h1>
-          <p className="mt-2 text-base text-secondary/90 leading-relaxed">
-            Interrogez d'un seul geste la base locale de l'<strong>Association Tunisienne de la Cœliaque</strong> (viandes, épices du souk, huiles, graines, farines locales) et la base mondiale <strong>Open Food Facts</strong> (produits emballés, codes-barres).
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHead
+        title={tr('Rechercher un produit', 'ابحث عن منتج')}
+        lede={tr(
+          'Un nom, une marque ou un code-barres. La recherche couvre les guides tunisiens (produits locaux, vrac, souk) et Open Food Facts (produits emballés du monde entier).',
+          'اسم، علامة أو رمز شريطي. يشمل البحث الأدلة التونسية (المنتجات المحلية والسائبة) وقاعدة Open Food Facts للمنتجات المعلبة.'
+        )}
+      />
 
-      {/* Unified Search Input */}
-      <div className="bg-[#FAF8F2] rounded-3xl p-6 border border-canvas-border shadow-sm space-y-4">
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-secondary/60" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher un aliment, une marque ou un code-barres (ex: couscous, harissa, drou3, Barilla, 8076809545440)..."
-            className="w-full pl-13 pr-12 py-4 rounded-2xl bg-white border border-canvas-border text-secondary-dark font-medium placeholder:text-secondary/50 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent text-base shadow-sm"
-          />
-          {loading && (
-            <RefreshCw className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-accent animate-spin" />
-          )}
-        </div>
-
-        {/* Filters & Tags */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-canvas-border/50">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold text-secondary flex items-center gap-1 mr-1">
-              <Filter className="w-3.5 h-3.5" /> Filtres :
-            </span>
-
-            {[
-              { id: 'ALL', label: 'Tous les résultats', count: allItems.length },
-              { id: 'ATC', label: 'Guide ATC Tunisie', count: (data.layerB || []).length },
-              { id: 'OFF', label: 'Open Food Facts', count: (data.layerA || []).length },
-              { id: 'SAFE', label: 'Sans Gluten', color: 'text-primary' },
-              { id: 'RISK', label: 'Risque Contamination', color: 'text-accent' },
-              { id: 'UNSAFE', label: 'Contient Gluten', color: 'text-status-unsafe' },
-            ].map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setActiveFilter(f.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  activeFilter === f.id
-                    ? 'bg-secondary text-white shadow-sm'
-                    : 'bg-canvas/50 text-secondary-dark hover:bg-white border border-canvas-border/60'
-                }`}
-              >
-                {f.label} {f.count !== undefined ? `(${f.count})` : ''}
+      <div className="relative">
+        <Search className="pointer-events-none absolute start-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-faint" />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={tr('couscous, harissa, Barilla, 8076809545440…', 'كسكسي، هريسة، باريلا، 8076809545440…')}
+          aria-label={tr('Nom, marque ou code-barres', 'اسم، علامة أو رمز شريطي')}
+          className="field h-14 pe-12 ps-12 text-base"
+        />
+        <span className="absolute end-3 top-1/2 -translate-y-1/2">
+          {loading || stale || offState === 'loading' ? (
+            <LoaderCircle className="h-5 w-5 animate-spin text-ink-soft" aria-label={tr('Recherche en cours', 'جاري البحث')} />
+          ) : (
+            query && (
+              <button type="button" onClick={() => setQuery('')} className="rounded-md p-1.5 text-ink-soft hover:text-ink" aria-label={tr('Effacer', 'مسح')}>
+                <X className="h-4 w-4" />
               </button>
-            ))}
-          </div>
-
-          <div className="text-xs text-secondary/80 font-medium">
-            {filteredItems.length} produit{filteredItems.length > 1 ? 's' : ''} trouvé{filteredItems.length > 1 ? 's' : ''}
-          </div>
-        </div>
+            )
+          )}
+        </span>
       </div>
 
-      {/* Error Notice */}
-      {errorMsg && (
-        <div className="p-4 rounded-2xl bg-status-unsafe/10 border border-status-unsafe/30 text-status-unsafe text-sm flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 shrink-0" />
-          <span>{errorMsg}</span>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-ink-soft" aria-live="polite">
+        <p>
+          {items.length} {tr(items.length > 1 ? 'résultats' : 'résultat', 'نتيجة')}
+        </p>
+        {offState === 'loading' && <p>{tr('Recherche dans Open Food Facts…', 'جاري البحث في Open Food Facts…')}</p>}
+      </div>
+
+      {offState === 'unavailable' && (
+        <Notice
+          tone="warning"
+          title={tr('Open Food Facts ne répond pas pour le moment.', 'Open Food Facts لا يستجيب حاليا.')}
+          action={
+            <button type="button" className="btn-quiet" onClick={() => setOffRetry((n) => n + 1)}>
+              {tr('Réessayer Open Food Facts', 'أعد المحاولة')}
+            </button>
+          }
+        >
+          {tr(
+            'Les résultats des guides tunisiens sont affichés. Le service limite le nombre de recherches : réessayez dans une minute.',
+            'تُعرض نتائج الأدلة التونسية. الخدمة تحدّ من عدد عمليات البحث: أعد المحاولة بعد دقيقة.'
+          )}
+        </Notice>
       )}
 
-      {/* Results Grid */}
-      {filteredItems.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredItems.map((item, idx) => {
-            const isSafe = item.status === 'SAFE';
-            const isUnsafe = item.status === 'UNSAFE';
-            const isRisk = item.status === 'CROSS_CONTAMINATION_RISK' || item.status === 'WARNING';
+      {errorMsg && (
+        <Notice tone="error" title={tr('La recherche n’a pas abouti.', 'تعذر إتمام البحث.')}>
+          {tr('Vérifiez votre connexion internet puis relancez la recherche.', 'تحقق من الاتصال ثم أعد البحث.')}
+        </Notice>
+      )}
 
-            const badgeBg = isSafe
-              ? 'bg-primary/15 text-primary-dark border-primary/30'
-              : isUnsafe
-              ? 'bg-status-unsafe/15 text-status-unsafe border-status-unsafe/30'
-              : 'bg-accent/15 text-accent-dark border-accent/30';
-
-            const sourceIsATC = item.source === 'Association Tunisienne de la Cœliaque';
-
+      {items.length > 0 ? (
+        <ul className="divide-y divide-canvas-line overflow-hidden rounded-xl border border-canvas-line bg-white">
+          {items.map((item, idx) => {
+            const k = statusKind(item.status);
+            const local = isLocal(item);
+            const label = lang === 'ar' ? item.badgeTextAr || STATUS[k].ar : item.badgeText || STATUS[k].fr;
+            const notes = lang === 'ar' ? item.notesAr || item.notes : item.notes;
             return (
-              <div
-                key={item.id || idx}
-                className="bg-[#FAF8F2] rounded-3xl p-6 border border-canvas-border shadow-sm hover:shadow-md transition-all flex flex-col justify-between group"
-              >
-                <div>
-                  {/* Top Layer & Source Badge */}
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    <span
-                      className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${badgeBg} flex items-center gap-1.5`}
-                    >
-                      {isSafe ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
-                      ) : isUnsafe ? (
-                        <XCircle className="w-3.5 h-3.5 text-status-unsafe" />
-                      ) : (
-                        <AlertTriangle className="w-3.5 h-3.5 text-accent" />
-                      )}
-                      <span>{item.badgeText || (isSafe ? 'Sans Gluten' : isUnsafe ? 'Contient du Gluten' : 'Risque Contamination')}</span>
-                    </span>
-
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                        sourceIsATC
-                          ? 'bg-primary/10 text-primary-dark border-primary/20'
-                          : 'bg-secondary/10 text-secondary-dark border-secondary/20'
-                      }`}
-                    >
-                      {sourceIsATC ? 'ATC Tunisie 🇹🇳' : 'Open Food Facts 🌐'}
-                    </span>
+              <li key={item.id || idx} className="flex gap-4 px-4 py-4 sm:px-5">
+                <StatusTile kind={k} className="mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-col gap-x-4 gap-y-1 sm:flex-row sm:items-baseline sm:justify-between">
+                    <h3 dir="auto" className="text-left text-base font-medium leading-snug rtl:text-right">
+                      {lang === 'ar' && item.productNameAr ? item.productNameAr : item.productNameFr}
+                    </h3>
+                    <p className={`shrink-0 text-sm font-medium ${STATUS[k].text}`}>{label}</p>
                   </div>
-
-                  {/* Product Title */}
-                  <h3 className="text-xl font-extrabold text-secondary-dark group-hover:text-primary transition-colors leading-snug">
-                    {item.productNameFr}
-                  </h3>
-
-                  {item.productNameAr && (
-                    <p className="text-base font-bold text-secondary font-arabic mt-1">
+                  {lang !== 'ar' && item.productNameAr && item.productNameAr !== item.productNameFr && (
+                    <p dir="rtl" lang="ar" className="text-left text-sm text-ink-soft">
                       {item.productNameAr}
                     </p>
                   )}
-
-                  {/* Brand & Barcode */}
-                  <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-secondary/80">
-                    <span className="font-semibold">{item.brand}</span>
-                    {item.barcode && (
-                      <span className="flex items-center gap-1 bg-canvas/60 px-2 py-0.5 rounded font-mono text-[11px]">
-                        <Barcode className="w-3.5 h-3.5" />
-                        {item.barcode}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Guidance & Health Notes */}
-                  <div className="mt-4 p-3.5 rounded-2xl bg-canvas/40 border border-canvas-border/50 text-xs text-secondary-dark leading-relaxed">
-                    <p>{item.notes}</p>
-                    {item.notesAr && (
-                      <p className="mt-2 text-secondary-dark/90 font-arabic border-t border-canvas-border/40 pt-2">
-                        {item.notesAr}
-                      </p>
-                    )}
-                  </div>
+                  {notes && <p dir="auto" className="mt-2 line-clamp-3 max-w-[70ch] text-left text-sm text-ink-soft rtl:text-right">{notes}</p>}
+                  <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-faint">
+                    {item.brand && <span dir="auto">{item.brand}</span>}
+                    {item.barcode && <span className="tabular-nums">{item.barcode}</span>}
+                    <span>{local ? tr('Source : guide tunisien', 'المصدر: دليل تونسي') : tr('Source : Open Food Facts', 'المصدر: Open Food Facts')}</span>
+                  </p>
                 </div>
-
-                {/* Footer Attribution Reference */}
-                <div className="mt-5 pt-3 border-t border-canvas-border/50 flex items-center justify-between text-[11px] text-secondary/70">
-                  <span className="truncate max-w-[220px]" title={item.officialDocReference}>
-                    {item.officialDocReference || item.source}
-                  </span>
-                  {sourceIsATC ? (
-                    <span className="font-bold text-primary flex items-center gap-1">
-                      <BookOpen className="w-3 h-3" /> Fiche ATC
-                    </span>
-                  ) : (
-                    <span className="font-bold text-secondary flex items-center gap-1">
-                      <ExternalLink className="w-3 h-3" /> Base OFF
-                    </span>
-                  )}
-                </div>
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       ) : (
-        !loading && (
-          <div className="bg-[#FAF8F2] rounded-3xl p-12 text-center border border-canvas-border">
-            <Search className="w-12 h-12 text-secondary/40 mx-auto mb-3" />
-            <h3 className="text-lg font-bold text-secondary-dark">Aucun produit trouvé</h3>
-            <p className="text-xs text-secondary max-w-md mx-auto mt-1">
-              Essayez une autre recherche (ex: "couscous", "harissa", "malsouka", "barilla") ou utilisez notre scanner visuel par caméra.
-            </p>
-          </div>
+        !loading &&
+        !stale &&
+        offState !== 'loading' &&
+        !errorMsg && (
+          <EmptyState title={tr('Aucun résultat', 'لا توجد نتائج')}>
+            {tr(
+              'Essayez un autre mot (« couscous », « malsouka »), un code-barres complet, ou photographiez le produit avec le scanner.',
+              'جرب كلمة أخرى، رمزا شريطيا كاملا، أو صوّر المنتج بالماسح.'
+            )}
+          </EmptyState>
         )
       )}
     </div>

@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { identifyProductFromImage } from '../services/visionService.js';
 import { AssociationProduct } from '../models/AssociationProduct.js';
+import { containsRegex } from '../utils/regex.js';
 import {
   searchOpenFoodFactsByQuery,
   fetchFromOpenFoodFactsByBarcode,
@@ -48,7 +49,7 @@ const matchProductInDatabases = async (searchTerm) => {
 
   // Try matching with Association DB first
   const words = term.split(/\s+/).filter((w) => w.length > 2);
-  const regexPatterns = [new RegExp(term, 'i'), ...words.map((w) => new RegExp(w, 'i'))];
+  const regexPatterns = [containsRegex(term), ...words.map((w) => containsRegex(w))];
 
   const localMatch = await AssociationProduct.findOne({
     $or: [
@@ -137,6 +138,7 @@ router.post('/identify', upload.single('image'), async (req, res) => {
         requiresFallback,
         visualDescriptors: visionResult.visualDescriptors || [],
         engine: visionResult.engine || 'Multimodal Vision Engine',
+        aiAvailable: Boolean(visionResult.aiAvailable),
         matchedProduct: matchedItem,
         candidates: candidateMatches,
         glutenStatus: matchedItem ? matchedItem.status : 'UNKNOWN',
