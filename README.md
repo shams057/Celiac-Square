@@ -52,7 +52,7 @@ Le design applique strictement les tokens d'interface spécifiés :
 app/
 ├── backend/
 │   ├── src/
-│   │   ├── config/db.js             # Connexion MongoDB
+│   │   ├── config/db.js             # Client Supabase (clé secrète, côté serveur)
 │   │   ├── models/                  # Schémas Spot & AssociationProduct
 │   │   ├── routes/                  # /api/map, /api/products, /api/vision
 │   │   ├── services/
@@ -80,7 +80,7 @@ app/
 
 ### 1. Prérequis
 - **Node.js** >= v18
-- **MongoDB** (exécuté localement sur `mongodb://127.0.0.1:27017`)
+- Un projet **Supabase** (schéma dans `supabase/migrations/`)
 
 ### 2. Initialisation de la Base de Données
 Peuple la base de données avec les adresses répertoriées en Tunisie et le guide alimentaire de l'ATC :
@@ -112,7 +112,9 @@ L'API backend est accessible sur **http://localhost:5000/api**.
 ## 🔑 Variables d'Environnement (Facultatif)
 Dans `backend/.env` :
 - `PORT=5000`
-- `MONGO_URI=mongodb://127.0.0.1:27017/celiac-square`
+- `SUPABASE_URL=https://<projet>.supabase.co`
+- `SUPABASE_SECRET_KEY=` *(clé secrète Supabase, jamais côté navigateur)*
+- `ADMIN_TOKEN=` *(jeton de l’espace administrateur)*
 - `GEMINI_API_KEY=` *(optionnel : pour activer les requêtes en direct vers Google Gemini Vision)*
 - `OPENAI_API_KEY=` *(optionnel)*
 

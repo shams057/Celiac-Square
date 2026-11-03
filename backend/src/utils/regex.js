@@ -1,29 +1,20 @@
 /**
- * Escape user input so it is matched literally inside a RegExp
+ * Lowercase and strip accents the same way the database's search_text columns do
+ * (public.f_unaccent(lower(...))), so "delice" matches "Délice" and "coeliaque" matches "cœliaque".
  */
-export const escapeRegExp = (str) => String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-// Each base letter also matches its accented forms, so "delice" finds "Délice"
-const ACCENTS = {
-  a: 'aàâäá',
-  c: 'cç',
-  e: 'eéèêë',
-  i: 'iîïí',
-  o: 'oôöó',
-  u: 'uùûüú',
-  y: 'yÿ',
-};
-
-const foldAccents = (escaped) =>
-  escaped.replace(/[a-zàâäáçéèêëîïíôöóùûüúÿ]/gi, (ch) => {
-    const base = ch
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
-    return ACCENTS[base] ? `[${ACCENTS[base]}]` : ch;
-  });
+export const foldText = (str) =>
+  String(str)
+    .toLowerCase()
+    .replace(/œ/g, 'oe')
+    .replace(/æ/g, 'ae')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
 
 /**
- * Case- and accent-insensitive "contains" RegExp built from untrusted user input
+ * ILIKE "contains" pattern for search_text columns, built from untrusted input:
+ * LIKE wildcards are escaped and PostgREST's `*` wildcard is dropped.
  */
-export const containsRegex = (str) => new RegExp(foldAccents(escapeRegExp(str)), 'i');
+export const containsPattern = (str) => `%${foldText(str).replace(/\*/g, '').replace(/[\\%_]/g, '\\$&')}%`;
+
+/** ILIKE pattern that matches the whole value, ignoring case (e.g. a city name) */
+export const exactPattern = (str) => String(str).replace(/\*/g, '').replace(/[\\%_]/g, '\\$&');

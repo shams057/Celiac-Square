@@ -9,8 +9,6 @@
     "frontend"
   ],
   "scripts": {
-    "db:start": "cd backend && npm run db:start",
-    "db:status": "cd backend && npm run db:status",
     "seed": "cd backend && npm run seed",
     "server": "cd backend && npm run dev",
     "client": "cd frontend && npm run dev",

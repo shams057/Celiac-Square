@@ -1,5 +1,13 @@
 import express from 'express';
-import { AtmcProduct } from '../models/AtmcProduct.js';
+import { db, unwrap } from '../config/db.js';
+import { toAtmcProduct } from '../models/mappers.js';
+
+const fetchAtmc = async ({ category, status } = {}) => {
+  let query = db().from('atmc_products').select('*').order('category_fr').order('status');
+  if (category && category !== 'ALL') query = query.eq('category_slug', category);
+  if (status && status !== 'ALL') query = query.eq('status', status.toUpperCase());
+  return unwrap(await query).map(toAtmcProduct);
+};
 
 const router = express.Router();
 
@@ -71,37 +79,20 @@ function calculateSimilarity(query, targetText) {
 router.get('/products', async (req, res) => {
   try {
     const { category, status, q } = req.query;
-    const filter = {};
-
-    if (category && category !== 'ALL') {
-      filter.categorySlug = category;
-    }
-
-    if (status && status !== 'ALL') {
-      filter.status = status.toUpperCase();
-    }
-
     const searchQuery = (q || '').trim();
+    const candidates = await fetchAtmc({ category, status });
 
     if (!searchQuery) {
-      const products = await AtmcProduct.find(filter).sort({ categoryFr: 1, status: 1 });
-      return res.json({
-        success: true,
-        count: products.length,
-        data: products,
-      });
+      return res.json({ success: true, count: candidates.length, data: candidates });
     }
-
-    // When a search query is present, pull all candidates matching category/status filter
-    const candidates = await AtmcProduct.find(filter);
 
     // Score and rank candidates by typo similarity
     const scored = candidates
       .map((item) => {
-        const textToMatch = `${item.name} ${item.brand} ${item.rawText} ${(item.items || []).join(' ')} ${item.categoryFr} ${item.categoryAr}`;
+        const textToMatch = `${item.name} ${item.nameFr} ${item.brand} ${item.rawText} ${(item.items || []).join(' ')} ${item.categoryFr} ${item.categoryAr}`;
         const simScore = calculateSimilarity(searchQuery, textToMatch);
         return {
-          ...item.toObject(),
+          ...item,
           similarityScore: Math.round(simScore * 100),
         };
       })
@@ -130,27 +121,19 @@ router.get('/products', async (req, res) => {
  */
 router.get('/categories', async (req, res) => {
   try {
-    const categories = await AtmcProduct.aggregate([
-      {
-        $group: {
-          _id: '$categorySlug',
-          categoryFr: { $first: '$categoryFr' },
-          categoryAr: { $first: '$categoryAr' },
-          categorySlug: { $first: '$categorySlug' },
-          totalCount: { $sum: 1 },
-          allowedCount: {
-            $sum: { $cond: [{ $eq: ['$status', 'ALLOWED'] }, 1, 0] },
-          },
-          toCheckCount: {
-            $sum: { $cond: [{ $eq: ['$status', 'TO_CHECK'] }, 1, 0] },
-          },
-          notAllowedCount: {
-            $sum: { $cond: [{ $eq: ['$status', 'NOT_ALLOWED'] }, 1, 0] },
-          },
-        },
-      },
-      { $sort: { categoryFr: 1 } },
-    ]);
+    const rows = unwrap(await db().from('atmc_products').select('category_slug, category_fr, category_ar, status'));
+    const bySlug = new Map();
+    for (const r of rows) {
+      const c =
+        bySlug.get(r.category_slug) ||
+        { _id: r.category_slug, categorySlug: r.category_slug, categoryFr: r.category_fr, categoryAr: r.category_ar, totalCount: 0, allowedCount: 0, toCheckCount: 0, notAllowedCount: 0 };
+      c.totalCount += 1;
+      if (r.status === 'ALLOWED') c.allowedCount += 1;
+      else if (r.status === 'TO_CHECK') c.toCheckCount += 1;
+      else c.notAllowedCount += 1;
+      bySlug.set(r.category_slug, c);
+    }
+    const categories = [...bySlug.values()].sort((a, b) => a.categoryFr.localeCompare(b.categoryFr, 'fr'));
 
     return res.json({
       success: true,
@@ -173,13 +156,13 @@ router.get('/categories', async (req, res) => {
  */
 router.get('/stats', async (req, res) => {
   try {
-    const [total, allowed, toCheck, notAllowed, categoryCount] = await Promise.all([
-      AtmcProduct.countDocuments(),
-      AtmcProduct.countDocuments({ status: 'ALLOWED' }),
-      AtmcProduct.countDocuments({ status: 'TO_CHECK' }),
-      AtmcProduct.countDocuments({ status: 'NOT_ALLOWED' }),
-      AtmcProduct.distinct('categorySlug'),
-    ]);
+    const rows = unwrap(await db().from('atmc_products').select('status, category_slug'));
+    const countOf = (st) => rows.filter((r) => r.status === st).length;
+    const total = rows.length;
+    const allowed = countOf('ALLOWED');
+    const toCheck = countOf('TO_CHECK');
+    const notAllowed = countOf('NOT_ALLOWED');
+    const categoryCount = new Set(rows.map((r) => r.category_slug));
 
     return res.json({
       success: true,
@@ -188,7 +171,7 @@ router.get('/stats', async (req, res) => {
         allowed,
         toCheck,
         notAllowed,
-        categories: categoryCount.length,
+        categories: categoryCount.size,
       },
     });
   } catch (error) {

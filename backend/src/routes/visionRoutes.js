@@ -1,8 +1,14 @@
 import express from 'express';
 import multer from 'multer';
 import { identifyProductFromImage } from '../services/visionService.js';
-import { AssociationProduct } from '../models/AssociationProduct.js';
-import { containsRegex } from '../utils/regex.js';
+import { db, unwrap } from '../config/db.js';
+import { toAssociationProduct } from '../models/mappers.js';
+import { containsPattern } from '../utils/regex.js';
+
+const findAssociationProduct = async (text) => {
+  const [row] = unwrap(await db().from('association_products').select('*').ilike('search_text', containsPattern(text)).limit(1));
+  return row ? toAssociationProduct(row) : null;
+};
 import {
   searchOpenFoodFactsByQuery,
   fetchFromOpenFoodFactsByBarcode,
@@ -33,18 +39,17 @@ const matchProductInDatabases = async (searchTerm) => {
   if (!searchTerm) return null;
   const term = searchTerm.trim();
 
-  // Try matching with Association DB first
-  const words = term.split(/\s+/).filter((w) => w.length > 2);
-  const regexPatterns = [containsRegex(term), ...words.map((w) => containsRegex(w))];
-
-  const localMatch = await AssociationProduct.findOne({
-    $or: [
-      { productNameFr: { $in: regexPatterns } },
-      { productNameAr: { $in: regexPatterns } },
-      { brand: { $in: regexPatterns } },
-      { keywords: { $in: regexPatterns } },
-    ],
-  });
+  // Association DB first: the full name, then its most specific words (longest first)
+  const words = term
+    .split(/\s+/)
+    .map((w) => w.replace(/[()]/g, ''))
+    .filter((w) => w.length > 3)
+    .sort((a, b) => b.length - a.length);
+  let localMatch = null;
+  for (const text of [term, ...words]) {
+    localMatch = await findAssociationProduct(text);
+    if (localMatch) break;
+  }
 
   if (localMatch) {
     return {

@@ -4,7 +4,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { connectDB, isDbConfigured } from './config/db.js';
+import { isDbConfigured, pingDb } from './config/db.js';
 import mapRoutes from './routes/mapRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import visionRoutes from './routes/visionRoutes.js';
@@ -31,14 +31,12 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api', async (req, res, next) => {
   if (req.path === '/health') return next();
   if (!isDbConfigured()) {
-    return res.status(503).json({ success: false, message: 'Base de données non configurée : définissez MONGO_URI.' });
+    return res.status(503).json({
+      success: false,
+      message: 'Base de données non configurée : définissez SUPABASE_URL et SUPABASE_SECRET_KEY.',
+    });
   }
-  try {
-    await connectDB();
-    return next();
-  } catch (err) {
-    return res.status(503).json({ success: false, message: 'Base de données injoignable. Réessayez dans un instant.' });
-  }
+  return next();
 });
 
 // Routes
@@ -52,7 +50,7 @@ app.get('/api/health', async (req, res) => {
   let database = 'not_configured';
   if (isDbConfigured()) {
     try {
-      await connectDB();
+      await pingDb();
       database = 'connected';
     } catch {
       database = 'unreachable';
@@ -63,7 +61,8 @@ app.get('/api/health', async (req, res) => {
     platform: 'Celiac Square Tunisia',
     database,
     config: {
-      mongoUri: Boolean(process.env.MONGO_URI),
+      supabaseUrl: Boolean(process.env.SUPABASE_URL),
+      supabaseSecretKey: Boolean(process.env.SUPABASE_SECRET_KEY),
       adminToken: Boolean(process.env.ADMIN_TOKEN),
       geminiApiKey: Boolean(process.env.GEMINI_API_KEY),
     },

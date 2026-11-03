@@ -1,7 +1,7 @@
 import express from 'express';
-import { AssociationProduct } from '../models/AssociationProduct.js';
-import { AtmcProduct } from '../models/AtmcProduct.js';
-import { containsRegex } from '../utils/regex.js';
+import { db, unwrap } from '../config/db.js';
+import { toAssociationProduct, toAtmcProduct } from '../models/mappers.js';
+import { containsPattern } from '../utils/regex.js';
 import { fetchFromOpenFoodFactsByBarcode, searchOpenFoodFacts } from '../services/openFoodFactsService.js';
 
 const router = express.Router();
@@ -15,7 +15,7 @@ const router = express.Router();
  */
 router.get('/search', async (req, res) => {
   const query = (req.query.q || '').trim();
-  // sources=local answers from MongoDB only (fast); sources=off queries Open Food Facts only
+  // sources=local answers from the database only (fast); sources=off queries Open Food Facts only
   const sources = (req.query.sources || 'all').toLowerCase();
   const wantLocal = sources !== 'off';
   const wantOff = sources !== 'local';
@@ -27,7 +27,7 @@ router.get('/search', async (req, res) => {
   if (!query) {
     // Return featured / common association staple products
     try {
-      const featured = await AssociationProduct.find().limit(20);
+      const featured = unwrap(await db().from('association_products').select('*').order('created_at').limit(20)).map(toAssociationProduct);
       return res.json({
         success: true,
         layerA: [],
@@ -60,21 +60,14 @@ router.get('/search', async (req, res) => {
     let offStatus = wantOff ? 'ok' : 'skipped';
 
     // --- Layer B: Tunisian Celiac Association Dataset (High Priority for local foods) ---
-    const associationFilter = {
-      $or: [
-        { productNameFr: containsRegex(query) },
-        { productNameAr: containsRegex(query) },
-        { brand: containsRegex(query) },
-        { notes: containsRegex(query) },
-        { keywords: { $in: [containsRegex(query)] } },
-      ],
-    };
-
-    if (isBarcode) {
-      associationFilter.$or.push({ barcode: query });
+    let matchedAssociation = [];
+    if (wantLocal) {
+      let assocQuery = db().from('association_products').select('*').limit(15);
+      assocQuery = isBarcode
+        ? assocQuery.or(`barcode.eq.${query},search_text.ilike.${containsPattern(query)}`)
+        : assocQuery.ilike('search_text', containsPattern(query));
+      matchedAssociation = unwrap(await assocQuery).map(toAssociationProduct);
     }
-
-    const matchedAssociation = wantLocal ? await AssociationProduct.find(associationFilter).limit(15) : [];
     layerBResults = matchedAssociation.map((item) => ({
       id: item._id,
       source: 'Association Tunisienne de la Cœliaque',
@@ -104,18 +97,9 @@ router.get('/search', async (req, res) => {
     }));
 
     // Also query full ATMC 2023 dataset
-    const atmcFilter = {
-      $or: [
-        { name: containsRegex(query) },
-        { nameFr: containsRegex(query) },
-        { brand: containsRegex(query) },
-        { rawText: containsRegex(query) },
-        { items: { $in: [containsRegex(query)] } },
-        { categoryFr: containsRegex(query) },
-        { categoryAr: containsRegex(query) },
-      ],
-    };
-    const matchedAtmc = wantLocal ? await AtmcProduct.find(atmcFilter).limit(20) : [];
+    const matchedAtmc = wantLocal
+      ? unwrap(await db().from('atmc_products').select('*').ilike('search_text', containsPattern(query)).limit(20)).map(toAtmcProduct)
+      : [];
     matchedAtmc.forEach((item) => {
       layerBResults.push({
         id: item._id,
@@ -184,7 +168,8 @@ router.get('/barcode/:barcode', async (req, res) => {
   const barcode = req.params.barcode.trim();
   try {
     // 1. Check local association dataset first
-    const localProduct = await AssociationProduct.findOne({ barcode });
+    const [localRow] = unwrap(await db().from('association_products').select('*').eq('barcode', barcode).limit(1));
+    const localProduct = localRow ? toAssociationProduct(localRow) : null;
     if (localProduct) {
       return res.json({
         success: true,
@@ -217,7 +202,8 @@ router.get('/barcode/:barcode', async (req, res) => {
  */
 router.get('/categories', async (req, res) => {
   try {
-    const categories = await AssociationProduct.distinct('category');
+    const rows = unwrap(await db().from('association_products').select('category'));
+    const categories = [...new Set(rows.map((r) => r.category))];
     return res.json({ success: true, data: categories });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });

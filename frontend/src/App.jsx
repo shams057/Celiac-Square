@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import Navbar from './components/Navbar';
 import VisionScanner from './components/VisionScanner';
 import ProductSearch from './components/ProductSearch';
@@ -62,6 +63,7 @@ export default function App() {
       />
 
       <Footer lang={lang} onOpenBackoffice={() => goTo('backoffice')} />
+      <Analytics />
     </div>
   );
 }

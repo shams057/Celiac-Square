@@ -1,25 +1,31 @@
-import mongoose from 'mongoose';
+import { createClient } from '@supabase/supabase-js';
 
-// One connection per process; on Vercel a warm function instance reuses it across requests
-let connection = null;
+/**
+ * Server-side Supabase client. It uses the secret key, which bypasses row level security,
+ * so it must never be sent to the browser.
+ */
+let client = null;
 
-export const isDbConfigured = () => Boolean(process.env.MONGO_URI) || process.env.NODE_ENV !== 'production';
+export const isDbConfigured = () => Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY);
 
-export const connectDB = async () => {
-  if (mongoose.connection.readyState === 1) return mongoose.connection;
-  if (!connection) {
-    const uri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/celiac-square';
-    connection = mongoose
-      .connect(uri, { serverSelectionTimeoutMS: 8000 })
-      .then((conn) => {
-        console.log(`[Database] MongoDB Connected: ${conn.connection.host}/${conn.connection.name}`);
-        return conn.connection;
-      })
-      .catch((error) => {
-        console.error(`[Database Error] MongoDB connection failure: ${error.message}`);
-        connection = null; // let the next request retry
-        throw error;
-      });
+export const db = () => {
+  if (!client) {
+    if (!isDbConfigured()) throw new Error('SUPABASE_URL and SUPABASE_SECRET_KEY must be set.');
+    client = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
   }
-  return connection;
+  return client;
+};
+
+/** Cheap query used by the health check */
+export const pingDb = async () => {
+  const { error } = await db().from('atmc_products').select('id', { head: true, count: 'exact' }).limit(1);
+  if (error) throw new Error(error.message);
+};
+
+/** Throws a regular Error for a failed Supabase call, otherwise returns its data */
+export const unwrap = ({ data, error }) => {
+  if (error) throw new Error(error.message);
+  return data;
 };
