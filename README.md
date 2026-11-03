@@ -25,7 +25,7 @@ Plateforme web et mobile pour manger sans gluten en Tunisie : le guide officiel 
 | Écran | Description |
 | --- | --- |
 | **Guide ATMC** | Les 241 produits du guide 2023 (autorisés, à vérifier, interdits), en français et en arabe, avec recherche tolérante aux fautes et filtres par rayon. |
-| **Scanner** | Photo d’un produit → identification par IA (Google Gemini) → verdict sans gluten croisé avec les guides tunisiens et Open Food Facts. |
+| **Scanner** | Deux modes. *Reconnaître le produit* : le texte de l’emballage est lu sur l’appareil (OCR Tesseract, gratuit) puis cherché dans les guides tunisiens. *Analyser les ingrédients* : la liste est lue sur l’appareil (OCR), puis seul le texte est envoyé à Google Gemini, qui renvoie le statut probable, un pourcentage de confiance et une courte explication. |
 | **Recherche** | Nom, marque ou code-barres. Résultats locaux instantanés, Open Food Facts ensuite. Insensible aux accents. |
 | **Carte** | Médecins, boulangeries, restaurants, cafés et épiceries sans gluten, filtrables par type et par ville. |
 | **Propositions** | Les visiteurs proposent des adresses ; elles arrivent dans une boîte de réception administrateur avant publication. |
@@ -114,8 +114,8 @@ Puis complétez `backend/.env` :
 | `SUPABASE_URL` | Oui | URL du projet Supabase |
 | `SUPABASE_SECRET_KEY` | Oui | Clé secrète Supabase (serveur uniquement) |
 | `ADMIN_TOKEN` | Oui | Jeton de l’espace administrateur. Générez-le avec `openssl rand -hex 24` |
-| `GEMINI_API_KEY` | Non | Active la reconnaissance d’image. Sans clé, le scanner renvoie vers la recherche |
-| `GEMINI_MODEL` | Non | Modèle Gemini (par défaut `gemini-3.8-flash`) |
+| `GEMINI_API_KEY` | Non | Active l’analyse des ingrédients. La reconnaissance de produit (OCR) fonctionne sans |
+| `GEMINI_MODEL` | Non | Modèle Gemini (par défaut `gemini-3.5-flash-lite`, avec repli sur `gemini-flash-lite-latest`) |
 | `OFF_USER_AGENT` | Non | Identifiant envoyé à Open Food Facts, par exemple `CeliacSquare/1.0 (contact@exemple.com)` |
 | `PORT` | Non | Port de l’API locale (par défaut `5000`) |
 
@@ -218,7 +218,8 @@ L’APK local est signé avec la clé de débogage : il convient pour vos appare
 | GET | `/api/atmc/stats` | Public | Totaux autorisés / à vérifier / interdits |
 | GET | `/api/products/search` | Public | Recherche (`q`, `sources=local\|off\|all`) |
 | GET | `/api/products/barcode/:code` | Public | Recherche par code-barres |
-| POST | `/api/vision/identify` | Public | Identification d’un produit par photo (champ `image`, 4 Mo max) |
+| POST | `/api/vision/match` | Public | Trouve le produit à partir du texte lu sur l’emballage (`{ "text": "…" }`) |
+| POST | `/api/vision/ingredients` | Public | Estime si un produit contient du gluten à partir du texte de ses ingrédients (`{ "text": "…" }`) |
 | GET | `/api/map/spots` | Public | Adresses (`category`, `city`, `isVerified`, `q`) |
 | GET | `/api/map/cities` | Public | Villes présentes sur la carte |
 | POST | `/api/map/proposals` | Public | Proposer une adresse |
@@ -256,7 +257,8 @@ Les routes *Admin* exigent l’en-tête `Authorization: Bearer <ADMIN_TOKEN>`.
 | `/api/health` indique `supabaseSecretKey: false` sur Vercel | La variable n’existe pas pour l’environnement *Production*, ou aucun redéploiement n’a suivi son ajout. |
 | La base est vide | Lancez `npm run seed` avec le bon `backend/.env`. |
 | « Open Food Facts ne répond pas » | Le service limite le nombre de recherches. Les résultats locaux restent affichés ; réessayez après une minute. |
-| Le scanner indique « Photo non analysée par l’IA » | `GEMINI_API_KEY` absente, invalide, ou modèle indisponible. Consultez les logs de l’API. |
+| « L’analyse des ingrédients n’est pas configurée » | `GEMINI_API_KEY` absente. La reconnaissance de produit, elle, n’en a pas besoin. |
+| La reconnaissance de produit reste sur « Préparation de la lecture… » | Le moteur OCR (~3 Mo) se télécharge à la première utilisation ; il faut une connexion internet, ensuite il est en cache. |
 | Mot de passe administrateur refusé | La valeur saisie doit être exactement `ADMIN_TOKEN` de l’environnement concerné (local ou Vercel). |
 | Android : écran rouge « development server returned 500 » | Une version *debug* est installée. Installez la version release avec `npm run android:release`. |
 | Android : l’installation reste bloquée | Une ancienne version signée différemment est installée : désinstallez-la puis relancez. |

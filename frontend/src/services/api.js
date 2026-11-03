@@ -109,16 +109,15 @@ export const fetchProductByBarcode = async (barcode) => {
   return res.data;
 };
 
-export const identifyProductVision = async (imageFile) => {
-  const formData = new FormData();
-  formData.append('image', imageFile);
+// Product photo: the text is read in the browser (OCR) and only the text is sent
+export const matchProductText = async (text) => {
+  const res = await axios.post(`${API_BASE}/vision/match`, { text }, { timeout: 15000 });
+  return res.data;
+};
 
-  const res = await axios.post(`${API_BASE}/vision/identify`, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-    timeout: 30000,
-  });
+// Ingredients: the list is read in the browser (OCR) and only the text is analysed by Gemini
+export const analyzeIngredients = async (text) => {
+  const res = await axios.post(`${API_BASE}/vision/ingredients`, { text }, { timeout: 20000 });
   return res.data;
 };
 

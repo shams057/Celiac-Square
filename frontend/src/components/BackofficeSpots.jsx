@@ -362,7 +362,7 @@ function BackofficeManager({ lang = 'fr', onLogout }) {
       {toast && (
         <div
           role="status"
-          className={`fixed bottom-24 left-1/2 z-[1100] -translate-x-1/2 rounded-lg px-4 py-3 text-sm font-medium shadow-lg lg:bottom-6 ${
+          className={`fixed bottom-24 left-1/2 z-[1100] -translate-x-1/2 animate-fade-in rounded-lg px-4 py-3 text-sm font-medium shadow-lg lg:bottom-6 ${
             toast.tone === 'error' ? 'bg-status-unsafe text-white' : 'bg-ink text-canvas-paper'
           }`}
         >

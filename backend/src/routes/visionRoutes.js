@@ -1,156 +1,79 @@
 import express from 'express';
-import multer from 'multer';
-import { identifyProductFromImage } from '../services/visionService.js';
-import { db, unwrap } from '../config/db.js';
-import { toAssociationProduct } from '../models/mappers.js';
-import { containsPattern } from '../utils/regex.js';
-
-const findAssociationProduct = async (text) => {
-  const [row] = unwrap(await db().from('association_products').select('*').ilike('search_text', containsPattern(text)).limit(1));
-  return row ? toAssociationProduct(row) : null;
-};
-import {
-  searchOpenFoodFactsByQuery,
-  fetchFromOpenFoodFactsByBarcode,
-} from '../services/openFoodFactsService.js';
+import { matchProductsFromText } from '../services/productMatcher.js';
+import { foldText } from '../utils/regex.js';
+import { analyzeIngredientsText, isIngredientsAiConfigured } from '../services/visionService.js';
 
 const router = express.Router();
 
-// Images stay in memory: they are only forwarded to the vision model, and Vercel's disk is read-only.
-// Vercel also caps request bodies at 4.5 MB, so the browser shrinks photos before sending them.
-const storage = multer.memoryStorage();
+// The photo shows an ingredients list rather than the front of the package.
+// Tested on accent-folded text: OCR returns "É" as "E" + a combining accent.
+const INGREDIENTS_RE = /ingredient|composition|zutaten|مكونات/;
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 4 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Format de fichier non supporté. Veuillez soumettre une image.'));
-    }
-  },
-});
+// Below this, the product is shown with alternatives for the user to confirm
+const CONFIRM_BELOW = 0.7;
 
 /**
- * Helper to query internal Association dataset + Open Food Facts given a recognized term
+ * POST /api/vision/match
+ * Body: { text } — text read from the package by OCR in the browser.
+ * Returns the best matching product from the Tunisian guides.
  */
-const matchProductInDatabases = async (searchTerm) => {
-  if (!searchTerm) return null;
-  const term = searchTerm.trim();
-
-  // Association DB first: the full name, then its most specific words (longest first)
-  const words = term
-    .split(/\s+/)
-    .map((w) => w.replace(/[()]/g, ''))
-    .filter((w) => w.length > 3)
-    .sort((a, b) => b.length - a.length);
-  let localMatch = null;
-  for (const text of [term, ...words]) {
-    localMatch = await findAssociationProduct(text);
-    if (localMatch) break;
-  }
-
-  if (localMatch) {
-    return {
-      source: 'Association Tunisienne de la Cœliaque',
-      productNameFr: localMatch.productNameFr,
-      productNameAr: localMatch.productNameAr,
-      brand: localMatch.brand,
-      category: localMatch.category,
-      isGlutenFree: localMatch.isGlutenFree,
-      status: localMatch.status,
-      notes: localMatch.notes,
-      notesAr: localMatch.notesAr,
-      officialDocReference: localMatch.officialDocReference,
-    };
-  }
-
-  // Next, query Open Food Facts
+router.post('/match', express.json({ limit: '50kb' }), async (req, res) => {
   try {
-    const offResults = await searchOpenFoodFactsByQuery(term);
-    if (offResults && offResults.length > 0) {
-      return offResults[0];
-    }
-  } catch (e) {
-    console.warn(`[Vision Route] Open Food Facts match warning: ${e.message}`);
-  }
-
-  return null;
-};
-
-/**
- * POST /api/vision/identify
- * Accepts multipart/form-data with field 'image'
- */
-router.post('/identify', upload.single('image'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: "Aucune image n'a été transmise pour l'analyse visuelle.",
-      });
+    const text = typeof req.body?.text === 'string' ? req.body.text.slice(0, 5000) : '';
+    if (!text.trim()) {
+      return res.status(400).json({ success: false, message: 'Aucun texte n’a été lu sur la photo.' });
     }
 
-    console.log(`[Vision API] Received image: ${req.file.originalname} (${req.file.size} bytes)`);
-
-    // 1. Run vision engine
-    const visionResult = await identifyProductFromImage(req.file);
-
-    // 2. Query Association dataset & Open Food Facts for the identified item
-    const matchedItem = await matchProductInDatabases(visionResult.identifiedProduct);
-
-    // Also look up candidate info for fallback if confidence < 0.70
-    const candidateMatches = [];
-    if (visionResult.candidateNames && Array.isArray(visionResult.candidateNames)) {
-      for (const candidateName of visionResult.candidateNames.slice(0, 3)) {
-        const itemInfo = await matchProductInDatabases(candidateName);
-        candidateMatches.push({
-          candidateName,
-          matchedProduct: itemInfo,
-        });
-      }
-    }
-
-    const confidenceScore = Number((visionResult.confidence || 0).toFixed(2));
-    const requiresFallback = confidenceScore < 0.7;
+    const { tokens, matches } = await matchProductsFromText(text, 4);
+    const best = matches[0] || null;
+    const confidence = best ? Number(best.confidence.toFixed(2)) : 0;
 
     return res.json({
       success: true,
       data: {
-        identifiedProduct: visionResult.identifiedProduct,
-        confidence: confidenceScore,
-        confidencePercentage: Math.round(confidenceScore * 100),
-        requiresFallback,
-        visualDescriptors: visionResult.visualDescriptors || [],
-        engine: visionResult.engine || 'Multimodal Vision Engine',
-        aiAvailable: Boolean(visionResult.aiAvailable),
-        matchedProduct: matchedItem,
-        candidates: candidateMatches,
-        glutenStatus: matchedItem ? matchedItem.status : 'UNKNOWN',
-        isGlutenFree: matchedItem ? matchedItem.isGlutenFree : false,
-        safetyBadge: matchedItem
-          ? matchedItem.status === 'SAFE'
-            ? 'Sans Gluten'
-            : matchedItem.status === 'UNSAFE'
-            ? 'Contient du Gluten'
-            : 'Risque de Contamination Croisée'
-          : 'Non Référencé / Analyse Visuelle Requise',
-        safetyBadgeAr: matchedItem
-          ? matchedItem.status === 'SAFE'
-            ? 'خالٍ من الغلوتين'
-            : matchedItem.status === 'UNSAFE'
-            ? 'يحتوي على الغلوتين'
-            : 'خطر التلوث المتبادل'
-          : 'غير مصنف في القائمة الرسمية',
+        identifiedProduct: best ? best.name : null,
+        confidence,
+        confidencePercentage: Math.round(confidence * 100),
+        requiresFallback: !best || confidence < CONFIRM_BELOW,
+        matchedProduct: best ? best.product : null,
+        glutenStatus: best ? best.product.status : 'UNKNOWN',
+        candidates: matches.slice(best && confidence >= CONFIRM_BELOW ? 1 : 0).map((m) => ({
+          candidateName: m.name,
+          matchedProduct: m.product,
+        })),
+        // Words read on the package, offered as a search when nothing matches
+        keywords: tokens.slice(0, 6),
+        looksLikeIngredients: INGREDIENTS_RE.test(foldText(text)),
+        engine: 'OCR',
       },
     });
   } catch (error) {
-    console.error(`[Vision Error] ${error.message}`);
-    return res.status(500).json({
+    console.error(`[Vision Match] ${error.message}`);
+    return res.status(500).json({ success: false, message: 'La recherche du produit a échoué.' });
+  }
+});
+
+/**
+ * POST /api/vision/ingredients
+ * Body: { text } — the ingredients list read from the photo by OCR in the browser.
+ * Gemini estimates whether the product contains gluten.
+ */
+router.post('/ingredients', express.json({ limit: '50kb' }), async (req, res) => {
+  const text = typeof req.body?.text === 'string' ? req.body.text.trim().slice(0, 4000) : '';
+  if (!text) {
+    return res.status(400).json({ success: false, message: 'Aucun texte d’ingrédients n’a été lu sur la photo.' });
+  }
+  if (!isIngredientsAiConfigured()) {
+    return res.status(503).json({ success: false, message: 'L’analyse des ingrédients n’est pas configurée (GEMINI_API_KEY).' });
+  }
+  try {
+    const data = await analyzeIngredientsText(text);
+    return res.json({ success: true, data });
+  } catch (error) {
+    console.error(`[Vision Ingredients] ${error.message}`);
+    return res.status(502).json({
       success: false,
-      message: "Une erreur est survenue lors de l'analyse visuelle du produit.",
-      error: error.message,
+      message: 'Le service d’analyse ne répond pas pour le moment. Réessayez dans un instant.',
     });
   }
 });

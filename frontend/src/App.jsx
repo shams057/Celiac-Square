@@ -9,6 +9,8 @@ import BackofficeSpots from './components/BackofficeSpots';
 import SpotModal from './components/SpotModal';
 import Footer from './components/Footer';
 
+const TAB_ORDER = ['atmc', 'vision', 'search', 'map', 'backoffice'];
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('atmc'); // 'atmc' | 'vision' | 'search' | 'map' | 'backoffice'
   const [searchInitialQuery, setSearchInitialQuery] = useState('');
@@ -21,7 +23,11 @@ export default function App() {
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
   }, [lang]);
 
+  // Slide direction follows the tab order: a tab further along slides in from the end side
+  const [slide, setSlide] = useState('');
   const goTo = (tab) => {
+    if (tab === activeTab) return;
+    setSlide(TAB_ORDER.indexOf(tab) > TAB_ORDER.indexOf(activeTab) ? 'animate-page-from-end' : 'animate-page-from-start');
     setActiveTab(tab);
     window.scrollTo({ top: 0 });
   };
@@ -45,7 +51,8 @@ export default function App() {
         setLang={setLang}
       />
 
-      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 pb-28 pt-6 sm:px-6 sm:pt-10 lg:pb-16">
+      <main id="main" className="mx-auto w-full max-w-6xl flex-1 overflow-x-clip px-4 pb-28 pt-6 sm:px-6 sm:pt-10 lg:pb-16">
+        <div key={activeTab} className={slide}>
         {activeTab === 'atmc' && <AtmcCatalog lang={lang} />}
         {activeTab === 'vision' && <VisionScanner onSwitchToSearch={handleSwitchToSearch} lang={lang} />}
         {activeTab === 'search' && <ProductSearch initialQuery={searchInitialQuery} lang={lang} />}
@@ -53,6 +60,7 @@ export default function App() {
           <TunisiaMap key={mapRefreshKey} onOpenSubmitModal={() => setIsSubmitModalOpen(true)} lang={lang} />
         )}
         {activeTab === 'backoffice' && <BackofficeSpots lang={lang} />}
+        </div>
       </main>
 
       <SpotModal

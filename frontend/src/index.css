@@ -85,6 +85,16 @@
   }
 }
 
+@layer base {
+  /* Distance pages slide when switching tabs; mirrored in Arabic */
+  :root {
+    --page-shift: 28px;
+  }
+  [dir='rtl'] {
+    --page-shift: -28px;
+  }
+}
+
 @layer utilities {
   .scrollbar-none {
     scrollbar-width: none;
