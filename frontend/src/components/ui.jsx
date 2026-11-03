@@ -75,14 +75,20 @@ export function StatusLabel({ kind, lang, label }) {
   );
 }
 
-/** Logo: four tiles, one per status colour plus sand */
-export function BrandMark({ className = 'w-8 h-8' }) {
+/** Logo: an olive leaf drawn as a "safe" tick inside a sage square.
+ *  `detailed` adds the leaf vein and orange sun; leave it off below ~48px. */
+export function BrandMark({ className = 'w-8 h-8', detailed = false }) {
   return (
-    <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
-      <rect x="1" y="1" width="14" height="14" rx="2" fill="#8BA850" />
-      <rect x="17" y="1" width="14" height="14" rx="2" fill="#756452" />
-      <rect x="1" y="17" width="14" height="14" rx="2" fill="#FF8A41" />
-      <rect x="17" y="17" width="14" height="14" rx="2" fill="#2F261D" />
+    <svg viewBox="0 0 120 120" className={className} aria-hidden="true">
+      <rect width="120" height="120" rx="28" fill="#8BA850" />
+      <path d="M30 62 L50 82" stroke="#FFFFFF" strokeWidth={detailed ? 13 : 15} strokeLinecap="round" fill="none" />
+      <path d="M46 86 C 51 58, 68 40, 95 29 C 92 58, 76 78, 46 86 Z" fill="#FFFFFF" />
+      {detailed && (
+        <>
+          <path d="M54 77 C 64 62, 76 48, 88 37" stroke="#8BA850" strokeWidth="3" strokeLinecap="round" fill="none" />
+          <circle cx="33" cy="33" r="8" fill="#FF8A41" />
+        </>
+      )}
     </svg>
   );
 }
