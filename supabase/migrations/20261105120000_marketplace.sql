@@ -29,6 +29,12 @@ $$;
 create trigger on_auth_user_created after insert on auth.users
   for each row execute function public.handle_new_user();
 
+-- Accounts created before this migration get their profile too
+insert into public.profiles (id, email, full_name)
+select id, coalesce(email, ''), coalesce(raw_user_meta_data ->> 'full_name', '')
+from auth.users
+on conflict (id) do nothing;
+
 -- Stores: a seller's shop on the marketplace ------------------------------
 create table public.stores (
   id uuid primary key default gen_random_uuid(),

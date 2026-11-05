@@ -102,8 +102,9 @@ npm install
 1. Créez un projet sur [supabase.com](https://supabase.com) (région conseillée : Francfort, `eu-central-1`).
 2. Ouvrez **SQL Editor** et exécutez, dans l’ordre, le contenu des fichiers de `supabase/migrations/` :
    - `20261103210000_initial_schema.sql` : tables `atmc_products`, `association_products`, `spots` et `spot_proposals`, recherche insensible aux accents, règles de sécurité ;
-   - `20261105120000_marketplace.sql` : comptes (`profiles`, avec le rôle), `stores`, `market_products`, `seller_applications` et le bucket Storage public `marketplace` pour les photos.
-   Sur une base existante, n’exécutez que la seconde.
+   - `20261105120000_marketplace.sql` : comptes (`profiles`, avec le rôle), `stores`, `market_products`, `seller_applications` et le bucket Storage public `marketplace` pour les photos ;
+   - `20261105130000_lock_handle_new_user.sql` : interdit d’appeler la fonction de création de profil depuis l’API.
+   Sur une base existante, n’exécutez que les fichiers qui ne l’ont pas encore été (**Database → Migrations** les liste).
    Dans **Authentication → Sign In / Providers → Email**, choisissez si les nouveaux comptes doivent confirmer leur adresse e-mail (*Confirm email*). L’application gère les deux cas.
 3. Dans **Project Settings → API Keys**, notez :
    - l’URL du projet (`https://<project-ref>.supabase.co`) ;
