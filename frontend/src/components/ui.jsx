@@ -121,7 +121,7 @@ export function Notice({ tone = 'info', title, children, action }) {
     success: 'border-status-safe/60 bg-status-safe/15',
   };
   return (
-    <div className={`rounded-lg border px-4 py-3 text-sm text-ink ${tones[tone]}`} role={tone === 'error' ? 'alert' : undefined}>
+    <div className={`rounded-xl border px-4 py-3 text-sm text-ink ${tones[tone]}`} role={tone === 'error' ? 'alert' : undefined}>
       {title && <p className="font-medium">{title}</p>}
       {children && <div className={title ? 'mt-0.5 text-ink-soft' : ''}>{children}</div>}
       {action && <div className="mt-3">{action}</div>}
@@ -155,12 +155,12 @@ export function Modal({ open, onClose, title, subtitle, children, width = 'max-w
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[1000] flex animate-fade-in items-end justify-center bg-ink/50 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 z-[1000] flex animate-fade-in items-end justify-center bg-ink/40 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
-        className={`flex max-h-[92vh] w-full ${width} animate-sheet-up flex-col rounded-t-2xl sm:animate-pop-in border border-canvas-line bg-canvas-raised shadow-[0_20px_60px_rgba(47,38,29,0.35)] sm:rounded-xl`}
+        className={`flex max-h-[92vh] w-full ${width} animate-sheet-up flex-col rounded-t-3xl sm:animate-pop-in border border-white/60 bg-canvas-raised/90 backdrop-blur-xl shadow-[0_20px_60px_rgba(47,38,29,0.35)] sm:rounded-3xl`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-canvas-line px-5 py-4 sm:px-6">
           <div>

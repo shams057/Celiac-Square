@@ -5,7 +5,7 @@ export default function Footer({ lang, onOpenBackoffice }) {
   const tr = t(lang);
 
   return (
-    <footer className="border-t border-canvas-line bg-canvas-raised pb-24 lg:pb-0">
+    <footer className="border-t border-white/50 bg-canvas-raised/50 pb-28">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">

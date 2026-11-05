@@ -51,7 +51,7 @@ export default function App() {
         setLang={setLang}
       />
 
-      <main id="main" className="mx-auto w-full max-w-6xl flex-1 overflow-x-clip px-4 pb-28 pt-6 sm:px-6 sm:pt-10 lg:pb-16">
+      <main id="main" className="mx-auto w-full max-w-6xl flex-1 overflow-x-clip px-4 pb-32 pt-6 sm:px-6 sm:pt-10">
         <div key={activeTab} className={slide}>
         {activeTab === 'atmc' && <AtmcCatalog lang={lang} />}
         {activeTab === 'vision' && <VisionScanner onSwitchToSearch={handleSwitchToSearch} lang={lang} />}

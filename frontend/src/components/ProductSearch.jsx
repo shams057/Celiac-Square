@@ -142,7 +142,7 @@ export default function ProductSearch({ initialQuery = '', lang }) {
       )}
 
       {items.length > 0 ? (
-        <ul className="divide-y divide-canvas-line overflow-hidden rounded-xl border border-canvas-line bg-white">
+        <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-white/70 bg-canvas-paper/80 backdrop-blur-sm">
           {items.map((item, idx) => {
             const k = statusKind(item.status);
             const local = isLocal(item);

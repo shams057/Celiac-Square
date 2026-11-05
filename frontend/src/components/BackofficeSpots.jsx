@@ -362,7 +362,7 @@ function BackofficeManager({ lang = 'fr', onLogout }) {
       {toast && (
         <div
           role="status"
-          className={`fixed bottom-24 left-1/2 z-[1100] -translate-x-1/2 animate-fade-in rounded-lg px-4 py-3 text-sm font-medium shadow-lg lg:bottom-6 ${
+          className={`fixed bottom-28 left-1/2 z-[1100] -translate-x-1/2 animate-fade-in rounded-full px-4 py-3 text-sm font-medium shadow-lg ${
             toast.tone === 'error' ? 'bg-status-unsafe text-white' : 'bg-ink text-canvas-paper'
           }`}
         >
@@ -514,7 +514,7 @@ function BackofficeManager({ lang = 'fr', onLogout }) {
           }
         />
       ) : (
-        <ul className="divide-y divide-canvas-line overflow-hidden rounded-xl border border-canvas-line bg-white">
+        <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-white/70 bg-canvas-paper/80 backdrop-blur-sm">
           {filteredSpots.map((spot) => {
             const cat = spotCategory(spot.category);
             const coords = spot.location?.coordinates || [0, 0];
@@ -815,7 +815,7 @@ function InboxView({ lang, proposals, loading, filter, setFilter, onApprove, onR
           {proposals.map((p) => {
             const cat = spotCategory(p.category);
             return (
-              <li key={p._id} className="rounded-xl border border-canvas-line bg-white p-4 sm:p-5">
+              <li key={p._id} className="rounded-2xl border border-white/70 bg-canvas-paper/80 backdrop-blur-sm p-4 sm:p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
