@@ -179,7 +179,10 @@ function AppShell() {
         onBecomeSeller={() => goTo('become-seller')}
         onOpenPrivacy={() => goTo('privacy')}
       />
-      <Analytics />
+      {/* Explicit mode: auto-detection picks the debug script from va.vercel-scripts.com when NODE_ENV
+          is not "production" at build time, and the Content-Security-Policy blocks that host.
+          In production mode the script is served by the site itself (/_vercel/insights). */}
+      <Analytics mode={import.meta.env.PROD ? 'production' : 'development'} />
     </div>
   );
 }
