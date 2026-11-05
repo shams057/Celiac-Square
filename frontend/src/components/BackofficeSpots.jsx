@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Search, LogOut, RotateCw, Pencil, Trash2, BadgeCheck, Clock, ExternalLink, Lock, Check, X } from 'lucide-react';
+import { Plus, Search, RotateCw, Pencil, Trash2, BadgeCheck, Clock, ExternalLink, Check, X } from 'lucide-react';
 import {
   fetchSpots,
   fetchCities,
@@ -10,10 +10,6 @@ import {
   fetchProposals,
   approveProposal,
   rejectProposal,
-  getAdminToken,
-  setAdminToken,
-  checkAdminToken,
-  ADMIN_LOGOUT_EVENT,
 } from '../services/api';
 import { t, PageHead, Spinner, Notice, EmptyState, Modal, SPOT_CATEGORIES, spotCategory } from './ui';
 
@@ -45,72 +41,8 @@ const EMPTY_SPOT_FORM = {
   submittedBy: 'Backoffice Admin',
 };
 
-// Login gate: the backend rejects edits without a valid ADMIN_TOKEN
+// Map addresses and community proposals. Shown inside the Backoffice, which checks the admin role.
 export default function BackofficeSpots({ lang = 'fr' }) {
-  const tr = t(lang);
-  const [isAuthed, setIsAuthed] = useState(Boolean(getAdminToken()));
-  const [tokenInput, setTokenInput] = useState('');
-  const [checking, setChecking] = useState(false);
-  const [loginError, setLoginError] = useState('');
-
-  useEffect(() => {
-    const onLogout = () => setIsAuthed(false);
-    window.addEventListener(ADMIN_LOGOUT_EVENT, onLogout);
-    return () => window.removeEventListener(ADMIN_LOGOUT_EVENT, onLogout);
-  }, []);
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setChecking(true);
-    setLoginError('');
-    try {
-      await checkAdminToken(tokenInput.trim());
-      setAdminToken(tokenInput.trim());
-      setTokenInput('');
-      setIsAuthed(true);
-    } catch (err) {
-      setLoginError(err.response?.data?.message || tr('Le jeton n’a pas pu être vérifié.', 'تعذر التحقق من الرمز.'));
-    } finally {
-      setChecking(false);
-    }
-  };
-
-  const handleLogout = () => {
-    setAdminToken('');
-    setIsAuthed(false);
-  };
-
-  if (isAuthed) return <BackofficeManager lang={lang} onLogout={handleLogout} />;
-
-  return (
-    <div className="mx-auto max-w-md pt-6">
-      <div className="panel p-6 sm:p-8">
-        <Lock className="h-6 w-6 text-ink-soft" />
-        <h1 className="mt-4 text-2xl font-semibold">{tr('Espace administrateur', 'فضاء الإدارة')}</h1>
-        <p className="mt-1 text-sm text-ink-soft">
-          {tr('Saisissez le jeton ADMIN_TOKEN défini dans backend/.env.', 'أدخل الرمز ADMIN_TOKEN المحدد في backend/.env.')}
-        </p>
-        <form onSubmit={handleLogin} className="mt-6 space-y-3">
-          <label htmlFor="admin-token" className="field-label">{tr('Jeton administrateur', 'رمز الإدارة')}</label>
-          <input
-            id="admin-token"
-            type="password"
-            value={tokenInput}
-            onChange={(e) => setTokenInput(e.target.value)}
-            autoComplete="current-password"
-            className="field"
-          />
-          {loginError && <Notice tone="error">{loginError}</Notice>}
-          <button type="submit" disabled={checking || !tokenInput.trim()} className="btn-primary w-full">
-            {checking ? tr('Vérification…', 'جاري التحقق…') : tr('Se connecter', 'تسجيل الدخول')}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function BackofficeManager({ lang = 'fr', onLogout }) {
   const tr = t(lang);
   const [spots, setSpots] = useState([]);
   const [cities, setCities] = useState([]);
@@ -391,9 +323,6 @@ function BackofficeManager({ lang = 'fr', onLogout }) {
               }}
               className="btn-quiet px-3" aria-label={tr('Actualiser', 'تحديث')} title={tr('Actualiser', 'تحديث')}>
               <RotateCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            </button>
-            <button type="button" onClick={onLogout} className="btn-quiet px-3" aria-label={tr('Se déconnecter', 'تسجيل الخروج')} title={tr('Se déconnecter', 'تسجيل الخروج')}>
-              <LogOut className="h-4 w-4" />
             </button>
           </div>
         }

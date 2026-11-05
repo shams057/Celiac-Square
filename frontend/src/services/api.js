@@ -1,4 +1,5 @@
 import axios from 'axios';
+import './session';
 
 const API_BASE = '/api';
 
@@ -14,46 +15,8 @@ axios.interceptors.response.use((res) => {
   return res;
 });
 
-// Backoffice admin token, kept for the browser session only
-const ADMIN_TOKEN_KEY = 'celiac-square-admin-token';
-export const ADMIN_LOGOUT_EVENT = 'celiac-square-admin-logout';
-
-export const getAdminToken = () => {
-  try {
-    return sessionStorage.getItem(ADMIN_TOKEN_KEY) || '';
-  } catch {
-    return '';
-  }
-};
-
-export const setAdminToken = (token) => {
-  try {
-    if (token) sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
-    else sessionStorage.removeItem(ADMIN_TOKEN_KEY);
-  } catch {
-    // Storage unavailable: the token simply won't persist
-  }
-};
-
-const adminRequest = async (config) => {
-  try {
-    const res = await axios({ ...config, headers: { Authorization: `Bearer ${getAdminToken()}` } });
-    return res.data;
-  } catch (err) {
-    if (err.response?.status === 401) {
-      setAdminToken('');
-      window.dispatchEvent(new Event(ADMIN_LOGOUT_EVENT));
-    }
-    throw err;
-  }
-};
-
-export const checkAdminToken = async (token) => {
-  const res = await axios.get(`${API_BASE}/map/admin/check`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  return res.data;
-};
+// Admin routes use the signed-in admin's session, attached by services/session.js
+const adminRequest = async (config) => (await axios(config)).data;
 
 export const fetchSpots = async (filters = {}) => {
   const params = new URLSearchParams();
@@ -140,3 +103,60 @@ export const fetchAtmcStats = async () => {
   const res = await axios.get(`${API_BASE}/atmc/stats`);
   return res.data;
 };
+
+// Accounts ------------------------------------------------------------------
+
+export const signUp = async ({ email, password, fullName }) =>
+  (await axios.post(`${API_BASE}/auth/signup`, { email, password, fullName }, { skipAuth: true })).data;
+
+export const logIn = async ({ email, password }) =>
+  (await axios.post(`${API_BASE}/auth/login`, { email, password }, { skipAuth: true })).data;
+
+export const logOut = async () => (await axios.post(`${API_BASE}/auth/logout`)).data;
+
+export const fetchMe = async () => (await axios.get(`${API_BASE}/auth/me`)).data;
+
+// Marketplace (signed-in accounts) ------------------------------------------
+
+export const fetchStores = async (type = 'ALL') => (await axios.get(`${API_BASE}/market/stores`, { params: { type } })).data;
+
+export const fetchStore = async (id) => (await axios.get(`${API_BASE}/market/stores/${id}`)).data;
+
+export const fetchMarketProducts = async ({ q = '', type = 'ALL', store = '' } = {}) =>
+  (await axios.get(`${API_BASE}/market/products`, { params: { q: q || undefined, type, store: store || undefined } })).data;
+
+export const fetchMyStore = async () => (await axios.get(`${API_BASE}/market/me/store`)).data;
+
+export const saveMyStore = async (store) => (await axios.put(`${API_BASE}/market/me/store`, store)).data;
+
+export const createMyProduct = async (product) => (await axios.post(`${API_BASE}/market/me/products`, product)).data;
+
+export const updateMyProduct = async (id, product) => (await axios.put(`${API_BASE}/market/me/products/${id}`, product)).data;
+
+export const deleteMyProduct = async (id) => (await axios.delete(`${API_BASE}/market/me/products/${id}`)).data;
+
+export const fetchMyApplications = async () => (await axios.get(`${API_BASE}/market/applications/mine`)).data;
+
+export const submitSellerApplication = async (application) =>
+  (await axios.post(`${API_BASE}/market/applications`, application)).data;
+
+// Backoffice: sellers and accounts ------------------------------------------
+
+export const fetchSellerApplications = (status = 'PENDING') =>
+  adminRequest({ method: 'get', url: `${API_BASE}/admin/seller-applications?status=${status}` });
+
+export const approveSellerApplication = (id) =>
+  adminRequest({ method: 'post', url: `${API_BASE}/admin/seller-applications/${id}/approve` });
+
+export const rejectSellerApplication = (id) =>
+  adminRequest({ method: 'post', url: `${API_BASE}/admin/seller-applications/${id}/reject` });
+
+export const fetchUsers = ({ q = '', role = '' } = {}) =>
+  adminRequest({ method: 'get', url: `${API_BASE}/admin/users`, params: { q: q || undefined, role: role || undefined } });
+
+export const setUserRole = (id, role) => adminRequest({ method: 'patch', url: `${API_BASE}/admin/users/${id}/role`, data: { role } });
+
+export const fetchAdminStores = () => adminRequest({ method: 'get', url: `${API_BASE}/admin/stores` });
+
+export const setStoreActive = (id, isActive) =>
+  adminRequest({ method: 'patch', url: `${API_BASE}/admin/stores/${id}`, data: { isActive } });

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, X, TriangleAlert, HelpCircle, LoaderCircle, SlidersHorizontal } from 'lucide-react';
+import { Check, X, TriangleAlert, HelpCircle, LoaderCircle, SlidersHorizontal, UtensilsCrossed, Croissant, Coffee, Palette } from 'lucide-react';
 
 // Translation helper: t(lang)('Français', 'العربية')
 export const t = (lang) => (fr, ar) => (lang === 'ar' ? ar : fr);
@@ -185,6 +185,34 @@ export const SPOT_CATEGORIES = [
   { value: 'CAFE', fr: 'Café, salon de thé', ar: 'مقهى', color: '#A0763A' },
   { value: 'SUPERMARKET', fr: 'Épicerie, supermarché', ar: 'مغازة، متجر', color: '#6F8A8C' },
 ];
+
+/** Marketplace store types */
+export const STORE_TYPES = [
+  { value: 'RESTAURANT', fr: 'Restaurant', frPlural: 'Restaurants', ar: 'مطعم', arPlural: 'مطاعم', icon: UtensilsCrossed, color: '#E5702A' },
+  { value: 'BAKERY', fr: 'Boulangerie', frPlural: 'Boulangeries', ar: 'مخبزة', arPlural: 'مخابز', icon: Croissant, color: '#4E6127' },
+  { value: 'CAFE', fr: 'Café', frPlural: 'Cafés', ar: 'مقهى', arPlural: 'مقاهي', icon: Coffee, color: '#A0763A' },
+  { value: 'ARTISAN', fr: 'Artisan', frPlural: 'Artisans', ar: 'حرفي', arPlural: 'حرفيون', icon: Palette, color: '#6F8A8C' },
+];
+
+export const storeType = (value) => STORE_TYPES.find((s) => s.value === value) || STORE_TYPES[0];
+
+/** Prices are in Tunisian dinars, with millimes */
+export const formatPrice = (price, lang) =>
+  price == null ? '' : `${Number(price).toLocaleString(lang === 'ar' ? 'ar-TN' : 'fr-TN', { minimumFractionDigits: 0, maximumFractionDigits: 3 })} ${lang === 'ar' ? 'د.ت' : 'DT'}`;
+
+/** Store logo, or its type's icon on the type's colour when there is none */
+export function StoreLogo({ store, className = 'h-12 w-12' }) {
+  const type = storeType(store?.type);
+  const Icon = type.icon;
+  if (store?.logoUrl) {
+    return <img src={store.logoUrl} alt="" className={`${className} shrink-0 rounded-2xl object-cover ring-1 ring-white/70`} />;
+  }
+  return (
+    <span className={`${className} inline-flex shrink-0 items-center justify-center rounded-2xl text-white ring-1 ring-white/70`} style={{ background: type.color }} aria-hidden="true">
+      <Icon className="h-1/2 w-1/2" strokeWidth={1.75} />
+    </span>
+  );
+}
 
 export const spotCategory = (value) => SPOT_CATEGORIES.find((c) => c.value === value) || SPOT_CATEGORIES[2];
 

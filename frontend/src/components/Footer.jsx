@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrandMark, t } from './ui';
 
-export default function Footer({ lang, onOpenBackoffice }) {
+export default function Footer({ lang, isAdmin, onOpenBackoffice, onBecomeSeller }) {
   const tr = t(lang);
 
   return (
@@ -18,6 +18,20 @@ export default function Footer({ lang, onOpenBackoffice }) {
               'دليلك للأكل بدون غلوتين في تونس: دليل الجمعية، ماسح للمنتجات وخريطة للعناوين الموثوقة.'
             )}
           </p>
+          <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+            <li>
+              <button type="button" onClick={onBecomeSeller} className="font-medium underline decoration-accent decoration-2 underline-offset-4 hover:text-ink">
+                {tr('Devenir vendeur sur le marché', 'كن بائعا في السوق')}
+              </button>
+            </li>
+            {isAdmin && (
+              <li>
+                <button type="button" onClick={onOpenBackoffice} className="text-ink-soft underline decoration-canvas-line underline-offset-4 hover:text-ink">
+                  {tr('Back-office', 'فضاء الإدارة')}
+                </button>
+              </li>
+            )}
+          </ul>
         </div>
 
         <div className="text-sm">
@@ -28,11 +42,6 @@ export default function Footer({ lang, onOpenBackoffice }) {
               <a href="https://world.openfoodfacts.org" target="_blank" rel="noreferrer" className="underline decoration-canvas-line underline-offset-4 hover:text-ink">
                 Open Food Facts
               </a>
-            </li>
-            <li>
-              <button type="button" onClick={onOpenBackoffice} className="underline decoration-canvas-line underline-offset-4 hover:text-ink">
-                {tr('Espace administrateur', 'فضاء الإدارة')}
-              </button>
             </li>
           </ul>
         </div>

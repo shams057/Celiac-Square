@@ -29,7 +29,11 @@ Plateforme web et mobile pour manger sans gluten en Tunisie : le guide officiel 
 | **Recherche** | Nom, marque ou code-barres. Résultats locaux instantanés, Open Food Facts ensuite. Insensible aux accents. |
 | **Carte** | Médecins, boulangeries, restaurants, cafés et épiceries sans gluten, filtrables par type et par ville. |
 | **Propositions** | Les visiteurs proposent des adresses ; elles arrivent dans une boîte de réception administrateur avant publication. |
-| **Administration** | Ajout, modification, vérification et suppression des adresses, validation des propositions. Protégée par jeton. |
+| **Marché** | Produits sans gluten des restaurants, boulangeries, cafés et artisans : tout voir d’un coup (rangé par boutique, comme un menu) ou boutique par boutique, recherche par produit, filtres par type. Réservé aux membres connectés. |
+| **Comptes** | Inscription et connexion (Supabase Auth). Trois rôles : *client* (par défaut), *vendeur*, *administrateur*. La connexion n’est obligatoire que pour le marché. |
+| **Espace vendeur** | Le vendeur présente sa boutique (logo, type, ville, présentation) et publie ses produits : titre, description, prix facultatif, jusqu’à 5 photos. |
+| **Devenir vendeur** | Lien en bas de page : un client envoie une demande, examinée dans le back-office. |
+| **Back-office** | Visible uniquement par les administrateurs. *Adresses* : ajout, modification, vérification et suppression des adresses, validation des propositions. *Vendeurs et comptes* : demandes de vendeur, suspension des boutiques, rôles des comptes. |
 
 Interface bilingue français / arabe (mise en page de droite à gauche en arabe), pensée d’abord pour le téléphone.
 
@@ -45,10 +49,11 @@ app/
 │       ├── app.js          # Application Express (sans écoute réseau)
 │       ├── server.js       # Serveur local (port 5000)
 │       ├── config/db.js    # Client Supabase côté serveur
-│       ├── routes/         # /api/map, /api/products, /api/atmc, /api/vision
-│       ├── services/       # Open Food Facts, vision (Gemini)
-│       ├── middleware/     # Authentification administrateur
-│       └── seed/           # Données initiales et script de seed
+│       ├── routes/         # /api/map, /api/products, /api/atmc, /api/vision, /api/auth, /api/market, /api/admin
+│       ├── services/       # Open Food Facts, vision (Gemini), photos du marché (Storage)
+│       ├── middleware/     # Comptes connectés, rôles, accès administrateur
+│       ├── seed/           # Données initiales et script de seed
+│       └── scripts/        # set-role : donner un rôle à un compte
 ├── frontend/               # React 18 + Vite + Tailwind CSS + Leaflet
 ├── mobile/                 # Application Expo (Android / iOS) qui affiche le site
 ├── supabase/migrations/    # Schéma Postgres (tables, RLS, recherche)
@@ -95,8 +100,11 @@ npm install
 ### 3. Créer la base Supabase
 
 1. Créez un projet sur [supabase.com](https://supabase.com) (région conseillée : Francfort, `eu-central-1`).
-2. Ouvrez **SQL Editor**, collez le contenu de `supabase/migrations/20261103210000_initial_schema.sql` et exécutez-le.
-   Il crée les tables `atmc_products`, `association_products`, `spots` et `spot_proposals`, la recherche insensible aux accents et les règles de sécurité.
+2. Ouvrez **SQL Editor** et exécutez, dans l’ordre, le contenu des fichiers de `supabase/migrations/` :
+   - `20261103210000_initial_schema.sql` : tables `atmc_products`, `association_products`, `spots` et `spot_proposals`, recherche insensible aux accents, règles de sécurité ;
+   - `20261105120000_marketplace.sql` : comptes (`profiles`, avec le rôle), `stores`, `market_products`, `seller_applications` et le bucket Storage public `marketplace` pour les photos.
+   Sur une base existante, n’exécutez que la seconde.
+   Dans **Authentication → Sign In / Providers → Email**, choisissez si les nouveaux comptes doivent confirmer leur adresse e-mail (*Confirm email*). L’application gère les deux cas.
 3. Dans **Project Settings → API Keys**, notez :
    - l’URL du projet (`https://<project-ref>.supabase.co`) ;
    - la **clé secrète** (`sb_secret_…`). Elle donne un accès complet à la base : ne la publiez jamais et ne l’utilisez jamais dans le frontend.
@@ -113,7 +121,7 @@ Puis complétez `backend/.env` :
 | --- | --- | --- |
 | `SUPABASE_URL` | Oui | URL du projet Supabase |
 | `SUPABASE_SECRET_KEY` | Oui | Clé secrète Supabase (serveur uniquement) |
-| `ADMIN_TOKEN` | Oui | Jeton de l’espace administrateur. Générez-le avec `openssl rand -hex 24` |
+| `ADMIN_TOKEN` | Non | Jeton pour appeler les routes administrateur depuis un script. Le back-office, lui, utilise les comptes administrateurs. Générez-le avec `openssl rand -hex 24` |
 | `GEMINI_API_KEY` | Non | Active l’analyse des ingrédients. La reconnaissance de produit (OCR) fonctionne sans |
 | `GEMINI_MODEL` | Non | Modèle Gemini (par défaut `gemini-3.5-flash-lite`, avec repli sur `gemini-flash-lite-latest`) |
 | `OFF_USER_AGENT` | Non | Identifiant envoyé à Open Food Facts, par exemple `CeliacSquare/1.0 (contact@exemple.com)` |
@@ -147,7 +155,13 @@ Vite redirige `/api` vers le port 5000 : le frontend appelle toujours des chemin
 
 **Vérifier l’installation :** `/api/health` doit répondre `"database": "connected"` avec `supabaseUrl`, `supabaseSecretKey` et `adminToken` à `true`.
 
-**Espace administrateur :** lien *Espace administrateur* en bas de page, puis saisissez la valeur de `ADMIN_TOKEN`.
+**Premier administrateur :** créez un compte sur le site (bouton *Se connecter*, puis *Nouveau compte*), puis donnez-lui le rôle administrateur :
+
+```bash
+npm run set-role -- vous@exemple.com ADMIN
+```
+
+Reconnectez-vous : le lien *Back-office* apparaît en bas de page. Ensuite, les rôles se changent depuis *Back-office → Vendeurs et comptes → Comptes*. (Ou, dans le SQL Editor de Supabase : `update profiles set role = 'ADMIN' where email = 'vous@exemple.com';`)
 
 ---
 
@@ -207,6 +221,7 @@ L’APK local est signé avec la clé de débogage : il convient pour vos appare
 | `npm run client` | Frontend seul |
 | `npm run build` | Build de production du frontend (`frontend/dist`) |
 | `npm run seed` | Réinitialise et remplit la base Supabase |
+| `npm run set-role -- <email> <ADMIN\|SELLER\|CLIENT>` | Change le rôle d’un compte existant (pour créer le premier administrateur) |
 
 ### API
 
@@ -228,8 +243,26 @@ L’APK local est signé avec la clé de débogage : il convient pour vos appare
 | POST | `/api/map/proposals/:id/reject` | Admin | Refuser une proposition |
 | POST / PUT / DELETE | `/api/map/spots[/:id]` | Admin | Gérer les adresses |
 | PATCH | `/api/map/spots/:id/verify` | Admin | Changer le statut vérifié |
+| POST | `/api/auth/signup` | Public | Créer un compte client (`{ email, password, fullName }`) |
+| POST | `/api/auth/login` | Public | Se connecter : renvoie la session et le profil |
+| POST | `/api/auth/refresh` | Public | Renouveler la session (`{ refreshToken }`) |
+| GET | `/api/auth/me` | Membre | Le compte connecté et son rôle |
+| POST | `/api/auth/logout` | Membre | Fermer la session sur cet appareil |
+| GET | `/api/market/stores` | Membre | Boutiques actives (`type`) avec leur nombre de produits |
+| GET | `/api/market/stores/:id` | Membre | Une boutique et ses produits |
+| GET | `/api/market/products` | Membre | Produits de toutes les boutiques (`q`, `type`, `store`) |
+| GET / PUT | `/api/market/me/store` | Vendeur | Sa boutique (le premier `PUT` la crée) |
+| POST / PUT / DELETE | `/api/market/me/products[/:id]` | Vendeur | Ses produits ; `images` : URL déjà enregistrées ou nouvelles photos en data URL |
+| GET | `/api/market/applications/mine` | Membre | Ses demandes de vendeur |
+| POST | `/api/market/applications` | Client | Demander à devenir vendeur |
+| GET | `/api/admin/seller-applications` | Admin | Demandes de vendeur (`status`) |
+| POST | `/api/admin/seller-applications/:id/approve` | Admin | Accepter : ouvre la boutique, le compte devient vendeur |
+| POST | `/api/admin/seller-applications/:id/reject` | Admin | Refuser |
+| GET / PATCH | `/api/admin/stores[/:id]` | Admin | Boutiques ; `{ isActive }` suspend ou réactive |
+| GET | `/api/admin/users` | Admin | Comptes (`q`, `role`) |
+| PATCH | `/api/admin/users/:id/role` | Admin | Changer le rôle (`{ role }`), sauf le sien |
 
-Les routes *Admin* exigent l’en-tête `Authorization: Bearer <ADMIN_TOKEN>`.
+Les routes *Membre*, *Client*, *Vendeur* et *Admin* exigent l’en-tête `Authorization: Bearer <jeton d’accès>` d’un compte qui a le rôle voulu. Les routes *Admin* acceptent aussi `Bearer <ADMIN_TOKEN>`, pratique pour les scripts.
 
 ### Données
 
@@ -259,7 +292,9 @@ Les routes *Admin* exigent l’en-tête `Authorization: Bearer <ADMIN_TOKEN>`.
 | « Open Food Facts ne répond pas » | Le service limite le nombre de recherches. Les résultats locaux restent affichés ; réessayez après une minute. |
 | « L’analyse des ingrédients n’est pas configurée » | `GEMINI_API_KEY` absente. La reconnaissance de produit, elle, n’en a pas besoin. |
 | La reconnaissance de produit reste sur « Préparation de la lecture… » | Le moteur OCR (~3 Mo) se télécharge à la première utilisation ; il faut une connexion internet, ensuite il est en cache. |
-| Mot de passe administrateur refusé | La valeur saisie doit être exactement `ADMIN_TOKEN` de l’environnement concerné (local ou Vercel). |
+| Pas de lien *Back-office* en bas de page | Le compte n’est pas administrateur : `npm run set-role -- <email> ADMIN`, puis déconnexion et reconnexion. |
+| « Confirmez d’abord votre adresse e-mail » | L’option *Confirm email* est active dans Supabase : ouvrez le lien reçu, ou désactivez l’option. |
+| Les photos des produits ne s’enregistrent pas | La migration `20261105120000_marketplace.sql` n’a pas été exécutée (bucket `marketplace` absent). |
 | Android : écran rouge « development server returned 500 » | Une version *debug* est installée. Installez la version release avec `npm run android:release`. |
 | Android : l’installation reste bloquée | Une ancienne version signée différemment est installée : désinstallez-la puis relancez. |
 
