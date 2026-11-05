@@ -72,16 +72,28 @@ export const fetchProductByBarcode = async (barcode) => {
   return res.data;
 };
 
-// Product photo: the text is read in the browser (OCR) and only the text is sent
+// Scanner. The photo (resized in the browser) is read by Gemini on the server; when the AI is
+// unavailable, the browser reads the text itself (OCR) and sends only the text.
+export const identifyProductPhoto = async (image) => {
+  const res = await axios.post(`${API_BASE}/vision/identify`, { image }, { timeout: 45000 });
+  return res.data;
+};
+
 export const matchProductText = async (text) => {
   const res = await axios.post(`${API_BASE}/vision/match`, { text }, { timeout: 15000 });
   return res.data;
 };
 
-// Ingredients: the list is read in the browser (OCR) and only the text is analysed by Gemini
-export const analyzeIngredients = async (text) => {
-  const res = await axios.post(`${API_BASE}/vision/ingredients`, { text }, { timeout: 20000 });
+/** payload: { image } (photo of the list) or { text } (OCR fallback) */
+export const analyzeIngredients = async (payload) => {
+  const res = await axios.post(`${API_BASE}/vision/ingredients`, payload, { timeout: 45000 });
   return res.data;
+};
+
+/** True when the AI could not answer and the on-device OCR should be tried instead */
+export const isAiUnavailable = (err) => {
+  const status = err?.response?.status;
+  return !err?.response || err.code === 'ECONNABORTED' || status === 502 || status === 503 || status === 504 || status === 429;
 };
 
 export const fetchAtmcProducts = async (filters = {}) => {

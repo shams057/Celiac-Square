@@ -239,8 +239,9 @@ L’APK local est signé avec la clé de débogage : il convient pour vos appare
 | GET | `/api/atmc/stats` | Public | Totaux autorisés / à vérifier / interdits |
 | GET | `/api/products/search` | Public | Recherche (`q`, `sources=local\|off\|all`) |
 | GET | `/api/products/barcode/:code` | Public | Recherche par code-barres |
-| POST | `/api/vision/match` | Public | Trouve le produit à partir du texte lu sur l’emballage (`{ "text": "…" }`) |
-| POST | `/api/vision/ingredients` | Public | Estime si un produit contient du gluten à partir du texte de ses ingrédients (`{ "text": "…" }`) |
+| POST | `/api/vision/identify` | Public | Reconnaît le produit sur une photo de l’emballage (`{ "image": "data:image/jpeg;base64,…" }`) et choisit la fiche du guide (Gemini) |
+| POST | `/api/vision/match` | Public | Repli sans IA : trouve le produit à partir du texte lu par OCR dans le navigateur (`{ "text": "…" }`) |
+| POST | `/api/vision/ingredients` | Public | Estime si un produit contient du gluten à partir d’une photo de ses ingrédients (`{ "image" }`) ou, en repli, du texte OCR (`{ "text" }`). Nos règles peuvent rendre le verdict plus strict, jamais plus permissif |
 | GET | `/api/map/spots` | Public | Adresses (`category`, `city`, `isVerified`, `q`) |
 | GET | `/api/map/cities` | Public | Villes présentes sur la carte |
 | POST | `/api/map/proposals` | Public | Proposer une adresse |

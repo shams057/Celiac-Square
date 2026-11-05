@@ -19,14 +19,14 @@ const SECTIONS = [
   },
   {
     fr: ['Le scanner', [
-      'La photo est lue sur votre appareil : elle n’est jamais envoyée.',
-      'Le texte lu sur l’emballage est envoyé à notre serveur pour être comparé aux guides tunisiens.',
-      'En mode « Analyser les ingrédients », ce texte est aussi transmis à Google (Gemini), qui estime la présence de gluten. N’y photographiez rien de personnel.',
+      'La photo est réduite sur votre appareil, puis envoyée à notre serveur et à Google (Gemini), qui reconnaît le produit ou lit sa liste d’ingrédients. N’y photographiez rien de personnel.',
+      'Elle n’est pas conservée : nous gardons seulement le résultat en mémoire, quelques heures, pour répondre plus vite si la même photo revient.',
+      'Si l’IA ne répond pas, le texte est lu sur votre appareil et seul ce texte est envoyé.',
     ]],
     ar: ['الماسح', [
-      'تُقرأ الصورة على جهازك ولا تُرسل أبدا.',
-      'يُرسل النص المقروء من العلبة إلى خادمنا لمقارنته بالأدلة التونسية.',
-      'في وضع «تحليل المكونات» يُرسل هذا النص أيضا إلى Google (Gemini) لتقدير وجود الغلوتين. لا تصوّر أي معلومات شخصية.',
+      'تُصغَّر الصورة على جهازك ثم تُرسل إلى خادمنا وإلى Google (Gemini) للتعرف على المنتج أو قراءة مكوناته. لا تصوّر أي معلومات شخصية.',
+      'لا تُحفظ الصورة: نحتفظ بالنتيجة فقط في الذاكرة لبضع ساعات للرد بسرعة إن أُرسلت الصورة نفسها مجددا.',
+      'إن لم يستجب الذكاء الاصطناعي، يُقرأ النص على جهازك ويُرسل النص وحده.',
     ]],
   },
   {

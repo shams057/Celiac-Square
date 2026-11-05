@@ -67,3 +67,12 @@ test('oversized vision bodies are refused', async () => {
   });
   assert.equal(res.status, 413);
 });
+
+test('scanner photo routes reject bad images and oversized bodies', async () => {
+  process.env.GEMINI_API_KEY ||= 'test-key';
+  const post = (path, body) =>
+    fetch(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  assert.equal((await post('/api/vision/identify', { image: 'data:text/html;base64,PGI+' })).status, 400);
+  assert.equal((await post('/api/vision/ingredients', { image: 'not-an-image' })).status, 400);
+  assert.equal((await post('/api/vision/identify', { image: `data:image/jpeg;base64,${'A'.repeat(3.2 * 1024 * 1024)}` })).status, 413);
+});

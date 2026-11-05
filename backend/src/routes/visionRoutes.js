@@ -1,7 +1,30 @@
 import { matchProductsFromText } from '../services/productMatcher.js';
 import { foldText } from '../utils/regex.js';
 import { asyncRouter } from '../utils/http.js';
-import { analyzeIngredientsText, isIngredientsAiConfigured } from '../services/visionService.js';
+import { analyzeIngredientsText, analyzeIngredientsImage, isIngredientsAiConfigured, isVisionAiConfigured } from '../services/visionService.js';
+import { identifyProductFromImage } from '../services/productVision.js';
+import { parseImageDataUrl, ImageError } from '../utils/images.js';
+
+// Photos are resized by the browser (about 100–400 kB); this leaves room without accepting huge uploads
+const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+
+const AI_DOWN = {
+  success: false,
+  code: 'AI_UNAVAILABLE',
+  message: 'Le service d’analyse ne répond pas pour le moment. Réessayez dans un instant.',
+};
+const AI_OFF = { success: false, code: 'AI_NOT_CONFIGURED', message: 'L’analyse par IA n’est pas configurée (GEMINI_API_KEY).' };
+
+/** The photo in the body, or a 400 already sent */
+const photoOf = (req, res) => {
+  try {
+    return parseImageDataUrl(req.body?.image, MAX_PHOTO_BYTES);
+  } catch (error) {
+    if (!(error instanceof ImageError)) throw error;
+    res.status(400).json({ success: false, message: error.message });
+    return null;
+  }
+};
 
 const router = asyncRouter();
 
@@ -13,11 +36,28 @@ const INGREDIENTS_RE = /ingredient|composition|zutaten|مكونات/;
 const CONFIRM_BELOW = 0.7;
 
 /**
+ * POST /api/vision/identify
+ * Body: { image: dataURL } — photo of the front of the package.
+ * Gemini reads the package and picks the guide entry; the status comes from the database.
+ * On AI_UNAVAILABLE the browser falls back to OCR + /match.
+ */
+router.post('/identify', async (req, res) => {
+  if (!isVisionAiConfigured()) return res.status(503).json(AI_OFF);
+  const image = photoOf(req, res);
+  if (!image) return undefined;
+  try {
+    return res.json({ success: true, data: await identifyProductFromImage(image) });
+  } catch (error) {
+    console.error(`[Vision Identify] ${error.message}`);
+    return res.status(502).json(AI_DOWN);
+  }
+});
+
+/**
  * POST /api/vision/match
- * Body: { text } — text read from the package by OCR in the browser.
+ * Body: { text } — text read from the package by OCR in the browser (fallback when the AI is unavailable).
  * Returns the best matching product from the Tunisian guides.
  */
-// Bodies are limited to 50 kB by the parser mounted for /api/vision in app.js
 router.post('/match', async (req, res) => {
   try {
     const text = typeof req.body?.text === 'string' ? req.body.text.slice(0, 5000) : '';
@@ -56,26 +96,31 @@ router.post('/match', async (req, res) => {
 
 /**
  * POST /api/vision/ingredients
- * Body: { text } — the ingredients list read from the photo by OCR in the browser.
- * Gemini estimates whether the product contains gluten.
+ * Body: { image: dataURL } — photo of the ingredients list, read by Gemini,
+ *    or { text } — the list read by OCR in the browser (fallback).
+ * Gemini estimates whether the product contains gluten; our own rules can only make the verdict stricter.
  */
 router.post('/ingredients', async (req, res) => {
+  if (!isIngredientsAiConfigured()) return res.status(503).json(AI_OFF);
+
+  if (req.body?.image !== undefined) {
+    const image = photoOf(req, res);
+    if (!image) return undefined;
+    try {
+      return res.json({ success: true, data: await analyzeIngredientsImage(image) });
+    } catch (error) {
+      console.error(`[Vision Ingredients] ${error.message}`);
+      return res.status(502).json(AI_DOWN);
+    }
+  }
+
   const text = typeof req.body?.text === 'string' ? req.body.text.trim().slice(0, 4000) : '';
-  if (!text) {
-    return res.status(400).json({ success: false, message: 'Aucun texte d’ingrédients n’a été lu sur la photo.' });
-  }
-  if (!isIngredientsAiConfigured()) {
-    return res.status(503).json({ success: false, message: 'L’analyse des ingrédients n’est pas configurée (GEMINI_API_KEY).' });
-  }
+  if (!text) return res.status(400).json({ success: false, message: 'Aucun texte d’ingrédients n’a été lu sur la photo.' });
   try {
-    const data = await analyzeIngredientsText(text);
-    return res.json({ success: true, data });
+    return res.json({ success: true, data: await analyzeIngredientsText(text) });
   } catch (error) {
     console.error(`[Vision Ingredients] ${error.message}`);
-    return res.status(502).json({
-      success: false,
-      message: 'Le service d’analyse ne répond pas pour le moment. Réessayez dans un instant.',
-    });
+    return res.status(502).json(AI_DOWN);
   }
 });
 

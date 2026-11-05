@@ -33,6 +33,8 @@ app.use(normalizeQuery);
 // so the route-specific limits must come before the default one.
 // Marketplace photos travel as data URLs: only the routes that take images accept large bodies.
 app.use(['/api/market/me/store', '/api/market/me/products'], express.json({ limit: '8mb' }));
+// Scanner photos (resized in the browser) go to /identify and /ingredients; OCR text to /match
+app.use(['/api/vision/identify', '/api/vision/ingredients'], express.json({ limit: '3mb' }));
 app.use('/api/vision', express.json({ limit: '50kb' }));
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));

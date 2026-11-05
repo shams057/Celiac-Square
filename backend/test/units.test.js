@@ -48,3 +48,25 @@ test('password policy', () => {
   assert.ok(passwordProblem('1234567890'));
   assert.equal(passwordProblem('celiac2026square'), null);
 });
+
+test('the safety net only ever makes an AI ingredients verdict stricter', async () => {
+  const { applySafetyNet } = await import('../src/services/visionService.js');
+  const ai = (verdict) => ({ verdict, confidence: 0.95, glutenIngredients: [], traces: [], explanationFr: '', explanationAr: '' });
+  assert.equal(applySafetyNet(ai('GLUTEN_FREE'), 'farine de blé, sucre').verdict, 'CONTAINS_GLUTEN');
+  assert.equal(applySafetyNet(ai('MAY_CONTAIN'), 'semoule de blé dur').verdict, 'CONTAINS_GLUTEN');
+  assert.equal(applySafetyNet(ai('GLUTEN_FREE'), 'riz, sucre. Peut contenir des traces de blé.').verdict, 'MAY_CONTAIN');
+  assert.equal(applySafetyNet(ai('GLUTEN_FREE'), 'lait, sucre, amidon, cacao').verdict, 'MAY_CONTAIN');
+  // Never more lenient than the AI, and nothing to change on a clean list
+  assert.equal(applySafetyNet(ai('CONTAINS_GLUTEN'), 'lait, sucre').verdict, 'CONTAINS_GLUTEN');
+  assert.equal(applySafetyNet(ai('GLUTEN_FREE'), 'lait, sucre, amidon de maïs').verdict, 'GLUTEN_FREE');
+  assert.equal(applySafetyNet(ai('UNREADABLE'), 'farine de blé').verdict, 'UNREADABLE');
+});
+
+test('scanner photos are checked before they reach the AI', async () => {
+  const { parseImageDataUrl } = await import('../src/utils/images.js');
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]).toString('base64');
+  assert.equal(parseImageDataUrl(`data:image/png;base64,${png}`, 1024).mimeType, 'image/png');
+  assert.throws(() => parseImageDataUrl(`data:image/jpeg;base64,${png}`, 1024), /pas une image valide/);
+  assert.throws(() => parseImageDataUrl('data:image/svg+xml;base64,PHN2Zz4=', 1024), /Format/);
+  assert.throws(() => parseImageDataUrl(`data:image/png;base64,${png}`, 4), /dépasse/);
+});

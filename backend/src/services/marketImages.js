@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { db } from '../config/db.js';
+import { parseImageDataUrl, ImageError } from '../utils/images.js';
 
 /**
  * Product and store photos live in the public "marketplace" Storage bucket, one folder
@@ -13,19 +14,11 @@ const BUCKET = 'marketplace';
 const MAX_BYTES = 3 * 1024 * 1024;
 export const MAX_IMAGES = 5;
 
-const DATA_URL_RE = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/;
 const EXT = { jpeg: 'jpg', png: 'png', webp: 'webp' };
 const FOLDER_RE = /^(products|stores)\/[0-9a-f-]{36}$/;
 const FILE_RE = /^[0-9a-f-]{36}\.(jpg|png|webp)$/;
 
-// The first bytes of each accepted format: the declared type must match the content
-const MAGIC = {
-  jpeg: (b) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
-  png: (b) => b.length > 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
-  webp: (b) => b.length > 12 && b.subarray(0, 4).toString('ascii') === 'RIFF' && b.subarray(8, 12).toString('ascii') === 'WEBP',
-};
-
-export class ImageError extends Error {}
+export { ImageError };
 
 const publicPrefix = () => `${process.env.SUPABASE_URL.replace(/\/$/, '')}/storage/v1/object/public/${BUCKET}/`;
 
@@ -41,14 +34,10 @@ export const pathIn = (url, folder) => {
 };
 
 const upload = async (dataUrl, folder) => {
-  const match = DATA_URL_RE.exec(dataUrl);
-  if (!match) throw new ImageError('Format d’image non pris en charge (JPEG, PNG ou WebP).');
-  const bytes = Buffer.from(match[2], 'base64');
-  if (bytes.length > MAX_BYTES) throw new ImageError('Une image dépasse 3 Mo.');
-  if (!MAGIC[match[1]](bytes)) throw new ImageError('Ce fichier n’est pas une image valide.');
+  const { type, bytes } = parseImageDataUrl(dataUrl, MAX_BYTES);
 
-  const path = `${folder}/${crypto.randomUUID()}.${EXT[match[1]]}`;
-  const { error } = await db().storage.from(BUCKET).upload(path, bytes, { contentType: `image/${match[1]}`, upsert: false });
+  const path = `${folder}/${crypto.randomUUID()}.${EXT[type]}`;
+  const { error } = await db().storage.from(BUCKET).upload(path, bytes, { contentType: `image/${type}`, upsert: false });
   if (error) throw new Error(`Envoi de l’image : ${error.message}`);
   return db().storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
 };

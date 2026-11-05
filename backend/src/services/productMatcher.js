@@ -75,7 +75,7 @@ const tokenMatches = (word, ocrTokens) =>
 const CACHE_MS = 5 * 60 * 1000;
 let cache = { at: 0, entries: [] };
 
-const loadCatalogue = async () => {
+export const loadCatalogue = async () => {
   if (Date.now() - cache.at < CACHE_MS && cache.entries.length) return cache.entries;
   const [assoc, atmc] = await Promise.all([
     db().from('association_products').select('*'),
@@ -85,6 +85,9 @@ const loadCatalogue = async () => {
     ...unwrap(assoc).map((row) => {
       const p = toAssociationProduct(row);
       return {
+        // Short stable code for prompts (uuid prefix), and the guide section the entry belongs to
+        code: `L${row.id.replace(/-/g, '').slice(0, 6)}`,
+        shelf: p.category,
         name: p.productNameFr,
         brandTokens: tokenize(p.brand.includes('/') ? '' : p.brand),
         ...splitAlternatives(p.productNameFr),
@@ -106,6 +109,8 @@ const loadCatalogue = async () => {
       const p = toAtmcProduct(row);
       const status = atmcToStatus(p.status);
       return {
+        code: `A${row.id.replace(/-/g, '').slice(0, 6)}`,
+        shelf: p.categoryFr,
         name: p.nameFr || p.name,
         brandTokens: tokenize(p.brand),
         ...splitAlternatives(p.nameFr || p.name),

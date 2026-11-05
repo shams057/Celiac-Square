@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, ImageUp, Video, RotateCcw, Search, ScanText, ListChecks, TriangleAlert } from 'lucide-react';
-import { matchProductText, analyzeIngredients } from '../services/api';
-import { preloadOcr, readText } from '../services/ocr';
+import { identifyProductPhoto, matchProductText, analyzeIngredients, isAiUnavailable } from '../services/api';
+import { resizeImage } from '../services/images';
+import { readText } from '../services/ocr';
 import { t, statusKind, STATUS, StatusTile, PageHead, Notice } from './ui';
 
-// Phone photos are often 4–12 MB; the photo is only read on the device, and smaller images read faster
+// Phone photos are often 4–12 MB: they are shrunk before reading, and again (1280 px JPEG) before upload
 const MAX_SIDE = 1600;
 const shrinkImage = async (file) => {
   try {
@@ -37,14 +38,14 @@ const MODES = {
     icon: ScanText,
     fr: 'Reconnaître le produit',
     ar: 'التعرف على المنتج',
-    hintFr: 'Photo de l’emballage : la marque et le nom sont lus puis cherchés dans le guide.',
-    hintAr: 'صورة العلبة: تُقرأ العلامة والاسم ثم يُبحث عنهما في الدليل.',
+    hintFr: 'Photo de la face avant : l’IA reconnaît la marque et le produit, puis le cherche dans le guide.',
+    hintAr: 'صورة الواجهة: يتعرف الذكاء الاصطناعي على العلامة والمنتج ثم يبحث عنه في الدليل.',
   },
   ingredients: {
     icon: ListChecks,
     fr: 'Analyser les ingrédients',
     ar: 'تحليل المكونات',
-    hintFr: 'Photo de la liste d’ingrédients : le texte est lu puis l’IA indique si le produit contient du gluten.',
+    hintFr: 'Photo de la liste d’ingrédients : l’IA la lit et indique si le produit contient du gluten.',
     hintAr: 'صورة قائمة المكونات: يحدد الذكاء الاصطناعي إن كان المنتج يحتوي على الغلوتين.',
   },
 };
@@ -67,10 +68,6 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
   const captureInputRef = useRef(null);
   const galleryInputRef = useRef(null);
 
-  // Download the text reader while the user frames the photo
-  useEffect(() => {
-    preloadOcr();
-  }, []);
 
   const stopCamera = () => {
     const stream = videoRef.current?.srcObject;
@@ -119,36 +116,65 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
 
   useEffect(() => () => previewUrl && URL.revokeObjectURL(previewUrl), [previewUrl]);
 
-  const identifyProduct = async (image) => {
-    setBusy({ label: tr('Lecture de l’emballage…', 'جاري قراءة العلبة…'), progress: 0 });
+  // The photo as sent to the server: about 100–300 kB
+  const toUpload = (image) => resizeImage(image, 1280, 0.85);
+
+  // Fallback when the AI cannot answer: the text is read on the device (Tesseract) and matched by words
+  const identifyByOcr = async (image) => {
+    setBusy({ label: tr('Lecture de l’emballage sur l’appareil…', 'جاري قراءة العلبة على الجهاز…'), progress: 0 });
     const { text } = await readText(image, ({ phase, progress }) =>
       setBusy({
-        label: phase === 'loading' ? tr('Préparation de la lecture…', 'جاري التحضير…') : tr('Lecture de l’emballage…', 'جاري قراءة العلبة…'),
+        label: phase === 'loading' ? tr('Préparation de la lecture…', 'جاري التحضير…') : tr('Lecture de l’emballage sur l’appareil…', 'جاري قراءة العلبة على الجهاز…'),
         progress,
       })
     );
-    if (!text.trim()) return { mode: 'product', data: { identifiedProduct: null, noText: true, keywords: [], candidates: [] } };
+    if (!text.trim()) return { identifiedProduct: null, noText: true, keywords: [], candidates: [], engine: 'OCR' };
     setBusy({ label: tr('Recherche dans le guide…', 'جاري البحث في الدليل…') });
     const res = await matchProductText(text);
     if (!res?.success) throw new Error(res?.message || 'failed');
-    return { mode: 'product', data: res.data };
+    return res.data;
   };
 
-  const checkIngredients = async (image) => {
+  const identifyProduct = async (image) => {
+    setBusy({ label: tr('Reconnaissance du produit…', 'جاري التعرف على المنتج…') });
+    try {
+      const res = await identifyProductPhoto(await toUpload(image));
+      if (!res?.success) throw new Error(res?.message || 'failed');
+      return { mode: 'product', data: res.data };
+    } catch (err) {
+      if (!isAiUnavailable(err) && err.response?.data?.code !== 'AI_NOT_CONFIGURED') throw err;
+      return { mode: 'product', data: { ...(await identifyByOcr(image)), aiUnavailable: true } };
+    }
+  };
+
+  const checkIngredientsByOcr = async (image) => {
     const { text, confidence } = await readText(image, ({ phase, progress }) =>
       setBusy({
-        label: phase === 'loading' ? tr('Préparation de la lecture…', 'جاري التحضير…') : tr('Lecture des ingrédients…', 'جاري قراءة المكونات…'),
+        label: phase === 'loading' ? tr('Préparation de la lecture…', 'جاري التحضير…') : tr('Lecture des ingrédients sur l’appareil…', 'جاري قراءة المكونات على الجهاز…'),
         progress,
       })
     );
     // Nothing legible, or text too garbled to trust: no need to ask the AI, which could guess wrong
     if (text.trim().length < 8 || confidence < MIN_OCR_CONFIDENCE) {
-      return { mode: 'ingredients', data: { verdict: 'UNREADABLE', confidence: 0, glutenIngredients: [], traces: [], text } };
+      return { verdict: 'UNREADABLE', confidence: 0, glutenIngredients: [], traces: [], ingredientsText: text };
     }
     setBusy({ label: tr('Analyse des ingrédients…', 'جاري تحليل المكونات…') });
-    const res = await analyzeIngredients(text);
+    const res = await analyzeIngredients({ text });
     if (!res?.success) throw new Error(res?.message || 'failed');
-    return { mode: 'ingredients', data: { ...res.data, text } };
+    return res.data;
+  };
+
+  const checkIngredients = async (image) => {
+    setBusy({ label: tr('Lecture et analyse des ingrédients…', 'جاري قراءة المكونات وتحليلها…') });
+    try {
+      const res = await analyzeIngredients({ image: await toUpload(image) });
+      if (!res?.success) throw new Error(res?.message || 'failed');
+      return { mode: 'ingredients', data: res.data };
+    } catch (err) {
+      // The photo could not be analysed: read the list on the device and send only the text
+      if (!isAiUnavailable(err)) throw err;
+      return { mode: 'ingredients', data: { ...(await checkIngredientsByOcr(image)), aiUnavailable: true } };
+    }
   };
 
   const analyze = async (file, scanMode = mode) => {
@@ -362,16 +388,59 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
   );
 }
 
+/** Shown when the photo could not be analysed by the AI and the device read the text instead */
+function FallbackNotice({ lang }) {
+  const tr = t(lang);
+  return (
+    <Notice tone="warning" title={tr('Analyse par IA indisponible pour le moment', 'التحليل بالذكاء الاصطناعي غير متاح حاليا')}>
+      {tr(
+        'Le texte a été lu sur votre appareil, ce qui est moins fiable sur les logos. Réessayez dans un instant pour un meilleur résultat.',
+        'قُرئ النص على جهازك، وهذا أقل دقة مع الشعارات. أعد المحاولة بعد لحظة لنتيجة أفضل.'
+      )}
+    </Notice>
+  );
+}
+
 function ProductVerdict({ result, lang, onSearch, onAnalyzeIngredients }) {
   const tr = t(lang);
-  const kind = result.matchedProduct ? statusKind(result.glutenStatus) : 'unknown';
+  const match = result.matchedProduct;
+  const kind = match ? statusKind(result.glutenStatus) : 'unknown';
   const meta = STATUS[kind];
   const Icon = meta.icon;
-  const match = result.matchedProduct;
   const notes = lang === 'ar' ? match?.notesAr || match?.notes : match?.notes;
+  const isAi = result.engine === 'AI';
+  const category = result.matchType === 'category';
+  // What the photo shows, as recognised by the AI (brand, name, variant)
+  const recognised = result.productLabel;
+
+  const headline = match
+    ? category
+      ? tr('À vérifier', 'للتثبت')
+      : tr(meta.fr, meta.ar)
+    : result.noProduct
+    ? tr('Aucun produit reconnu', 'لم يُتعرف على أي منتج')
+    : tr('Produit non trouvé', 'المنتج غير موجود');
+
+  const detail = match
+    ? category
+      ? tr(
+          `${recognised || 'Ce produit'} n’a pas de fiche à son nom. Règle du guide pour ce type de produit : « ${result.identifiedProduct} ».`,
+          `${recognised || 'هذا المنتج'} ليست له بطاقة باسمه. قاعدة الدليل لهذا النوع: «${result.identifiedProduct}».`
+        )
+      : result.identifiedProduct
+    : result.noText
+    ? tr('Aucun texte lisible sur la photo.', 'لا يوجد نص مقروء في الصورة.')
+    : result.noProduct
+    ? tr('Photographiez la face avant d’un produit alimentaire, marque et nom bien visibles.', 'صوّر الواجهة الأمامية لمنتج غذائي مع إظهار العلامة والاسم.')
+    : recognised
+    ? tr(`${recognised} n’est pas dans les guides tunisiens.`, `${recognised} غير موجود في الأدلة التونسية.`)
+    : tr('Ce produit n’est pas dans les guides tunisiens.', 'هذا المنتج غير موجود في الأدلة التونسية.');
+
+  const searchQuery = result.searchQuery || (match ? result.identifiedProduct : (result.keywords || []).join(' '));
 
   return (
     <div className="space-y-4">
+      {result.aiUnavailable && <FallbackNotice lang={lang} />}
       {result.looksLikeIngredients && (
         <Notice
           tone="info"
@@ -391,19 +460,18 @@ function ProductVerdict({ result, lang, onSearch, onAnalyzeIngredients }) {
         <span className="flex h-14 w-14 items-center justify-center rounded-tile bg-ink/10">
           <Icon className="h-8 w-8" strokeWidth={2.5} />
         </span>
-        <p className="mt-6 text-[2.25rem] font-semibold leading-none tracking-[-0.02em] sm:text-[2.75rem]">
-          {match ? (lang === 'ar' ? meta.ar : meta.fr) : tr('Produit non trouvé', 'المنتج غير موجود')}
-        </p>
-        <p dir="auto" className="mt-3 text-left text-lg rtl:text-right">
-          {match
-            ? result.identifiedProduct
-            : result.noText
-            ? tr('Aucun texte lisible sur la photo.', 'لا يوجد نص مقروء في الصورة.')
-            : tr('Ce produit n’est pas dans les guides tunisiens.', 'هذا المنتج غير موجود في الأدلة التونسية.')}
-        </p>
-        {match && (
+        <p className="mt-6 text-[2.25rem] font-semibold leading-none tracking-[-0.02em] sm:text-[2.75rem]">{headline}</p>
+        <p dir="auto" className="mt-3 text-left text-lg rtl:text-right">{detail}</p>
+        {isAi && recognised && match && !category && (
+          <p dir="auto" className="mt-1 text-left text-sm opacity-80 rtl:text-right">
+            {tr(`Produit reconnu : ${recognised}`, `المنتج المتعرَّف عليه: ${recognised}`)}
+          </p>
+        )}
+        {(match || (isAi && recognised)) && result.confidencePercentage > 0 && (
           <p className="mt-1 text-sm opacity-80">
-            {tr(`Correspondance : ${result.confidencePercentage} %`, `نسبة التطابق: ${result.confidencePercentage}٪`)}
+            {isAi
+              ? tr(`Reconnaissance : ${result.confidencePercentage} %`, `نسبة التعرف: ${result.confidencePercentage}٪`)
+              : tr(`Correspondance : ${result.confidencePercentage} %`, `نسبة التطابق: ${result.confidencePercentage}٪`)}
           </p>
         )}
       </div>
@@ -417,8 +485,8 @@ function ProductVerdict({ result, lang, onSearch, onAnalyzeIngredients }) {
 
       {result.requiresFallback && result.candidates?.length > 0 && (
         <div className="panel p-4">
-          <p className="font-medium">{match ? tr('Ce n’est pas le bon produit ?', 'ليس هذا المنتج؟') : tr('Produits proches', 'منتجات قريبة')}</p>
-          <p className="text-sm text-ink-soft">{tr('Choisissez celui qui correspond pour voir sa fiche.', 'اختر المنتج المطابق لعرض بطاقته.')}</p>
+          <p className="font-medium">{match ? tr('Ce n’est pas la bonne fiche ?', 'ليست هذه البطاقة؟') : tr('Fiches proches dans le guide', 'بطاقات قريبة في الدليل')}</p>
+          <p className="text-sm text-ink-soft">{tr('Choisissez celle qui correspond pour voir le détail.', 'اختر البطاقة المطابقة لعرض التفاصيل.')}</p>
           <ul className="mt-3 space-y-1.5">
             {result.candidates.map((cand) => (
               <li key={cand.candidateName}>
@@ -436,7 +504,7 @@ function ProductVerdict({ result, lang, onSearch, onAnalyzeIngredients }) {
         </div>
       )}
 
-      {!match && result.keywords?.length > 0 && (
+      {!match && !isAi && result.keywords?.length > 0 && (
         <div className="panel p-4">
           <p className="font-medium">{tr('Mots lus sur l’emballage', 'كلمات مقروءة على العلبة')}</p>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -450,10 +518,14 @@ function ProductVerdict({ result, lang, onSearch, onAnalyzeIngredients }) {
         </div>
       )}
 
-      <button type="button" onClick={() => onSearch?.(match ? result.identifiedProduct : (result.keywords || []).join(' '))} className="btn-quiet w-full">
-        <Search className="h-4 w-4" />
-        {match ? tr('Voir tous les résultats pour ce produit', 'عرض كل النتائج لهذا المنتج') : tr('Chercher dans Open Food Facts', 'ابحث في Open Food Facts')}
-      </button>
+      {searchQuery && !result.noProduct && (
+        <button type="button" onClick={() => onSearch?.(searchQuery)} className="btn-quiet w-full">
+          <Search className="h-4 w-4" />
+          {match && !category
+            ? tr('Voir tous les résultats pour ce produit', 'عرض كل النتائج لهذا المنتج')
+            : tr(`Chercher « ${searchQuery} » dans Open Food Facts`, `ابحث عن «${searchQuery}» في Open Food Facts`)}
+        </button>
+      )}
     </div>
   );
 }
@@ -477,6 +549,7 @@ function IngredientsVerdict({ result, lang }) {
 
   return (
     <div className="space-y-4">
+      {result.aiUnavailable && <FallbackNotice lang={lang} />}
       <div className={`animate-verdict rounded-xl p-6 ${VERDICT_BLOCK[v.kind]}`}>
         <div className="flex items-start justify-between gap-4">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-tile bg-ink/10">
@@ -502,6 +575,15 @@ function IngredientsVerdict({ result, lang }) {
         )}
       </div>
 
+      {result.adjusted && (
+        <Notice tone="warning" title={tr('Verdict rendu plus strict par nos règles', 'حكم أشد بفضل قواعدنا')}>
+          {tr(
+            'L’IA était plus confiante, mais notre vérification de la liste a trouvé un ingrédient à risque.',
+            'كان الذكاء الاصطناعي أكثر تفاؤلا، لكن مراجعتنا للقائمة وجدت مكوّنا محفوفا بالخطر.'
+          )}
+        </Notice>
+      )}
+
       {(result.glutenIngredients.length > 0 || result.traces.length > 0) && (
         <div className="flex flex-wrap gap-1.5 text-sm">
           {result.glutenIngredients.map((g) => (
@@ -526,11 +608,11 @@ function IngredientsVerdict({ result, lang }) {
         </span>
       </p>
 
-      {result.text?.trim() && (
+      {result.ingredientsText?.trim() && (
         <details className="panel p-4 text-sm">
-          <summary className="cursor-pointer font-medium">{tr('Texte lu sur la photo', 'النص المقروء من الصورة')}</summary>
+          <summary className="cursor-pointer font-medium">{tr('Ingrédients lus sur la photo', 'المكونات المقروءة من الصورة')}</summary>
           <p dir="auto" className="mt-2 whitespace-pre-line text-left leading-relaxed text-ink-soft rtl:text-right">
-            {result.text.trim()}
+            {result.ingredientsText.trim()}
           </p>
         </details>
       )}
@@ -544,12 +626,12 @@ function HowItWorks({ mode, lang }) {
     mode === 'product'
       ? [
           tr('Photographiez la face avant : marque et nom du produit bien visibles.', 'صوّر الواجهة الأمامية مع إظهار العلامة واسم المنتج.'),
-          tr('Le texte est lu directement sur votre appareil, sans envoyer la photo.', 'يُقرأ النص على جهازك مباشرة دون إرسال الصورة.'),
-          tr('Le produit est cherché dans le guide de l’ATMC et les produits de l’association.', 'يُبحث عن المنتج في دليل الجمعية ومنتجاتها.'),
+          tr('La photo, réduite, est envoyée à une IA (Google Gemini) qui reconnaît la marque et le produit, même sur un logo.', 'تُرسل الصورة مصغّرة إلى ذكاء اصطناعي (Google Gemini) يتعرف على العلامة والمنتج حتى من الشعار.'),
+          tr('L’IA désigne la fiche du guide de l’ATMC ou de l’association qui le concerne ; le statut vient toujours du guide.', 'يحدد الذكاء الاصطناعي بطاقة الدليل المعنية، والحالة تأتي دائما من الدليل.'),
         ]
       : [
           tr('Photographiez toute la liste d’ingrédients, nette et bien éclairée.', 'صوّر قائمة المكونات كاملة وبوضوح وإضاءة جيدة.'),
-          tr('Le texte est lu sur votre appareil, puis envoyé à une IA (Google Gemini) qui y repère blé, orge, seigle, avoine, malt et traces. La photo, elle, reste sur l’appareil.', 'يُقرأ النص على جهازك ثم يُرسل إلى ذكاء اصطناعي (Google Gemini) يكشف القمح والشعير والشوفان والمالط والآثار. أما الصورة فتبقى على جهازك.'),
+          tr('La photo, réduite, est envoyée à une IA (Google Gemini) qui lit la liste et y repère blé, orge, seigle, avoine, malt et traces. Nos propres règles relisent la liste : elles peuvent rendre le verdict plus strict, jamais plus permissif.', 'تُرسل الصورة مصغّرة إلى ذكاء اصطناعي (Google Gemini) يقرأ القائمة ويكشف القمح والشعير والشوفان والمالط والآثار. ثم تراجعها قواعدنا: قد تجعل الحكم أشد، ولا تجعله أبدا أكثر تساهلا.'),
           tr('Vous obtenez un verdict avec sa probabilité. Vérifiez toujours l’étiquette.', 'تحصل على حكم مع احتماله. تحقق دائما من الملصق.'),
         ];
   return (
