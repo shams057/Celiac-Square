@@ -103,9 +103,11 @@ npm install
 2. Ouvrez **SQL Editor** et exécutez, dans l’ordre, le contenu des fichiers de `supabase/migrations/` :
    - `20261103210000_initial_schema.sql` : tables `atmc_products`, `association_products`, `spots` et `spot_proposals`, recherche insensible aux accents, règles de sécurité ;
    - `20261105120000_marketplace.sql` : comptes (`profiles`, avec le rôle), `stores`, `market_products`, `seller_applications` et le bucket Storage public `marketplace` pour les photos ;
-   - `20261105130000_lock_handle_new_user.sql` : interdit d’appeler la fonction de création de profil depuis l’API.
+   - `20261105130000_lock_handle_new_user.sql` : interdit d’appeler la fonction de création de profil depuis l’API ;
+   - `20261105160000_audit_fixes.sql` : plus de notes inventées sur les adresses, date et auteur de la vérification, limites de longueur des textes, journal des actions admin (`admin_audit_log`).
    Sur une base existante, n’exécutez que les fichiers qui ne l’ont pas encore été (**Database → Migrations** les liste).
-   Dans **Authentication → Sign In / Providers → Email**, choisissez si les nouveaux comptes doivent confirmer leur adresse e-mail (*Confirm email*). L’application gère les deux cas.
+   Dans **Authentication → Sign In / Providers → Email**, activez *Confirm email* (recommandé : sans confirmation, le formulaire d’inscription peut révéler qu’une adresse a déjà un compte). Réglez aussi la longueur minimale du mot de passe sur 10.
+   Dans **Authentication → URL Configuration**, ajoutez `<SITE_URL>/compte/nouveau-mot-de-passe` aux *Redirect URLs* (lien des e-mails « mot de passe oublié »).
 3. Dans **Project Settings → API Keys**, notez :
    - l’URL du projet (`https://<project-ref>.supabase.co`) ;
    - la **clé secrète** (`sb_secret_…`). Elle donne un accès complet à la base : ne la publiez jamais et ne l’utilisez jamais dans le frontend.
@@ -122,7 +124,8 @@ Puis complétez `backend/.env` :
 | --- | --- | --- |
 | `SUPABASE_URL` | Oui | URL du projet Supabase |
 | `SUPABASE_SECRET_KEY` | Oui | Clé secrète Supabase (serveur uniquement) |
-| `ADMIN_TOKEN` | Non | Jeton pour appeler les routes administrateur depuis un script. Le back-office, lui, utilise les comptes administrateurs. Générez-le avec `openssl rand -hex 24` |
+| `SITE_URL` | Production | Adresse publique du site, utilisée dans les e-mails de réinitialisation du mot de passe |
+| `CORS_ORIGINS` | Non | Autres origines autorisées à appeler l’API depuis un navigateur, séparées par des virgules. Les appels du site lui-même (même origine) n’en ont pas besoin |
 | `GEMINI_API_KEY` | Non | Active l’analyse des ingrédients. La reconnaissance de produit (OCR) fonctionne sans |
 | `GEMINI_MODEL` | Non | Modèle Gemini (par défaut `gemini-3.5-flash-lite`, avec repli sur `gemini-flash-lite-latest`) |
 | `OFF_USER_AGENT` | Non | Identifiant envoyé à Open Food Facts, par exemple `CeliacSquare/1.0 (contact@exemple.com)` |
@@ -131,7 +134,7 @@ Puis complétez `backend/.env` :
 ### 5. Remplir la base
 
 ```bash
-npm run seed
+npm run seed -- --yes-wipe-database
 ```
 
 Charge 241 produits du guide ATMC (avec leurs noms français), 20 produits de l’association et 16 adresses.
@@ -172,7 +175,7 @@ Reconnectez-vous : le lien *Back-office* apparaît en bas de page. Ensuite, les 
 2. Sur [vercel.com](https://vercel.com), **Add New → Project**, importez le dépôt.
    - **Root Directory :** la racine du dépôt (là où se trouve `vercel.json`).
    - **Framework Preset :** *Other*. Les commandes viennent de `vercel.json`.
-3. Dans **Settings → Environment Variables**, ajoutez pour *Production* (et *Preview* si besoin) les mêmes variables que `backend/.env`. Marquez `SUPABASE_SECRET_KEY`, `ADMIN_TOKEN` et `GEMINI_API_KEY` comme **Sensitive**, et utilisez un `ADMIN_TOKEN` différent de celui du développement.
+3. Dans **Settings → Environment Variables**, ajoutez pour *Production* (et *Preview* si besoin) les mêmes variables que `backend/.env`. Marquez `SUPABASE_SECRET_KEY` et `GEMINI_API_KEY` comme **Sensitive**, et définissez `SITE_URL`. L’ancien `ADMIN_TOKEN` n’est plus utilisé : supprimez-le. Les limites de débit de l’API sont gardées en mémoire par instance ; pour des limites strictes, ajoutez une règle *Rate limiting* dans **Firewall**.
 4. Déployez. Chaque `git push` sur `main` redéploie automatiquement.
 5. Vérifiez `https://<votre-domaine>/api/health`.
 
@@ -221,14 +224,16 @@ L’APK local est signé avec la clé de débogage : il convient pour vos appare
 | `npm run server` | API seule (redémarre à chaque modification) |
 | `npm run client` | Frontend seul |
 | `npm run build` | Build de production du frontend (`frontend/dist`) |
-| `npm run seed` | Réinitialise et remplit la base Supabase |
+| `npm run seed -- --yes-wipe-database` | Vide puis remplit les tables du guide et de la carte (refuse sans ce drapeau, et en production) |
+| `npm test` | Tests de l’API (classement gluten, robustesse, sécurité) |
 | `npm run set-role -- <email> <ADMIN\|SELLER\|CLIENT>` | Change le rôle d’un compte existant (pour créer le premier administrateur) |
 
 ### API
 
 | Méthode | Route | Accès | Description |
 | --- | --- | --- | --- |
-| GET | `/api/health` | Public | État de la base et de la configuration (jamais les valeurs) |
+| GET | `/api/health` | Public | `{ status }` seulement |
+| GET | `/api/admin/health` | Admin | État de la base et de la configuration (jamais les valeurs) |
 | GET | `/api/atmc/products` | Public | Guide ATMC (`category`, `status`, `q`) |
 | GET | `/api/atmc/categories` | Public | Rayons et nombre de produits par statut |
 | GET | `/api/atmc/stats` | Public | Totaux autorisés / à vérifier / interdits |
@@ -246,12 +251,14 @@ L’APK local est signé avec la clé de débogage : il convient pour vos appare
 | PATCH | `/api/map/spots/:id/verify` | Admin | Changer le statut vérifié |
 | POST | `/api/auth/signup` | Public | Créer un compte client (`{ email, password, fullName }`) |
 | POST | `/api/auth/login` | Public | Se connecter : renvoie la session et le profil |
-| POST | `/api/auth/refresh` | Public | Renouveler la session (`{ refreshToken }`) |
+| POST | `/api/auth/refresh` | Public | Renouveler la session (cookie `cs_refresh`, httpOnly) |
+| POST | `/api/auth/forgot` | Public | Envoyer un e-mail de réinitialisation (`{ email }`) |
+| POST | `/api/auth/reset` | Public | Nouveau mot de passe (`{ accessToken, password }`, jeton du lien de l’e-mail) |
 | GET | `/api/auth/me` | Membre | Le compte connecté et son rôle |
-| POST | `/api/auth/logout` | Membre | Fermer la session sur cet appareil |
-| GET | `/api/market/stores` | Membre | Boutiques actives (`type`) avec leur nombre de produits |
-| GET | `/api/market/stores/:id` | Membre | Une boutique et ses produits |
-| GET | `/api/market/products` | Membre | Produits de toutes les boutiques (`q`, `type`, `store`) |
+| POST | `/api/auth/logout` | Public | Fermer la session sur cet appareil et effacer le cookie |
+| GET | `/api/market/stores` | Public | Boutiques actives (`type`) avec leur nombre de produits |
+| GET | `/api/market/stores/:id` | Public | Une boutique et ses produits |
+| GET | `/api/market/products` | Public | Produits de toutes les boutiques (`q`, `type`, `store`) |
 | GET / PUT | `/api/market/me/store` | Vendeur | Sa boutique (le premier `PUT` la crée) |
 | POST / PUT / DELETE | `/api/market/me/products[/:id]` | Vendeur | Ses produits ; `images` : URL déjà enregistrées ou nouvelles photos en data URL |
 | GET | `/api/market/applications/mine` | Membre | Ses demandes de vendeur |
@@ -262,8 +269,11 @@ L’APK local est signé avec la clé de débogage : il convient pour vos appare
 | GET / PATCH | `/api/admin/stores[/:id]` | Admin | Boutiques ; `{ isActive }` suspend ou réactive |
 | GET | `/api/admin/users` | Admin | Comptes (`q`, `role`) |
 | PATCH | `/api/admin/users/:id/role` | Admin | Changer le rôle (`{ role }`), sauf le sien |
+| GET | `/api/admin/audit-log` | Admin | Les 200 dernières actions admin |
 
-Les routes *Membre*, *Client*, *Vendeur* et *Admin* exigent l’en-tête `Authorization: Bearer <jeton d’accès>` d’un compte qui a le rôle voulu. Les routes *Admin* acceptent aussi `Bearer <ADMIN_TOKEN>`, pratique pour les scripts.
+Les routes *Membre*, *Client*, *Vendeur* et *Admin* exigent l’en-tête `Authorization: Bearer <jeton d’accès>` d’un compte qui a le rôle voulu. Le jeton d’accès est renvoyé par `/login` et `/refresh` et gardé en mémoire par le site ; le jeton de renouvellement reste dans un cookie httpOnly. Les actions admin sont enregistrées dans `admin_audit_log` (onglet *Journal* du back-office).
+
+Limites de débit (par IP) : 300 requêtes/min sur l’API, 10 connexions ou inscriptions par 15 min, 5 propositions d’adresse ou demandes de vendeur par heure, 60 recherches produits/min. Le scanner (`/api/vision`) n’est pas limité.
 
 ### Données
 
@@ -289,7 +299,7 @@ Les routes *Membre*, *Client*, *Vendeur* et *Admin* exigent l’en-tête `Author
 | --- | --- |
 | Le guide affiche « 0 produit » ou une erreur | Ouvrez `/api/health`. `not_configured` : variables Supabase manquantes. `unreachable` : URL ou clé incorrecte. |
 | `/api/health` indique `supabaseSecretKey: false` sur Vercel | La variable n’existe pas pour l’environnement *Production*, ou aucun redéploiement n’a suivi son ajout. |
-| La base est vide | Lancez `npm run seed` avec le bon `backend/.env`. |
+| La base est vide | Lancez `npm run seed -- --yes-wipe-database` avec le bon `backend/.env`. |
 | « Open Food Facts ne répond pas » | Le service limite le nombre de recherches. Les résultats locaux restent affichés ; réessayez après une minute. |
 | « L’analyse des ingrédients n’est pas configurée » | `GEMINI_API_KEY` absente. La reconnaissance de produit, elle, n’en a pas besoin. |
 | La reconnaissance de produit reste sur « Préparation de la lecture… » | Le moteur OCR (~3 Mo) se télécharge à la première utilisation ; il faut une connexion internet, ensuite il est en cache. |

@@ -14,8 +14,10 @@ export const toSpot = (r) => ({
   isVerified: r.is_verified,
   speciality: r.speciality,
   hours: r.hours,
-  rating: Number(r.rating),
-  reviewCount: r.review_count,
+  // No review system yet: null until real reviews exist
+  rating: r.rating == null ? null : Number(r.rating),
+  reviewCount: r.review_count ?? 0,
+  verifiedAt: r.verified_at ?? null,
   notes: r.notes,
   submittedBy: r.submitted_by,
   createdAt: r.created_at,
@@ -63,6 +65,12 @@ export const toStore = (r) => ({
   productCount: Array.isArray(r.market_products) ? r.market_products[0]?.count ?? 0 : undefined,
   createdAt: r.created_at,
 });
+
+/** A store as the public marketplace shows it: without its owner's account id */
+export const toPublicStore = (r) => {
+  const { ownerId, ...store } = toStore(r); // eslint-disable-line no-unused-vars
+  return store;
+};
 
 export const toMarketProduct = (r) => ({
   _id: r.id,

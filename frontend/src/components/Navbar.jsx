@@ -2,6 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { BookOpen, Camera, Search, MapPin, Plus, Languages, ShoppingBag, UserRound, Store, LogOut, BadgePlus } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { BrandMark, t } from './ui';
+import { pathFor } from '../services/router';
+
+// Plain clicks navigate in the page; Ctrl/Cmd/middle clicks keep the browser's "open in new tab"
+const linkClick = (go, tab) => (e) => {
+  if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  go(tab);
+};
 
 const TABS = [
   { id: 'atmc', icon: BookOpen, fr: 'Guide ATMC', ar: 'دليل الجمعية' },
@@ -36,9 +44,9 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSubmitModal, lan
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
           <button
             type="button"
-            onClick={() => setActiveTab('vision')}
-            className="flex shrink-0 items-center gap-2.5 rounded-full"
-            aria-label="Celiac Square"
+            onClick={() => setActiveTab('atmc')}
+            className="flex min-h-11 shrink-0 items-center gap-2.5 rounded-full"
+            aria-label={tr('Celiac Square, accueil', 'Celiac Square، الصفحة الرئيسية')}
           >
             <BrandMark className="h-8 w-8" />
             <span className="text-lg font-semibold tracking-[-0.02em]">Celiac Square</span>
@@ -50,9 +58,10 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSubmitModal, lan
               onClick={() => setLang(lang === 'fr' ? 'ar' : 'fr')}
               className="btn-ghost px-3"
               lang={lang === 'fr' ? 'ar' : 'fr'}
+              aria-label={lang === 'fr' ? 'العربية — عرض الموقع بالعربية' : 'Français — afficher le site en français'}
             >
-              <Languages className="h-4 w-4" />
-              <span className="hidden sm:inline">{lang === 'fr' ? 'العربية' : 'Français'}</span>
+              <Languages className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline" aria-hidden="true">{lang === 'fr' ? 'العربية' : 'Français'}</span>
             </button>
             <button type="button" onClick={onOpenSubmitModal} className="btn-primary px-3 sm:px-4" aria-label={tr('Proposer une adresse', 'اقترح عنوانا')}>
               <Plus className="h-4 w-4" />
@@ -80,18 +89,18 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSubmitModal, lan
           {TABS.map(({ id, icon: Icon, fr, ar }) => {
             const active = activeTab === id;
             return (
-              <button
+              <a
                 key={id}
-                type="button"
-                onClick={() => setActiveTab(id)}
+                href={pathFor(id)}
+                onClick={linkClick(setActiveTab, id)}
                 aria-current={active ? 'page' : undefined}
                 className={`relative flex flex-col items-center justify-center gap-0.5 rounded-full py-2 text-[11px] transition-colors lg:flex-row lg:gap-2 lg:py-2.5 lg:text-sm ${
                   active ? 'font-medium text-ink' : 'text-ink-soft hover:text-ink'
                 }`}
               >
-                <Icon className={`h-5 w-5 transition-transform duration-300 lg:h-4 lg:w-4 ${active ? 'scale-110 lg:scale-100' : ''}`} strokeWidth={active ? 2.25 : 1.75} />
+                <Icon aria-hidden="true" className={`h-5 w-5 transition-transform duration-300 lg:h-4 lg:w-4 ${active ? 'scale-110 lg:scale-100' : ''}`} strokeWidth={active ? 2.25 : 1.75} />
                 <span className="whitespace-nowrap">{tr(fr, ar)}</span>
-              </button>
+              </a>
             );
           })}
         </div>
@@ -144,7 +153,7 @@ function AccountMenu({ lang, go }) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={tr('Mon compte', 'حسابي')}
-        className="flex h-10 w-10 items-center justify-center rounded-full bg-ink text-sm font-semibold text-canvas-paper ring-2 ring-white/70 transition-transform active:scale-95"
+        className="flex h-11 w-11 items-center justify-center rounded-full bg-ink text-sm font-semibold text-canvas-paper ring-2 ring-white/70 transition-transform active:scale-95"
       >
         {initial}
       </button>

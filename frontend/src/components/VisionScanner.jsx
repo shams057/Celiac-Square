@@ -4,7 +4,7 @@ import { matchProductText, analyzeIngredients } from '../services/api';
 import { preloadOcr, readText } from '../services/ocr';
 import { t, statusKind, STATUS, StatusTile, PageHead, Notice } from './ui';
 
-// Phone photos are often 4–12 MB; the API accepts at most 4.5 MB, and smaller images read faster
+// Phone photos are often 4–12 MB; the photo is only read on the device, and smaller images read faster
 const MAX_SIDE = 1600;
 const shrinkImage = async (file) => {
   try {
@@ -21,6 +21,9 @@ const shrinkImage = async (file) => {
     return file; // formats the browser cannot decode are sent as they are
   }
 };
+
+// Below this mean word confidence (0–100), the OCR text is mostly guesswork
+const MIN_OCR_CONFIDENCE = 45;
 
 const VERDICT_BLOCK = {
   safe: 'bg-status-safe text-ink',
@@ -118,7 +121,7 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
 
   const identifyProduct = async (image) => {
     setBusy({ label: tr('Lecture de l’emballage…', 'جاري قراءة العلبة…'), progress: 0 });
-    const text = await readText(image, ({ phase, progress }) =>
+    const { text } = await readText(image, ({ phase, progress }) =>
       setBusy({
         label: phase === 'loading' ? tr('Préparation de la lecture…', 'جاري التحضير…') : tr('Lecture de l’emballage…', 'جاري قراءة العلبة…'),
         progress,
@@ -132,14 +135,14 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
   };
 
   const checkIngredients = async (image) => {
-    const text = await readText(image, ({ phase, progress }) =>
+    const { text, confidence } = await readText(image, ({ phase, progress }) =>
       setBusy({
         label: phase === 'loading' ? tr('Préparation de la lecture…', 'جاري التحضير…') : tr('Lecture des ingrédients…', 'جاري قراءة المكونات…'),
         progress,
       })
     );
-    // Nothing legible: no need to ask the AI
-    if (text.trim().length < 8) {
+    // Nothing legible, or text too garbled to trust: no need to ask the AI, which could guess wrong
+    if (text.trim().length < 8 || confidence < MIN_OCR_CONFIDENCE) {
       return { mode: 'ingredients', data: { verdict: 'UNREADABLE', confidence: 0, glutenIngredients: [], traces: [], text } };
     }
     setBusy({ label: tr('Analyse des ingrédients…', 'جاري تحليل المكونات…') });
@@ -158,7 +161,8 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
       setResult(scanMode === 'product' ? await identifyProduct(image) : await checkIngredients(image));
     } catch (err) {
       console.error('Scan error:', err);
-      setErrorMsg(err.response?.data?.message || (err.message && err.message !== 'failed' ? err.message : 'network'));
+      const status = err.response?.status;
+      setErrorMsg(status && status < 500 && err.response?.data?.message ? err.response.data.message : status ? tr('Le service d’analyse ne répond pas pour le moment. Réessayez dans un instant.', 'خدمة التحليل لا تستجيب حاليا. أعد المحاولة بعد لحظة.') : 'network');
     } finally {
       setBusy(null);
     }
@@ -545,7 +549,7 @@ function HowItWorks({ mode, lang }) {
         ]
       : [
           tr('Photographiez toute la liste d’ingrédients, nette et bien éclairée.', 'صوّر قائمة المكونات كاملة وبوضوح وإضاءة جيدة.'),
-          tr('Le texte est lu sur votre appareil, puis l’IA y repère blé, orge, seigle, avoine, malt et traces.', 'يُقرأ النص على جهازك ثم يكشف الذكاء الاصطناعي القمح والشعير والشوفان والمالط والآثار.'),
+          tr('Le texte est lu sur votre appareil, puis envoyé à une IA (Google Gemini) qui y repère blé, orge, seigle, avoine, malt et traces. La photo, elle, reste sur l’appareil.', 'يُقرأ النص على جهازك ثم يُرسل إلى ذكاء اصطناعي (Google Gemini) يكشف القمح والشعير والشوفان والمالط والآثار. أما الصورة فتبقى على جهازك.'),
           tr('Vous obtenez un verdict avec sa probabilité. Vérifiez toujours l’étiquette.', 'تحصل على حكم مع احتماله. تحقق دائما من الملصق.'),
         ];
   return (

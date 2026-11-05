@@ -1,34 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Search, ChevronLeft, ChevronRight, MapPin, Phone, Store, ShoppingBag } from 'lucide-react';
 import { fetchStores, fetchMarketProducts, fetchStore } from '../services/api';
-import { useAuth } from './AuthContext';
-import AuthPanel from './AuthPanel';
 import { t, PageHead, Spinner, Notice, EmptyState, Modal, STORE_TYPES, storeType, formatPrice, StoreLogo } from './ui';
 
 /**
  * Gluten-free marketplace: every store's products at once, grouped by store,
- * or one store's menu. Members only.
+ * or one store's menu (its own URL: /marche/boutique/<id>). Open to everyone.
  */
-export default function Marketplace({ lang }) {
-  const tr = t(lang);
-  const { user } = useAuth();
-
-  if (!user) {
-    return (
-      <AuthPanel
-        lang={lang}
-        title={tr('Le marché est réservé aux membres', 'السوق مخصص للأعضاء')}
-        lede={tr(
-          'Connectez-vous ou créez un compte gratuit pour voir les produits sans gluten des restaurants, boulangeries, cafés et artisans.',
-          'سجّل الدخول أو أنشئ حسابا مجانيا لترى المنتجات بدون غلوتين من المطاعم والمخابز والمقاهي والحرفيين.'
-        )}
-      />
-    );
-  }
-  return <MarketBrowser lang={lang} />;
+export default function Marketplace({ lang, storeId, onOpenStore, onCloseStore }) {
+  return <MarketBrowser lang={lang} storeId={storeId} onOpenStore={onOpenStore} onCloseStore={onCloseStore} />;
 }
 
-function MarketBrowser({ lang }) {
+function MarketBrowser({ lang, storeId, onOpenStore, onCloseStore }) {
   const tr = t(lang);
   const [type, setType] = useState('ALL');
   const [query, setQuery] = useState('');
@@ -37,7 +20,6 @@ function MarketBrowser({ lang }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [storeId, setStoreId] = useState(null);
   const [openProduct, setOpenProduct] = useState(null);
 
   // Search as the user types, without a request per keystroke
@@ -77,14 +59,13 @@ function MarketBrowser({ lang }) {
 
   const openStore = (id) => {
     setOpenProduct(null);
-    setStoreId(id);
-    window.scrollTo({ top: 0 });
+    onOpenStore(id);
   };
 
   if (storeId) {
     return (
       <>
-        <StoreMenu lang={lang} storeId={storeId} onBack={() => setStoreId(null)} onOpenProduct={setOpenProduct} />
+        <StoreMenu lang={lang} storeId={storeId} onBack={onCloseStore} onOpenProduct={setOpenProduct} />
         <ProductSheet lang={lang} product={openProduct} onClose={() => setOpenProduct(null)} />
       </>
     );
@@ -220,6 +201,8 @@ function StoreMenu({ lang, storeId, onBack, onOpenProduct }) {
 
   useEffect(() => {
     let cancelled = false;
+    setStore(null);
+    setError(false);
     fetchStore(storeId)
       .then((res) => {
         if (cancelled) return;
@@ -267,7 +250,7 @@ function StoreMenu({ lang, storeId, onBack, onOpenProduct }) {
               </span>
             )}
             {store.phone && (
-              <a href={`tel:${store.phone}`} className="inline-flex items-center gap-1.5 hover:text-ink" dir="ltr">
+              <a href={`tel:${store.phone.replace(/[^\d+]/g, '')}`} className="inline-flex items-center gap-1.5 hover:text-ink" dir="ltr">
                 <Phone className="h-4 w-4" />
                 {store.phone}
               </a>
@@ -284,6 +267,7 @@ function StoreMenu({ lang, storeId, onBack, onOpenProduct }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={tr(`Chercher chez ${store.name}`, `ابحث في ${store.name}`)}
+            aria-label={tr(`Chercher chez ${store.name}`, `ابحث في ${store.name}`)}
             className="field ps-10"
           />
         </div>

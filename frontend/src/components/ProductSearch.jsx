@@ -141,6 +141,15 @@ export default function ProductSearch({ initialQuery = '', lang }) {
         </Notice>
       )}
 
+      {offItems.length > 0 && (
+        <Notice tone="warning" title={tr('Résultats Open Food Facts : vérifiez toujours l’étiquette.', 'نتائج Open Food Facts: تحقق دائما من الملصق.')}>
+          {tr(
+            'Ces fiches sont remplies par des bénévoles et notre lecture des ingrédients est automatique : elles peuvent être incomplètes ou dépassées. Seul l’emballage fait foi.',
+            'يملأ هذه البطاقات متطوعون وقراءتنا للمكونات آلية: قد تكون ناقصة أو قديمة. العلبة وحدها هي المرجع.'
+          )}
+        </Notice>
+      )}
+
       {items.length > 0 ? (
         <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-white/70 bg-canvas-paper/80 backdrop-blur-sm">
           {items.map((item, idx) => {
@@ -167,7 +176,7 @@ export default function ProductSearch({ initialQuery = '', lang }) {
                   <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-faint">
                     {item.brand && <span dir="auto">{item.brand}</span>}
                     {item.barcode && <span className="tabular-nums">{item.barcode}</span>}
-                    <span>{local ? tr('Source : guide tunisien', 'المصدر: دليل تونسي') : tr('Source : Open Food Facts', 'المصدر: Open Food Facts')}</span>
+                    <span>{local ? tr('Source : guide tunisien', 'المصدر: دليل تونسي') : tr('Source : Open Food Facts — vérifiez l’étiquette', 'المصدر: Open Food Facts — تحقق من الملصق')}</span>
                   </p>
                 </div>
               </li>

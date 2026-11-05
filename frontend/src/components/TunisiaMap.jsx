@@ -41,6 +41,9 @@ const markerIcon = (category, isVerified, active) => {
   return iconCache[key];
 };
 
+const verifiedDate = (iso, lang) =>
+  new Date(iso).toLocaleDateString(lang === 'ar' ? 'ar-TN' : 'fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+
 function FlyTo({ target }) {
   const map = useMap();
   useEffect(() => {
@@ -206,7 +209,7 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
       </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-[1.5fr_1fr]">
-        <div className="relative z-0 h-[55vh] min-h-[340px] overflow-hidden rounded-2xl border border-white/60 shadow-[0_8px_24px_-16px_rgba(47,38,29,0.3)] lg:sticky lg:top-24 lg:h-[620px]">
+        <div role="region" aria-label={tr('Carte des adresses. La liste qui suit présente les mêmes lieux.', 'خريطة العناوين. القائمة التالية تعرض نفس الأماكن.')} className="relative z-0 h-[55vh] min-h-[340px] overflow-hidden rounded-2xl border border-white/60 shadow-[0_8px_24px_-16px_rgba(47,38,29,0.3)] lg:sticky lg:top-24 lg:h-[620px]">
           <MapContainer center={TUNISIA_CENTER} zoom={TUNISIA_ZOOM} scrollWheelZoom className="h-full w-full">
             <FlyTo target={flyTarget} />
             <TileLayer
@@ -221,13 +224,27 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
                   key={spot._id}
                   position={[lat, lng]}
                   icon={markerIcon(spot.category, spot.isVerified, activeId === spot._id)}
-                  eventHandlers={{ click: () => setActiveId(spot._id) }}
+                  title={`${spot.name}, ${spot.city}`}
+                  keyboard
+                  eventHandlers={{
+                    click: () => setActiveId(spot._id),
+                    // Div icons ignore `alt`: name the focusable marker element for screen readers
+                    add: (e) => {
+                      const el = e.target.getElement();
+                      if (!el) return;
+                      el.setAttribute('role', 'button');
+                      el.setAttribute(
+                        'aria-label',
+                        `${spot.name}, ${spot.city} — ${tr(spotCategory(spot.category).fr, spotCategory(spot.category).ar)}${spot.isVerified ? `, ${tr('vérifiée', 'موثق')}` : ''}`
+                      );
+                    },
+                  }}
                 >
                   <Popup>
                     <p className="font-medium">{spot.name}</p>
                     <p className="text-ink-soft">{spot.address}</p>
                     {spot.phone && (
-                      <a href={`tel:${spot.phone.replace(/\s/g, '')}`} className="mt-1 inline-block text-status-safe-ink underline">
+                      <a href={`tel:${spot.phone.replace(/[^\d+]/g, '')}`} className="mt-1 inline-block text-status-safe-ink underline">
                         {spot.phone}
                       </a>
                     )}
@@ -239,11 +256,11 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
           <button
             type="button"
             onClick={resetView}
-            className="absolute end-3 top-3 z-[500] rounded-lg border border-canvas-line bg-canvas-paper p-2 text-ink shadow-sm hover:bg-white"
+            className="absolute end-3 top-3 z-[500] flex h-11 w-11 items-center justify-center rounded-lg border border-canvas-line bg-canvas-paper text-ink shadow-sm hover:bg-white"
             aria-label={tr('Revoir toute la Tunisie', 'عرض كامل تونس')}
             title={tr('Revoir toute la Tunisie', 'عرض كامل تونس')}
           >
-            <LocateFixed className="h-5 w-5" />
+            <LocateFixed className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
 
@@ -285,9 +302,14 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
                         <span className="h-3 w-3 shrink-0 rounded-[2px]" style={{ background: cat.color }} aria-hidden="true" />
                         {tr(cat.fr, cat.ar)}, {spot.city}
                         {spot.isVerified && (
-                          <span className="ms-auto inline-flex items-center gap-1 text-status-safe-ink">
-                            <BadgeCheck className="h-4 w-4" />
-                            {tr('Vérifiée', 'موثق')}
+                          <span
+                            className="ms-auto inline-flex items-center gap-1 text-status-safe-ink"
+                            title={spot.verifiedAt ? tr(`Vérifiée par l’équipe le ${verifiedDate(spot.verifiedAt, lang)}`, `وثقه الفريق في ${verifiedDate(spot.verifiedAt, lang)}`) : undefined}
+                          >
+                            <BadgeCheck className="h-4 w-4" aria-hidden="true" />
+                            {spot.verifiedAt
+                              ? tr(`Vérifiée le ${verifiedDate(spot.verifiedAt, lang)}`, `موثق في ${verifiedDate(spot.verifiedAt, lang)}`)
+                              : tr('Vérifiée', 'موثق')}
                           </span>
                         )}
                       </span>

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Clock, BadgeCheck, X } from 'lucide-react';
-import { fetchMyApplications, submitSellerApplication } from '../services/api';
+import { fetchMyApplications, submitSellerApplication, errorMessage } from '../services/api';
 import { useAuth } from './AuthContext';
 import AuthPanel from './AuthPanel';
 import { t, PageHead, Spinner, Notice, STORE_TYPES } from './ui';
@@ -62,7 +62,7 @@ function ApplicationForm({ lang }) {
       setApplications((a) => [res.data, ...(a || [])]);
       setForm(EMPTY_FORM);
     } catch (err) {
-      setError(err.response?.data?.message || tr('La demande n’a pas été envoyée.', 'لم يتم إرسال الطلب.'));
+      setError(errorMessage(err, tr('La demande n’a pas été envoyée.', 'لم يتم إرسال الطلب.')));
     } finally {
       setBusy(false);
     }
@@ -106,11 +106,11 @@ function ApplicationForm({ lang }) {
           <form onSubmit={submit} className="panel space-y-4 p-5 sm:p-6">
             <div>
               <label htmlFor="app-name" className="field-label">{tr('Nom de l’établissement', 'اسم المحل')}</label>
-              <input id="app-name" value={form.businessName} onChange={set('businessName')} required className="field" />
+              <input id="app-name" value={form.businessName} onChange={set('businessName')} required maxLength={120} className="field" />
             </div>
             <div>
               <p className="field-label">{tr('Type', 'النوع')}</p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label={tr('Type d’établissement', 'نوع المحل')}>
                 {STORE_TYPES.map(({ value, fr, ar, icon: Icon }) => (
                   <button
                     key={value}
@@ -131,16 +131,16 @@ function ApplicationForm({ lang }) {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor="app-city" className="field-label">{tr('Ville', 'المدينة')}</label>
-                <input id="app-city" value={form.city} onChange={set('city')} required className="field" />
+                <input id="app-city" value={form.city} onChange={set('city')} required maxLength={80} className="field" />
               </div>
               <div>
                 <label htmlFor="app-phone" className="field-label">{tr('Téléphone', 'الهاتف')}</label>
-                <input id="app-phone" type="tel" value={form.phone} onChange={set('phone')} required className="field" dir="ltr" />
+                <input id="app-phone" type="tel" value={form.phone} onChange={set('phone')} required maxLength={30} className="field" dir="ltr" />
               </div>
             </div>
             <div>
               <label htmlFor="app-address" className="field-label">{tr('Adresse', 'العنوان')} <span className="font-normal text-ink-faint">{tr('facultatif', 'اختياري')}</span></label>
-              <input id="app-address" value={form.address} onChange={set('address')} className="field" />
+              <input id="app-address" value={form.address} onChange={set('address')} maxLength={200} className="field" />
             </div>
             <div>
               <label htmlFor="app-description" className="field-label">{tr('Vos produits sans gluten', 'منتجاتك بدون غلوتين')}</label>
@@ -149,6 +149,7 @@ function ApplicationForm({ lang }) {
                 value={form.description}
                 onChange={set('description')}
                 rows={4}
+                maxLength={2000}
                 placeholder={tr('Ce que vous préparez, et comment vous évitez la contamination croisée.', 'ما تحضّره، وكيف تتجنب التلوث بالغلوتين.')}
                 className="field"
               />

@@ -98,7 +98,7 @@
 
   /* Buttons */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-[background-color,box-shadow,transform] active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-[background-color,box-shadow,transform] active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
     @apply btn bg-accent text-ink hover:bg-[#F27A2E];
@@ -134,7 +134,7 @@
 
   /* Toggle chips (filters) */
   .chip {
-    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-white/60 bg-canvas-paper/60 px-3.5 py-1.5 text-sm text-ink-soft transition-colors hover:text-ink;
+    @apply inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-full border border-white/60 bg-canvas-paper/60 px-3.5 py-1.5 text-sm text-ink-soft transition-colors hover:text-ink;
   }
   .chip[aria-pressed='true'] {
     @apply border-ink bg-ink text-canvas-paper;

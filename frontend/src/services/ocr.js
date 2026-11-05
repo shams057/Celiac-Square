@@ -1,7 +1,7 @@
 /**
  * Text recognition in the browser (Tesseract.js): free, no API key, and the photo never leaves the device.
- * The engine and the French language data (~3 MB, cached by the browser afterwards) are loaded on demand,
- * once, and the worker is reused for every scan.
+ * The engine and the French + Arabic language data (cached by the browser afterwards) are loaded on demand,
+ * once, and the worker is reused for every scan. Tunisian packaging is often printed in both languages.
  */
 let workerPromise = null;
 let listener = null;
@@ -9,7 +9,7 @@ let listener = null;
 const getWorker = () => {
   if (!workerPromise) {
     workerPromise = import('tesseract.js')
-      .then(({ createWorker }) => createWorker('fra', 1, { logger: (m) => listener?.(m) }))
+      .then(({ createWorker }) => createWorker(['fra', 'ara'], 1, { logger: (m) => listener?.(m) }))
       .catch((err) => {
         workerPromise = null; // allow a retry, e.g. after a network error
         throw err;
@@ -25,6 +25,7 @@ export const preloadOcr = () => {
 
 /**
  * Read the text on an image. onProgress receives { phase: 'loading' | 'reading', progress: 0..1 }.
+ * Returns { text, confidence } where confidence (0–100) is Tesseract's mean word confidence.
  */
 export const readText = async (image, onProgress) => {
   listener = (m) => {
@@ -34,7 +35,7 @@ export const readText = async (image, onProgress) => {
   try {
     const worker = await getWorker();
     const { data } = await worker.recognize(image);
-    return data.text || '';
+    return { text: data.text || '', confidence: Number.isFinite(data.confidence) ? data.confidence : 0 };
   } finally {
     listener = null;
   }

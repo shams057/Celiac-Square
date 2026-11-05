@@ -5,7 +5,7 @@ const bearer = (req) => {
   return header.startsWith('Bearer ') ? header.slice(7).trim() : '';
 };
 
-// Supabase access tokens are JWTs; the legacy ADMIN_TOKEN is not, so it is never sent to Supabase Auth
+// Supabase access tokens are JWTs: anything else is not worth a call to Supabase Auth
 const looksLikeJwt = (token) => token.split('.').length === 3;
 
 /**

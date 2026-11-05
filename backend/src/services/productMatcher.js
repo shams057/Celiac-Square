@@ -1,6 +1,7 @@
 import { db, unwrap } from '../config/db.js';
 import { toAssociationProduct, toAtmcProduct } from '../models/mappers.js';
 import { foldText } from '../utils/regex.js';
+import { atmcToStatus } from './statusBadges.js';
 
 /**
  * Matches text read from a product photo (OCR, done in the browser) against the
@@ -103,7 +104,7 @@ const loadCatalogue = async () => {
     }),
     ...unwrap(atmc).map((row) => {
       const p = toAtmcProduct(row);
-      const status = p.status === 'ALLOWED' ? 'SAFE' : p.status === 'NOT_ALLOWED' ? 'UNSAFE' : 'WARNING';
+      const status = atmcToStatus(p.status);
       return {
         name: p.nameFr || p.name,
         brandTokens: tokenize(p.brand),
@@ -160,8 +161,7 @@ export const matchProductsFromText = async (text, limit = 3) => {
     let confidence = Math.min(1, coverage * (brandFound ? 1 : 0.75) + (brandFound ? 0.15 : 0));
     // One short word ("Blé", "Thé") also appears in countless ingredient lists: not enough to name the product
     if (matchedWeight < 8 && !brandFound) confidence *= 0.6;
-    const found = matchedWeight;
-    scored.push({ name: entry.name, product: entry.product, confidence, found: found.length });
+    scored.push({ name: entry.name, product: entry.product, confidence, found: matchedWeight });
   }
 
   scored.sort((a, b) => b.confidence - a.confidence || b.found - a.found);

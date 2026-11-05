@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrandMark, t } from './ui';
 
-export default function Footer({ lang, isAdmin, onOpenBackoffice, onBecomeSeller }) {
+export default function Footer({ lang, isAdmin, onOpenBackoffice, onBecomeSeller, onOpenPrivacy }) {
   const tr = t(lang);
 
   return (
@@ -24,6 +24,11 @@ export default function Footer({ lang, isAdmin, onOpenBackoffice, onBecomeSeller
                 {tr('Devenir vendeur sur le marché', 'كن بائعا في السوق')}
               </button>
             </li>
+            <li>
+              <button type="button" onClick={onOpenPrivacy} className="text-ink-soft underline decoration-canvas-line underline-offset-4 hover:text-ink">
+                {tr('Confidentialité et conditions', 'الخصوصية والشروط')}
+              </button>
+            </li>
             {isAdmin && (
               <li>
                 <button type="button" onClick={onOpenBackoffice} className="text-ink-soft underline decoration-canvas-line underline-offset-4 hover:text-ink">
@@ -39,7 +44,7 @@ export default function Footer({ lang, isAdmin, onOpenBackoffice, onBecomeSeller
           <ul className="mt-3 space-y-2 text-ink-soft">
             <li>{tr('Guide du régime sans gluten, ATMC, décembre 2023', 'دليل الحمية بدون غلوتين، الجمعية، ديسمبر 2023')}</li>
             <li>
-              <a href="https://world.openfoodfacts.org" target="_blank" rel="noreferrer" className="underline decoration-canvas-line underline-offset-4 hover:text-ink">
+              <a href="https://world.openfoodfacts.org" target="_blank" rel="noopener noreferrer" className="underline decoration-canvas-line underline-offset-4 hover:text-ink">
                 Open Food Facts
               </a>
             </li>

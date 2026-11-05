@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Fuse from 'fuse.js';
 import { Search, X } from 'lucide-react';
 import { fetchAtmcProducts, fetchAtmcCategories, fetchAtmcStats } from '../services/api';
-import { t, statusKind, STATUS, StatusTile, PageHead, Spinner, Notice, EmptyState, FilterSheet } from './ui';
+import { t, statusKind, STATUS, StatusTile, PageHead, Notice, EmptyState, FilterSheet } from './ui';
 
 // Lowercase without accents, so "the" matches "Thé"
 const fold = (str) =>
@@ -104,7 +104,7 @@ export default function AtmcCatalog({ lang = 'fr' }) {
 
   const categoryList = (
     <div className="flex flex-col gap-0.5">
-      <CategoryButton active={selectedCategory === 'ALL'} onClick={() => setSelectedCategory('ALL')} label={tr('Tous les rayons', 'كل الأصناف')} count={products.length} />
+      <CategoryButton active={selectedCategory === 'ALL'} onClick={() => setSelectedCategory('ALL')} label={tr('Tous les rayons', 'كل الأصناف')} count={loading ? null : products.length} />
       {categories.map((cat) => (
         <CategoryButton
           key={cat._id}
@@ -122,8 +122,8 @@ export default function AtmcCatalog({ lang = 'fr' }) {
       <PageHead
         title={tr('Que puis-je manger ?', 'ماذا يمكنني أن آكل؟')}
         lede={tr(
-          'Les 241 produits vendus en Tunisie classés par l’Association Tunisienne de la Maladie Cœliaque, avec Mme Zeineb Ben Ameur, nutritionniste à La Rabta. Édition de décembre 2023.',
-          '241 منتجا متوفرا في تونس صنفتها الجمعية التونسية لمرضى الأبطن بالتعاون مع السيدة زينب بن عامر، أخصائية التغذية بمستشفى الرابطة. طبعة ديسمبر 2023.'
+          `${stats ? `Les ${stats.total} produits` : 'Les produits'} vendus en Tunisie classés par l’Association Tunisienne de la Maladie Cœliaque, avec Mme Zeineb Ben Ameur, nutritionniste à La Rabta. Édition de décembre 2023.`,
+          `${stats ? `${stats.total} منتجا متوفرا` : 'المنتجات المتوفرة'} في تونس صنفتها الجمعية التونسية لمرضى الأبطن بالتعاون مع السيدة زينب بن عامر، أخصائية التغذية بمستشفى الرابطة. طبعة ديسمبر 2023.`
         )}
       />
 
@@ -171,7 +171,7 @@ export default function AtmcCatalog({ lang = 'fr' }) {
               type="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={tr('Produit ou marque…', 'منتج أو علامة…')}
+              placeholder={tr('Rechercher…', 'ابحث…')}
               aria-label={tr('Rechercher dans le guide', 'ابحث في الدليل')}
               className="field h-12 pe-10 ps-11 text-base"
             />
@@ -203,7 +203,7 @@ export default function AtmcCatalog({ lang = 'fr' }) {
 
           <div className="flex items-center justify-between text-sm text-ink-soft">
             <span aria-live="polite">
-              {filteredProducts.length} {tr(filteredProducts.length > 1 ? 'produits' : 'produit', 'منتج')}
+              {loading ? tr('Chargement…', 'جاري التحميل…') : `${filteredProducts.length} ${tr(filteredProducts.length > 1 ? 'produits' : 'produit', 'منتج')}`}
             </span>
             {(searchQuery || selectedCategory !== 'ALL' || selectedStatus !== 'ALL') && (
               <button type="button" onClick={resetFilters} className="underline underline-offset-4 hover:text-ink">
@@ -213,7 +213,7 @@ export default function AtmcCatalog({ lang = 'fr' }) {
           </div>
 
           {loading ? (
-            <Spinner label={tr('Chargement du guide…', 'جاري تحميل الدليل…')} />
+            <ListSkeleton label={tr('Chargement du guide…', 'جاري تحميل الدليل…')} />
           ) : errorMsg ? (
             <Notice
               tone="error"
@@ -270,6 +270,23 @@ export default function AtmcCatalog({ lang = 'fr' }) {
   );
 }
 
+/** Grey rows in the shape of the list while it loads, instead of "0 produit" */
+function ListSkeleton({ label }) {
+  return (
+    <div role="status" aria-label={label} className="overflow-hidden rounded-2xl border border-white/70 bg-canvas-paper/80">
+      {Array.from({ length: 8 }, (_, i) => (
+        <div key={i} className="flex items-start gap-3.5 border-b border-canvas-line/40 px-4 py-4 last:border-0" aria-hidden="true">
+          <span className="h-6 w-6 shrink-0 animate-pulse rounded-tile bg-canvas-sunk" />
+          <span className="flex-1 space-y-2">
+            <span className="block h-3.5 animate-pulse rounded bg-canvas-sunk" style={{ width: `${55 + ((i * 37) % 35)}%` }} />
+            <span className="block h-3 w-24 animate-pulse rounded bg-canvas-sunk/70" />
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function CategoryButton({ active, onClick, label, count }) {
   return (
     <button
@@ -282,7 +299,7 @@ function CategoryButton({ active, onClick, label, count }) {
       }`}
     >
       <span>{label}</span>
-      <span className={`tabular-nums ${active ? 'text-canvas-paper/80' : 'text-ink-faint'}`}>{count}</span>
+      {count != null && <span className={`tabular-nums ${active ? 'text-canvas-paper/80' : 'text-ink-faint'}`}>{count}</span>}
     </button>
   );
 }

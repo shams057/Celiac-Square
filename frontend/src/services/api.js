@@ -61,7 +61,7 @@ export const deleteSpot = (id) =>
 export const toggleSpotVerification = (id, isVerified) =>
   adminRequest({ method: 'patch', url: `${API_BASE}/map/spots/${id}/verify`, data: { isVerified } });
 
-// sources: 'local' (MongoDB, instant), 'off' (Open Food Facts, slow and rate limited) or 'all'
+// sources: 'local' (the Tunisian guides, instant), 'off' (Open Food Facts, slow and rate limited) or 'all'
 export const searchProducts = async (query = '', sources = 'all') => {
   const res = await axios.get(`${API_BASE}/products/search?q=${encodeURIComponent(query)}&sources=${sources}`);
   return res.data;
@@ -116,6 +116,12 @@ export const logOut = async () => (await axios.post(`${API_BASE}/auth/logout`)).
 
 export const fetchMe = async () => (await axios.get(`${API_BASE}/auth/me`)).data;
 
+export const requestPasswordReset = async (email) =>
+  (await axios.post(`${API_BASE}/auth/forgot`, { email }, { skipAuth: true })).data;
+
+export const resetPassword = async ({ accessToken, password }) =>
+  (await axios.post(`${API_BASE}/auth/reset`, { accessToken, password }, { skipAuth: true })).data;
+
 // Marketplace (signed-in accounts) ------------------------------------------
 
 export const fetchStores = async (type = 'ALL') => (await axios.get(`${API_BASE}/market/stores`, { params: { type } })).data;
@@ -160,3 +166,12 @@ export const fetchAdminStores = () => adminRequest({ method: 'get', url: `${API_
 
 export const setStoreActive = (id, isActive) =>
   adminRequest({ method: 'patch', url: `${API_BASE}/admin/stores/${id}`, data: { isActive } });
+
+export const fetchAuditLog = () => adminRequest({ method: 'get', url: `${API_BASE}/admin/audit-log` });
+
+/** The message to show for a failed request: the API's own message for 4xx, a fallback otherwise */
+export const errorMessage = (err, fallback) => {
+  const status = err?.response?.status;
+  const message = err?.response?.data?.message;
+  return status && status < 500 && typeof message === 'string' && message ? message : fallback;
+};

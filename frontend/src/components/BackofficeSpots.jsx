@@ -10,6 +10,7 @@ import {
   fetchProposals,
   approveProposal,
   rejectProposal,
+  errorMessage,
 } from '../services/api';
 import { t, PageHead, Spinner, Notice, EmptyState, Modal, SPOT_CATEGORIES, spotCategory } from './ui';
 
@@ -34,8 +35,6 @@ const EMPTY_SPOT_FORM = {
   phone: '',
   speciality: '',
   hours: '',
-  rating: 4.8,
-  reviewCount: 1,
   isVerified: true,
   notes: '',
   submittedBy: 'Backoffice Admin',
@@ -119,7 +118,8 @@ export default function BackofficeSpots({ lang = 'fr' }) {
 
   // Approving goes through the full form so the admin can set the exact position
   const handleOpenApprove = (proposal) => {
-    const coords = proposal.coordinates?.length === 2 ? proposal.coordinates : [10.1815, 36.8065];
+    // Proposals usually come without a position: the fields stay empty so the admin must set the real one
+    const coords = proposal.coordinates?.length === 2 ? proposal.coordinates : ['', ''];
     setModalMode('approve');
     setEditingId(proposal._id);
     setFormError('');
@@ -152,7 +152,7 @@ export default function BackofficeSpots({ lang = 'fr' }) {
         loadProposals();
       }
     } catch (err) {
-      showToast(err.response?.data?.message || tr('Le refus n’a pas été enregistré.', 'لم يتم تسجيل الرفض.'), 'error');
+      showToast(errorMessage(err, tr('Le refus n’a pas été enregistré.', 'لم يتم تسجيل الرفض.')), 'error');
     } finally {
       setIsRejecting(false);
     }
@@ -195,8 +195,6 @@ export default function BackofficeSpots({ lang = 'fr' }) {
       phone: spot.phone || '',
       speciality: spot.speciality || '',
       hours: spot.hours || '',
-      rating: spot.rating ?? 4.8,
-      reviewCount: spot.reviewCount ?? 1,
       isVerified: Boolean(spot.isVerified),
       notes: spot.notes || '',
       submittedBy: spot.submittedBy || 'Backoffice Admin',
@@ -208,8 +206,8 @@ export default function BackofficeSpots({ lang = 'fr' }) {
     e.preventDefault();
     const lng = parseFloat(formData.longitude);
     const lat = parseFloat(formData.latitude);
-    if (Number.isNaN(lng) || Number.isNaN(lat)) {
-      setFormError(tr('Saisissez une latitude et une longitude valides.', 'أدخل خط عرض وخط طول صحيحين.'));
+    if (Number.isNaN(lng) || Number.isNaN(lat) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+      setFormError(tr('Saisissez la latitude et la longitude exactes du lieu (clic droit sur Google Maps → coordonnées).', 'أدخل خط العرض وخط الطول الدقيقين للمكان.'));
       return;
     }
     setFormSubmitting(true);
@@ -223,8 +221,6 @@ export default function BackofficeSpots({ lang = 'fr' }) {
       phone: formData.phone.trim(),
       speciality: formData.speciality.trim(),
       hours: formData.hours.trim(),
-      rating: Number(formData.rating) || 4.8,
-      reviewCount: Number(formData.reviewCount) || 1,
       isVerified: Boolean(formData.isVerified),
       notes: formData.notes.trim(),
       submittedBy: formData.submittedBy.trim(),
@@ -250,7 +246,7 @@ export default function BackofficeSpots({ lang = 'fr' }) {
         setFormError(res?.message || tr('L’enregistrement a échoué.', 'فشل الحفظ.'));
       }
     } catch (err) {
-      setFormError(err.response?.data?.message || tr('Le serveur ne répond pas. Réessayez.', 'الخادم لا يستجيب. أعد المحاولة.'));
+      setFormError(errorMessage(err, tr('Le serveur ne répond pas. Réessayez.', 'الخادم لا يستجيب. أعد المحاولة.')));
     } finally {
       setFormSubmitting(false);
     }
@@ -537,7 +533,7 @@ export default function BackofficeSpots({ lang = 'fr' }) {
 
           <div>
             <label htmlFor="bo-name" className="field-label">{tr('Nom', 'الاسم')}</label>
-            <input id="bo-name" required value={formData.name} onChange={set('name')} className="field" />
+            <input id="bo-name" maxLength={120} required value={formData.name} onChange={set('name')} className="field" />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -553,17 +549,22 @@ export default function BackofficeSpots({ lang = 'fr' }) {
             </div>
             <div>
               <label htmlFor="bo-city" className="field-label">{tr('Ville', 'المدينة')}</label>
-              <input id="bo-city" required value={formData.city} onChange={set('city')} className="field" />
+              <input id="bo-city" maxLength={80} required value={formData.city} onChange={set('city')} className="field" />
             </div>
           </div>
 
           <div>
             <label htmlFor="bo-address" className="field-label">{tr('Adresse', 'العنوان')}</label>
-            <input id="bo-address" required value={formData.address} onChange={set('address')} className="field" />
+            <input id="bo-address" maxLength={200} required value={formData.address} onChange={set('address')} className="field" />
           </div>
 
           <fieldset className="rounded-lg border border-canvas-line p-4">
             <legend className="px-1 text-sm font-medium">{tr('Position sur la carte', 'الموقع على الخريطة')}</legend>
+            {modalMode === 'approve' && (formData.latitude === '' || formData.longitude === '') && (
+              <p className="mb-3 text-sm text-status-warning-ink">
+                {tr('La personne n’a pas indiqué de position : saisissez celle du lieu avant de publier.', 'لم يحدد صاحب الاقتراح الموقع: أدخل موقع المكان قبل النشر.')}
+              </p>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="bo-lat" className="field-label">Latitude</label>
@@ -599,32 +600,22 @@ export default function BackofficeSpots({ lang = 'fr' }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="bo-phone" className="field-label">{tr('Téléphone', 'الهاتف')}</label>
-              <input id="bo-phone" type="tel" dir="ltr" value={formData.phone} onChange={set('phone')} className="field" />
+              <input id="bo-phone" maxLength={30} type="tel" dir="ltr" value={formData.phone} onChange={set('phone')} className="field" />
             </div>
             <div>
               <label htmlFor="bo-speciality" className="field-label">{tr('Spécialité', 'الاختصاص')}</label>
-              <input id="bo-speciality" value={formData.speciality} onChange={set('speciality')} className="field" />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-[2fr_1fr_1fr]">
-            <div>
-              <label htmlFor="bo-hours" className="field-label">{tr('Horaires', 'التوقيت')}</label>
-              <input id="bo-hours" value={formData.hours} onChange={set('hours')} className="field" />
-            </div>
-            <div>
-              <label htmlFor="bo-rating" className="field-label">{tr('Note sur 5', 'التقييم من 5')}</label>
-              <input id="bo-rating" type="number" step="0.1" min="1" max="5" value={formData.rating} onChange={set('rating')} className="field tabular-nums" />
-            </div>
-            <div>
-              <label htmlFor="bo-reviews" className="field-label">{tr('Avis', 'الآراء')}</label>
-              <input id="bo-reviews" type="number" min="0" value={formData.reviewCount} onChange={set('reviewCount')} className="field tabular-nums" />
+              <input id="bo-speciality" maxLength={120} value={formData.speciality} onChange={set('speciality')} className="field" />
             </div>
           </div>
 
           <div>
+            <label htmlFor="bo-hours" className="field-label">{tr('Horaires', 'التوقيت')}</label>
+            <input id="bo-hours" maxLength={120} value={formData.hours} onChange={set('hours')} className="field" />
+          </div>
+
+          <div>
             <label htmlFor="bo-notes" className="field-label">{tr('Précautions contre la contamination', 'احتياطات ضد التلوث')}</label>
-            <textarea id="bo-notes" rows={3} value={formData.notes} onChange={set('notes')} className="field" />
+            <textarea id="bo-notes" maxLength={1000} rows={3} value={formData.notes} onChange={set('notes')} className="field" />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 sm:items-end">
@@ -639,7 +630,7 @@ export default function BackofficeSpots({ lang = 'fr' }) {
             </label>
             <div>
               <label htmlFor="bo-author" className="field-label">{tr('Proposée par', 'اقترحها')}</label>
-              <input id="bo-author" value={formData.submittedBy} onChange={set('submittedBy')} className="field" />
+              <input id="bo-author" maxLength={80} value={formData.submittedBy} onChange={set('submittedBy')} className="field" />
             </div>
           </div>
 

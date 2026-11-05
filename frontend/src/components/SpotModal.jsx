@@ -1,34 +1,24 @@
 import React, { useState } from 'react';
-import { submitSpot } from '../services/api';
+import { submitSpot, errorMessage } from '../services/api';
 import { t, Modal, Notice, SPOT_CATEGORIES } from './ui';
 
-const CITY_COORDINATES = {
-  Tunis: [10.1815, 36.8065],
-  Ariana: [10.1972, 36.8522],
-  'La Marsa': [10.3236, 36.8781],
-  Sousse: [10.6369, 35.8256],
-  Sfax: [10.7602, 34.7405],
-  Bizerte: [9.8739, 37.2744],
-  Nabeul: [10.7329, 36.4561],
-  Monastir: [10.8261, 35.7779],
-  Djerba: [10.8573, 33.875],
-  Kairouan: [10.0963, 35.6781],
-  Gabès: [10.1005, 33.8815],
-};
+// Suggestions only: any town can be typed. The team sets the exact map position before publishing.
+const CITY_SUGGESTIONS = ['Tunis', 'Ariana', 'Ben Arous', 'La Marsa', 'Sousse', 'Sfax', 'Bizerte', 'Nabeul', 'Hammamet', 'Monastir', 'Mahdia', 'Djerba', 'Kairouan', 'Gabès', 'Gafsa', 'Tozeur', 'Béja', 'Jendouba', 'Le Kef', 'Médenine'];
 
 const EMPTY_FORM = {
   name: '',
   category: 'ARTISAN',
-  city: 'Tunis',
+  city: '',
   address: '',
   phone: '',
   speciality: '',
   hours: '',
   notes: '',
   submittedBy: '',
+  website: '', // honeypot: hidden from people, filled in by bots
 };
 
-export default function SpotModal({ isOpen, onClose, onSuccess, lang }) {
+export default function SpotModal({ isOpen, onClose, lang }) {
   const tr = t(lang);
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(false);
@@ -51,20 +41,15 @@ export default function SpotModal({ isOpen, onClose, onSuccess, lang }) {
     setLoading(true);
     setErrorMsg('');
     try {
-      // Without a map picker, place the spot near its city centre
-      const [lng, lat] = CITY_COORDINATES[formData.city] || CITY_COORDINATES.Tunis;
-      const res = await submitSpot({
-        ...formData,
-        coordinates: [lng + (Math.random() - 0.5) * 0.02, lat + (Math.random() - 0.5) * 0.02],
-      });
+      // No coordinates are sent: the team places the spot on the map when it checks the address
+      const res = await submitSpot(formData);
       if (res?.success) {
         setSent(true);
-        onSuccess?.();
       } else {
         setErrorMsg(res?.message || tr('L’adresse n’a pas été envoyée.', 'لم يتم إرسال العنوان.'));
       }
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || tr('L’adresse n’a pas été envoyée. Vérifiez votre connexion.', 'لم يتم إرسال العنوان. تحقق من الاتصال.'));
+      setErrorMsg(errorMessage(err, tr('L’adresse n’a pas été envoyée. Vérifiez votre connexion.', 'لم يتم إرسال العنوان. تحقق من الاتصال.')));
     } finally {
       setLoading(false);
     }
@@ -96,7 +81,7 @@ export default function SpotModal({ isOpen, onClose, onSuccess, lang }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="spot-name" className="field-label">{tr('Nom du lieu ou du médecin', 'اسم المكان أو الطبيب')}</label>
-              <input id="spot-name" required value={formData.name} onChange={set('name')} placeholder={tr('Boulangerie Épi d’Or', 'مخبزة السنبلة')} className="field" />
+              <input id="spot-name" required maxLength={120} value={formData.name} onChange={set('name')} placeholder={tr('Boulangerie Épi d’Or', 'مخبزة السنبلة')} className="field" />
             </div>
             <div>
               <label htmlFor="spot-category" className="field-label">{tr('Type de lieu', 'نوع المكان')}</label>
@@ -113,44 +98,48 @@ export default function SpotModal({ isOpen, onClose, onSuccess, lang }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="spot-city" className="field-label">{tr('Ville', 'المدينة')}</label>
-              <select id="spot-city" value={formData.city} onChange={set('city')} className="field">
-                {Object.keys(CITY_COORDINATES).map((city) => (
-                  <option key={city} value={city}>
-                    {city}
-                  </option>
+              <input id="spot-city" required list="spot-city-suggestions" value={formData.city} onChange={set('city')} maxLength={80} autoComplete="address-level2" className="field" />
+              <datalist id="spot-city-suggestions">
+                {CITY_SUGGESTIONS.map((city) => (
+                  <option key={city} value={city} />
                 ))}
-              </select>
+              </datalist>
             </div>
             <div>
               <label htmlFor="spot-phone" className="field-label">{tr('Téléphone (facultatif)', 'الهاتف (اختياري)')}</label>
-              <input id="spot-phone" type="tel" dir="ltr" value={formData.phone} onChange={set('phone')} placeholder="+216 71 000 000" className="field" />
+              <input id="spot-phone" type="tel" dir="ltr" maxLength={30} value={formData.phone} onChange={set('phone')} placeholder="+216 71 000 000" className="field" />
             </div>
           </div>
 
           <div>
             <label htmlFor="spot-address" className="field-label">{tr('Adresse', 'العنوان')}</label>
-            <input id="spot-address" required value={formData.address} onChange={set('address')} placeholder={tr('12 rue Habib Bourguiba, La Marsa', '12 نهج الحبيب بورقيبة، المرسى')} className="field" />
+            <input id="spot-address" required maxLength={200} autoComplete="street-address" value={formData.address} onChange={set('address')} placeholder={tr('12 rue Habib Bourguiba, La Marsa', '12 نهج الحبيب بورقيبة، المرسى')} className="field" />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="spot-speciality" className="field-label">{tr('Ce qu’on y trouve (facultatif)', 'ماذا يوجد هناك (اختياري)')}</label>
-              <input id="spot-speciality" value={formData.speciality} onChange={set('speciality')} placeholder={tr('Pain, malsouka, pizzas', 'خبز، ملسوقة، بيتزا')} className="field" />
+              <input id="spot-speciality" maxLength={120} value={formData.speciality} onChange={set('speciality')} placeholder={tr('Pain, malsouka, pizzas', 'خبز، ملسوقة، بيتزا')} className="field" />
             </div>
             <div>
               <label htmlFor="spot-hours" className="field-label">{tr('Horaires (facultatif)', 'التوقيت (اختياري)')}</label>
-              <input id="spot-hours" value={formData.hours} onChange={set('hours')} placeholder={tr('Lun–sam, 8 h–19 h 30', 'الاثنين–السبت، 8–19:30')} className="field" />
+              <input id="spot-hours" maxLength={120} value={formData.hours} onChange={set('hours')} placeholder={tr('Lun–sam, 8 h–19 h 30', 'الاثنين–السبت، 8–19:30')} className="field" />
             </div>
           </div>
 
           <div>
             <label htmlFor="spot-notes" className="field-label">{tr('Précautions contre la contamination (facultatif)', 'احتياطات ضد التلوث (اختياري)')}</label>
-            <textarea id="spot-notes" rows="3" value={formData.notes} onChange={set('notes')} placeholder={tr('Four dédié, cuisine séparée…', 'فرن مخصص، مطبخ منفصل…')} className="field" />
+            <textarea id="spot-notes" rows="3" maxLength={1000} value={formData.notes} onChange={set('notes')} placeholder={tr('Four dédié, cuisine séparée…', 'فرن مخصص، مطبخ منفصل…')} className="field" />
           </div>
 
           <div>
             <label htmlFor="spot-author" className="field-label">{tr('Votre prénom (facultatif)', 'اسمك (اختياري)')}</label>
-            <input id="spot-author" value={formData.submittedBy} onChange={set('submittedBy')} className="field" />
+            <input id="spot-author" maxLength={80} value={formData.submittedBy} onChange={set('submittedBy')} autoComplete="given-name" className="field" />
+          </div>
+
+          <div aria-hidden="true" className="absolute -start-[9999px] h-px w-px overflow-hidden">
+            <label htmlFor="spot-website">Website</label>
+            <input id="spot-website" tabIndex={-1} autoComplete="off" value={formData.website} onChange={set('website')} />
           </div>
 
           <div className="flex flex-col-reverse gap-2 border-t border-canvas-line pt-4 sm:flex-row sm:justify-end">

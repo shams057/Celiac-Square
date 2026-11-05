@@ -6,7 +6,7 @@ export default {
       colors: {
         primary: {
           DEFAULT: '#8BA850', // Sage Olive Green
-          dark: '#4E6127', // text-safe olive on sand
+          dark: '#45561E', // text-safe olive on sand
           tint: '#C9D3A6',
         },
         secondary: {
@@ -15,7 +15,7 @@ export default {
         },
         accent: {
           DEFAULT: '#FF8A41', // Vibrant Orange (CTA, carries ink text)
-          dark: '#9A4510', // text-safe orange on sand
+          dark: '#863B0D', // text-safe orange on sand
           tint: '#F6C29C',
         },
         canvas: {
@@ -28,15 +28,15 @@ export default {
         ink: {
           DEFAULT: '#2F261D',
           soft: '#584A3B',
-          faint: '#7A6A58',
+          faint: '#63543F', // ≥ 4.5:1 on every canvas tone (WCAG AA)
         },
         status: {
           safe: '#8BA850',
-          'safe-ink': '#4E6127',
+          'safe-ink': '#45561E',
           warning: '#FF8A41',
-          'warning-ink': '#9A4510',
-          unsafe: '#D9534F',
-          'unsafe-ink': '#A3302C',
+          'warning-ink': '#863B0D',
+          unsafe: '#C9423D', // white text on it ≥ 4.5:1
+          'unsafe-ink': '#922825',
         },
       },
       fontFamily: {

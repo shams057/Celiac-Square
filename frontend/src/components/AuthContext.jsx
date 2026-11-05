@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { fetchMe, logOut } from '../services/api';
-import { getSession, saveAuthResponse, setSession, SESSION_EVENT } from '../services/session';
+import { getUser, hasSession, refresh, saveAuthResponse, setSession, updateUser, SESSION_EVENT } from '../services/session';
 
 const AuthContext = createContext(null);
 
@@ -9,28 +9,29 @@ const AuthContext = createContext(null);
  * Roles: ADMIN, SELLER, CLIENT.
  */
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => getSession()?.user || null);
+  const [user, setUser] = useState(getUser);
 
   useEffect(() => {
-    const sync = () => setUser(getSession()?.user || null);
+    const sync = () => setUser(getUser());
     window.addEventListener(SESSION_EVENT, sync);
     return () => window.removeEventListener(SESSION_EVENT, sync);
   }, []);
 
   // The role can change while signed out (a seller request approved, say): reload it
   const refreshUser = useCallback(async () => {
-    if (!getSession()) return;
+    if (!hasSession()) return;
     try {
       const res = await fetchMe();
-      if (res?.user && getSession()) setSession({ ...getSession(), user: res.user });
+      if (res?.user) updateUser(res.user);
     } catch {
       // A dead session is cleared by services/session.js
     }
   }, []);
 
+  // After a reload only the hint is known: the session cookie gives a fresh access token and account
   useEffect(() => {
-    refreshUser();
-  }, [refreshUser]);
+    if (hasSession()) refresh();
+  }, []);
 
   const signIn = useCallback((authResponse) => saveAuthResponse(authResponse), []);
 

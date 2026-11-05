@@ -1,9 +1,9 @@
-import express from 'express';
 import { matchProductsFromText } from '../services/productMatcher.js';
 import { foldText } from '../utils/regex.js';
+import { asyncRouter } from '../utils/http.js';
 import { analyzeIngredientsText, isIngredientsAiConfigured } from '../services/visionService.js';
 
-const router = express.Router();
+const router = asyncRouter();
 
 // The photo shows an ingredients list rather than the front of the package.
 // Tested on accent-folded text: OCR returns "É" as "E" + a combining accent.
@@ -17,7 +17,8 @@ const CONFIRM_BELOW = 0.7;
  * Body: { text } — text read from the package by OCR in the browser.
  * Returns the best matching product from the Tunisian guides.
  */
-router.post('/match', express.json({ limit: '50kb' }), async (req, res) => {
+// Bodies are limited to 50 kB by the parser mounted for /api/vision in app.js
+router.post('/match', async (req, res) => {
   try {
     const text = typeof req.body?.text === 'string' ? req.body.text.slice(0, 5000) : '';
     if (!text.trim()) {
@@ -58,7 +59,7 @@ router.post('/match', express.json({ limit: '50kb' }), async (req, res) => {
  * Body: { text } — the ingredients list read from the photo by OCR in the browser.
  * Gemini estimates whether the product contains gluten.
  */
-router.post('/ingredients', express.json({ limit: '50kb' }), async (req, res) => {
+router.post('/ingredients', async (req, res) => {
   const text = typeof req.body?.text === 'string' ? req.body.text.trim().slice(0, 4000) : '';
   if (!text) {
     return res.status(400).json({ success: false, message: 'Aucun texte d’ingrédients n’a été lu sur la photo.' });

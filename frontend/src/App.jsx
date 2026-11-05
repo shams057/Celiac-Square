@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import Navbar from './components/Navbar';
 import VisionScanner from './components/VisionScanner';
@@ -7,15 +7,55 @@ import AtmcCatalog from './components/AtmcCatalog';
 import TunisiaMap from './components/TunisiaMap';
 import Marketplace from './components/Marketplace';
 import AuthPanel from './components/AuthPanel';
+import ResetPassword from './components/ResetPassword';
 import SellerDashboard from './components/SellerDashboard';
 import BecomeSeller from './components/BecomeSeller';
 import Backoffice from './components/Backoffice';
+import Privacy from './components/Privacy';
 import SpotModal from './components/SpotModal';
 import Footer from './components/Footer';
 import { AuthProvider, useAuth } from './components/AuthContext';
+import { navigate, pathFor, useRoute } from './services/router';
 
 // Dock tabs first, then pages reached from the account menu and the footer
-const TAB_ORDER = ['atmc', 'vision', 'search', 'map', 'market', 'account', 'seller', 'become-seller', 'backoffice'];
+const TAB_ORDER = ['atmc', 'vision', 'search', 'map', 'market', 'account', 'reset-password', 'seller', 'become-seller', 'backoffice', 'privacy'];
+
+const PAGE_TITLES = {
+  atmc: ['Guide ATMC', 'دليل الجمعية'],
+  vision: ['Scanner un produit', 'امسح منتجا'],
+  search: ['Rechercher un produit', 'ابحث عن منتج'],
+  map: ['Carte des adresses', 'خريطة العناوين'],
+  market: ['Marché sans gluten', 'سوق بدون غلوتين'],
+  account: ['Mon compte', 'حسابي'],
+  'reset-password': ['Nouveau mot de passe', 'كلمة مرور جديدة'],
+  seller: ['Ma boutique', 'محلي'],
+  'become-seller': ['Devenir vendeur', 'كن بائعا'],
+  backoffice: ['Back-office', 'فضاء الإدارة'],
+  privacy: ['Confidentialité', 'الخصوصية'],
+};
+
+const SITE = {
+  fr: { name: 'Celiac Square', tagline: 'Manger sans gluten en Tunisie', description: 'Le guide ATMC des produits sans gluten, un scanner de produits et la carte des adresses sûres pour les cœliaques en Tunisie.' },
+  ar: { name: 'Celiac Square', tagline: 'الأكل بدون غلوتين في تونس', description: 'دليل الجمعية للمنتجات بدون غلوتين، ماسح للمنتجات وخريطة العناوين الموثوقة لمرضى الأبطن في تونس.' },
+};
+
+const LANG_KEY = 'celiac-square-lang';
+
+// The saved choice, otherwise the browser's language (Arabic or French)
+const initialLang = () => {
+  try {
+    const saved = localStorage.getItem(LANG_KEY);
+    if (saved === 'fr' || saved === 'ar') return saved;
+  } catch {
+    // storage unavailable
+  }
+  return (navigator.languages || [navigator.language]).some((l) => String(l).toLowerCase().startsWith('ar')) ? 'ar' : 'fr';
+};
+
+const setMeta = (selector, value) => {
+  const el = document.head.querySelector(selector);
+  if (el) el.setAttribute('content', value);
+};
 
 export default function App() {
   return (
@@ -27,30 +67,94 @@ export default function App() {
 
 function AppShell() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('atmc');
-  const [searchInitialQuery, setSearchInitialQuery] = useState('');
+  const route = useRoute();
+  const activeTab = route.tab;
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
-  const [mapRefreshKey, setMapRefreshKey] = useState(0);
-  const [lang, setLang] = useState('fr');
+  const [lang, setLangState] = useState(initialLang);
+  const [slide, setSlide] = useState('');
+  const previousTab = useRef(activeTab);
+  const firstRender = useRef(true);
+  const mainRef = useRef(null);
 
+  const setLang = (next) => {
+    setLangState(next);
+    try {
+      localStorage.setItem(LANG_KEY, next);
+    } catch {
+      // storage unavailable
+    }
+  };
+
+  // Document language, direction, title and description follow the page and the language
   useEffect(() => {
+    const site = SITE[lang];
+    const [fr, ar] = PAGE_TITLES[activeTab] || PAGE_TITLES.atmc;
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
-  }, [lang]);
+    document.title = activeTab === 'atmc' ? `${site.name} — ${site.tagline}` : `${lang === 'ar' ? ar : fr} · ${site.name}`;
+    setMeta('meta[name="description"]', site.description);
+    setMeta('meta[property="og:title"]', `${site.name} — ${site.tagline}`);
+    setMeta('meta[property="og:description"]', site.description);
+    setMeta('meta[property="og:locale"]', lang === 'ar' ? 'ar_TN' : 'fr_TN');
+  }, [lang, activeTab]);
 
-  // Slide direction follows the tab order: a tab further along slides in from the end side
-  const [slide, setSlide] = useState('');
-  const goTo = (tab) => {
-    if (tab === activeTab) return;
-    setSlide(TAB_ORDER.indexOf(tab) > TAB_ORDER.indexOf(activeTab) ? 'animate-page-from-end' : 'animate-page-from-start');
-    setActiveTab(tab);
+  // Slide direction follows the tab order; focus moves to the new page's heading for screen readers
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    if (previousTab.current !== activeTab) {
+      setSlide(TAB_ORDER.indexOf(activeTab) > TAB_ORDER.indexOf(previousTab.current) ? 'animate-page-from-end' : 'animate-page-from-start');
+      previousTab.current = activeTab;
+    }
     window.scrollTo({ top: 0 });
-  };
+    requestAnimationFrame(() => {
+      const heading = mainRef.current?.querySelector('h1');
+      if (heading) {
+        heading.setAttribute('tabindex', '-1');
+        heading.focus({ preventScroll: true });
+      }
+    });
+  }, [activeTab, route.params.storeId]);
 
-  const handleSwitchToSearch = (query) => {
-    setSearchInitialQuery(query);
-    goTo('search');
-  };
+  const goTo = (tab, options) => navigate(pathFor(tab, options));
+
+  const handleSwitchToSearch = (query) => goTo('search', { query: query ? { q: query } : undefined });
+
+  const page = (() => {
+    switch (activeTab) {
+      case 'vision':
+        return <VisionScanner onSwitchToSearch={handleSwitchToSearch} lang={lang} />;
+      case 'search':
+        return <ProductSearch initialQuery={route.query.q || ''} lang={lang} />;
+      case 'map':
+        return <TunisiaMap onOpenSubmitModal={() => setIsSubmitModalOpen(true)} lang={lang} />;
+      case 'market':
+        return (
+          <Marketplace
+            lang={lang}
+            storeId={route.params.storeId || null}
+            onOpenStore={(id) => goTo('market', { storeId: id })}
+            onCloseStore={() => goTo('market')}
+          />
+        );
+      case 'account':
+        return <AuthPanel lang={lang} onDone={() => goTo('market')} />;
+      case 'reset-password':
+        return <ResetPassword lang={lang} onDone={() => goTo('account')} />;
+      case 'seller':
+        return user ? <SellerDashboard lang={lang} /> : <AuthPanel lang={lang} />;
+      case 'become-seller':
+        return <BecomeSeller lang={lang} onOpenShop={() => goTo('seller')} />;
+      case 'backoffice':
+        return <Backoffice lang={lang} />;
+      case 'privacy':
+        return <Privacy lang={lang} />;
+      default:
+        return <AtmcCatalog lang={lang} />;
+    }
+  })();
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -58,42 +162,22 @@ function AppShell() {
         {lang === 'ar' ? 'انتقل إلى المحتوى' : 'Aller au contenu'}
       </a>
 
-      <Navbar
-        activeTab={activeTab}
-        setActiveTab={goTo}
-        onOpenSubmitModal={() => setIsSubmitModalOpen(true)}
-        lang={lang}
-        setLang={setLang}
-      />
+      <Navbar activeTab={activeTab} setActiveTab={goTo} onOpenSubmitModal={() => setIsSubmitModalOpen(true)} lang={lang} setLang={setLang} />
 
-      <main id="main" className="mx-auto w-full max-w-6xl flex-1 overflow-x-clip px-4 pb-32 pt-6 sm:px-6 sm:pt-10">
+      <main id="main" ref={mainRef} className="mx-auto w-full max-w-6xl flex-1 overflow-x-clip px-4 pb-32 pt-6 sm:px-6 sm:pt-10">
         <div key={activeTab} className={slide}>
-        {activeTab === 'atmc' && <AtmcCatalog lang={lang} />}
-        {activeTab === 'vision' && <VisionScanner onSwitchToSearch={handleSwitchToSearch} lang={lang} />}
-        {activeTab === 'search' && <ProductSearch initialQuery={searchInitialQuery} lang={lang} />}
-        {activeTab === 'map' && (
-          <TunisiaMap key={mapRefreshKey} onOpenSubmitModal={() => setIsSubmitModalOpen(true)} lang={lang} />
-        )}
-        {activeTab === 'market' && <Marketplace lang={lang} />}
-        {activeTab === 'account' && <AuthPanel lang={lang} onDone={() => goTo('market')} />}
-        {activeTab === 'seller' && (user ? <SellerDashboard lang={lang} /> : <AuthPanel lang={lang} />)}
-        {activeTab === 'become-seller' && <BecomeSeller lang={lang} onOpenShop={() => goTo('seller')} />}
-        {activeTab === 'backoffice' && <Backoffice lang={lang} />}
+          {page}
         </div>
       </main>
 
-      <SpotModal
-        isOpen={isSubmitModalOpen}
-        onClose={() => setIsSubmitModalOpen(false)}
-        onSuccess={() => setMapRefreshKey((k) => k + 1)}
-        lang={lang}
-      />
+      <SpotModal isOpen={isSubmitModalOpen} onClose={() => setIsSubmitModalOpen(false)} lang={lang} />
 
       <Footer
         lang={lang}
         isAdmin={user?.role === 'ADMIN'}
         onOpenBackoffice={() => goTo('backoffice')}
         onBecomeSeller={() => goTo('become-seller')}
+        onOpenPrivacy={() => goTo('privacy')}
       />
       <Analytics />
     </div>

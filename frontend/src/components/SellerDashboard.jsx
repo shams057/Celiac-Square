@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Plus, Pencil, Trash2, ImagePlus, X, EyeOff, Store } from 'lucide-react';
-import { fetchMyStore, saveMyStore, createMyProduct, updateMyProduct, deleteMyProduct } from '../services/api';
+import { fetchMyStore, saveMyStore, createMyProduct, updateMyProduct, deleteMyProduct, errorMessage } from '../services/api';
 import { resizeImage } from '../services/images';
 import { t, PageHead, Spinner, Notice, EmptyState, Modal, STORE_TYPES, storeType, formatPrice, StoreLogo } from './ui';
 
 const MAX_IMAGES = 5;
 const EMPTY_PRODUCT = { title: '', description: '', price: '', images: [], isAvailable: true };
 
-const errorText = (err, fallback) => err.response?.data?.message || fallback;
+const errorText = errorMessage;
 
 /** A seller's own shop: its profile and the products it sells */
 export default function SellerDashboard({ lang }) {
@@ -72,8 +72,17 @@ export default function SellerDashboard({ lang }) {
   }
 
   const type = storeType(store.type);
+  const locked = !store.isActive; // suspended by the team: read-only
   return (
     <div className="space-y-6">
+      {locked && (
+        <Notice tone="error" title={tr('Votre boutique est suspendue par l’équipe.', 'محلك موقوف من الفريق.')}>
+          {tr(
+            'Elle n’apparaît plus sur le marché et vous ne pouvez pas la modifier pour le moment. Contactez l’équipe pour en savoir plus.',
+            'لم يعد ظاهرا في السوق ولا يمكنك تعديله حاليا. اتصل بالفريق لمعرفة المزيد.'
+          )}
+        </Notice>
+      )}
       {toast && (
         <div role="status" className="fixed bottom-28 left-1/2 z-[1100] -translate-x-1/2 animate-fade-in rounded-full bg-ink px-4 py-3 text-sm font-medium text-canvas-paper shadow-lg">
           {toast}
@@ -87,7 +96,7 @@ export default function SellerDashboard({ lang }) {
           `${store.products.length} منتج. يرى الأعضاء منتجاتك المتوفرة في السوق.`
         )}
         action={
-          <button type="button" className="btn-primary" onClick={() => setProduct({})}>
+          <button type="button" className="btn-primary" onClick={() => setProduct({})} disabled={locked}>
             <Plus className="h-4 w-4" />
             {tr('Ajouter un produit', 'أضف منتجا')}
           </button>
@@ -102,9 +111,9 @@ export default function SellerDashboard({ lang }) {
             {tr(type.fr, type.ar)}
             {store.city ? ` · ${store.city}` : ''}
           </p>
-          {!store.isActive && <p className="mt-1 text-sm font-medium text-status-unsafe-ink">{tr('Boutique suspendue par l’équipe : elle n’est pas visible.', 'المحل موقوف من الفريق: غير ظاهر.')}</p>}
+          {locked && <p className="mt-1 text-sm font-medium text-status-unsafe-ink">{tr('Boutique suspendue par l’équipe : elle n’est pas visible.', 'المحل موقوف من الفريق: غير ظاهر.')}</p>}
         </div>
-        <button type="button" className="btn-quiet shrink-0" onClick={() => setEditingStore(true)}>
+        <button type="button" className="btn-quiet shrink-0" onClick={() => setEditingStore(true)} disabled={locked} aria-label={tr('Modifier la boutique', 'تعديل المحل')}>
           <Pencil className="h-4 w-4" />
           <span className="hidden sm:inline">{tr('Modifier', 'تعديل')}</span>
         </button>
@@ -113,7 +122,7 @@ export default function SellerDashboard({ lang }) {
       {store.products.length === 0 ? (
         <EmptyState
           title={tr('Aucun produit pour l’instant', 'لا منتجات بعد')}
-          action={<button type="button" className="btn-primary" onClick={() => setProduct({})}><Plus className="h-4 w-4" />{tr('Ajouter mon premier produit', 'أضف أول منتج')}</button>}
+          action={<button type="button" className="btn-primary" onClick={() => setProduct({})} disabled={locked}><Plus className="h-4 w-4" />{tr('Ajouter mon premier produit', 'أضف أول منتج')}</button>}
         >
           {tr('Ajoutez un titre, une description et des photos.', 'أضف عنوانا ووصفا وصورا.')}
         </EmptyState>
@@ -137,10 +146,10 @@ export default function SellerDashboard({ lang }) {
                   )}
                 </p>
               </div>
-              <button type="button" className="btn-ghost p-2" onClick={() => setProduct(p)} aria-label={tr(`Modifier ${p.title}`, `تعديل ${p.title}`)}>
+              <button type="button" className="btn-ghost p-2" onClick={() => setProduct(p)} disabled={locked} aria-label={tr(`Modifier ${p.title}`, `تعديل ${p.title}`)}>
                 <Pencil className="h-4 w-4" />
               </button>
-              <button type="button" className="btn-ghost p-2 hover:text-status-unsafe-ink" onClick={() => setToDelete(p)} aria-label={tr(`Supprimer ${p.title}`, `حذف ${p.title}`)}>
+              <button type="button" className="btn-ghost p-2 hover:text-status-unsafe-ink" onClick={() => setToDelete(p)} disabled={locked} aria-label={tr(`Supprimer ${p.title}`, `حذف ${p.title}`)}>
                 <Trash2 className="h-4 w-4" />
               </button>
             </li>
@@ -251,11 +260,11 @@ function StoreForm({ lang, store, onSaved }) {
             </button>
           )}
         </div>
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickLogo} />
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickLogo} aria-label={tr('Logo de la boutique', 'شعار المحل')} />
       </div>
       <div>
         <label htmlFor="store-name" className="field-label">{tr('Nom de la boutique', 'اسم المحل')}</label>
-        <input id="store-name" value={form.name} onChange={set('name')} required className="field" />
+        <input id="store-name" value={form.name} onChange={set('name')} required maxLength={120} className="field" />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
@@ -268,22 +277,22 @@ function StoreForm({ lang, store, onSaved }) {
         </div>
         <div>
           <label htmlFor="store-city" className="field-label">{tr('Ville', 'المدينة')}</label>
-          <input id="store-city" value={form.city} onChange={set('city')} className="field" />
+          <input id="store-city" value={form.city} onChange={set('city')} maxLength={80} className="field" />
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="store-address" className="field-label">{tr('Adresse', 'العنوان')}</label>
-          <input id="store-address" value={form.address} onChange={set('address')} className="field" />
+          <input id="store-address" value={form.address} onChange={set('address')} maxLength={200} className="field" />
         </div>
         <div>
           <label htmlFor="store-phone" className="field-label">{tr('Téléphone', 'الهاتف')}</label>
-          <input id="store-phone" type="tel" value={form.phone} onChange={set('phone')} className="field" dir="ltr" />
+          <input id="store-phone" type="tel" value={form.phone} onChange={set('phone')} maxLength={30} className="field" dir="ltr" />
         </div>
       </div>
       <div>
         <label htmlFor="store-description" className="field-label">{tr('Présentation', 'تقديم')}</label>
-        <textarea id="store-description" value={form.description} onChange={set('description')} rows={3} className="field" />
+        <textarea id="store-description" value={form.description} onChange={set('description')} rows={3} maxLength={2000} className="field" />
       </div>
       {error && <Notice tone="error">{error}</Notice>}
       <button type="submit" disabled={busy} className="btn-primary w-full">
@@ -377,7 +386,7 @@ function ProductForm({ lang, product, onSaved }) {
             </button>
           )}
         </div>
-        <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={addImages} />
+        <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={addImages} aria-label={tr('Photos du produit', 'صور المنتج')} />
       </div>
 
       <div>

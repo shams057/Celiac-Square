@@ -65,7 +65,8 @@ export default function App() {
             ref={webRef}
             source={{ uri: SITE_URL }}
             style={styles.web}
-            originWhitelist={['*']}
+            // Only the site itself loads inside the app; anything else is handed to the system
+            originWhitelist={[`https://${SITE_HOST}`, 'about:*', 'blob:*', 'data:*']}
             onShouldStartLoadWithRequest={onShouldStartLoad}
             onNavigationStateChange={(nav) => setCanGoBack(nav.canGoBack)}
             onLoadEnd={() => SplashScreen.hideAsync().catch(() => {})}
@@ -73,8 +74,9 @@ export default function App() {
               setFailed(true);
               SplashScreen.hideAsync().catch(() => {});
             }}
-            // Scanner: photo picker / camera capture and live camera from the page
-            allowFileAccess
+            // Scanner: photo picker / camera capture and live camera from the page.
+            // (File inputs work without allowFileAccess, which would expose file:// URLs.)
+            allowFileAccess={false}
             mediaCapturePermissionGrantType="grantIfSameHostElsePrompt"
             allowsInlineMediaPlayback
             mediaPlaybackRequiresUserAction={false}

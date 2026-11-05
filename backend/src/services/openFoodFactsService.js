@@ -1,97 +1,39 @@
+import crypto from 'crypto';
 import axios from 'axios';
+import { analyzeGlutenSafety } from './glutenAnalysis.js';
+
+export { analyzeGlutenSafety };
 
 const OFF_BASE_URL = 'https://world.openfoodfacts.org';
 // Open Food Facts asks for "AppName/Version (contact)"; set OFF_USER_AGENT in .env to add your contact
 const offUserAgent = () => process.env.OFF_USER_AGENT || 'CeliacSquare/1.0 (Tunisia celiac platform)';
 
-/**
- * Analyzes Open Food Facts product data for gluten presence
- */
-export const analyzeGlutenSafety = (product) => {
-  const allergensHierarchy = product.allergens_hierarchy || [];
-  const allergensTags = product.allergens_tags || [];
-  const tracesTags = product.traces_tags || [];
-  const tracesHierarchy = product.traces_hierarchy || [];
-  const labelsTags = product.labels_tags || [];
-  const ingredientsText = (product.ingredients_text || product.ingredients_text_fr || product.ingredients_text_en || '').toLowerCase();
+/** EAN-8, UPC-A, EAN-13 and GTIN-14 barcodes, digits only */
+export const isBarcode = (value) => /^\d{8,14}$/.test(String(value));
 
-  const allAllergens = [...allergensHierarchy, ...allergensTags].map((t) => t.toLowerCase());
-  const allTraces = [...tracesHierarchy, ...tracesTags].map((t) => t.toLowerCase());
-  const allLabels = labelsTags.map((l) => l.toLowerCase());
+// Products without a barcode still need an id that stays the same between searches (React keys)
+const stableId = (p) =>
+  p.code ? `off_${p.code}` : `off_${crypto.createHash('sha1').update(`${p.product_name || ''}|${p.brands || ''}`).digest('hex').slice(0, 16)}`;
 
-  const glutenAllergens = ['en:gluten', 'gluten', 'en:wheat', 'blé', 'orge', 'seigle', 'avoine', 'kamut', 'spelt', 'épeautre'];
-  const glutenCertifications = ['en:gluten-free', 'fr:sans-gluten', 'en:crossed-grain-symbol', 'en:no-gluten', 'sans-gluten'];
-
-  const hasGlutenCertification = allLabels.some((l) =>
-    glutenCertifications.some((cert) => l.includes(cert))
-  );
-
-  const containsGlutenAllergen = allAllergens.some((a) =>
-    glutenAllergens.some((g) => a.includes(g))
-  );
-
-  const tracesGluten = allTraces.some((t) =>
-    glutenAllergens.some((g) => t.includes(g))
-  );
-
-  const ingredientsContainGluten = glutenAllergens.some((g) => {
-    // Basic word boundary search
-    const regex = new RegExp(`\\b${g}\\b`, 'i');
-    return regex.test(ingredientsText);
-  });
-
-  if (hasGlutenCertification) {
-    return {
-      status: 'SAFE',
-      isGlutenFree: true,
-      badgeText: 'Certifié Sans Gluten',
-      badgeTextAr: 'معتمد خالٍ من الغلوتين',
-      reason: 'Produit portant un label ou certification officielle sans gluten.',
-      reasonAr: 'المنتج يحمل علامة أو شهادة رسمية خالية من الغلوتين.',
-    };
-  }
-
-  if (containsGlutenAllergen || ingredientsContainGluten) {
-    return {
-      status: 'UNSAFE',
-      isGlutenFree: false,
-      badgeText: 'Contient du Gluten',
-      badgeTextAr: 'يحتوي على الغلوتين',
-      reason: 'Présence avérée de gluten ou de céréales contenant du gluten dans la liste des ingrédients.',
-      reasonAr: 'يحتوي على الغلوتين أو الحبوب المحتوية على الغلوتين في المكونات.',
-    };
-  }
-
-  if (tracesGluten || ingredientsText.includes('traces de gluten') || ingredientsText.includes('traces de blé')) {
-    return {
-      status: 'CROSS_CONTAMINATION_RISK',
-      isGlutenFree: false,
-      badgeText: 'Risque de Contamination Croisée',
-      badgeTextAr: 'خطر التلوث المتبادل',
-      reason: "Traces possibles de gluten mentionnées par le fabricant (lignes de production partagées).",
-      reasonAr: 'احتمال وجود آثار غلوتين حسب بيانات المصنع (خطوط إنتاج مشتركة).',
-    };
-  }
-
-  // If no gluten found and ingredients exist
-  if (ingredientsText.length > 5 || (product.ingredients && product.ingredients.length > 0)) {
-    return {
-      status: 'SAFE',
-      isGlutenFree: true,
-      badgeText: 'Gluten Non Détecté (Vérifier)',
-      badgeTextAr: 'غير مذكور غلوتين (يرجى التحقق)',
-      reason: "Aucun ingrédient contenant du gluten n'a été répertorié dans les données Open Food Facts. Vérifiez toujours l'emballage physique.",
-      reasonAr: 'لم يتم العثور على أي مكونات غلوتين مسجلة. يُنصح دائمًا بالتحقق من الغلاف الأصلي.',
-    };
-  }
-
+const toProduct = (p, fallbackBarcode = '') => {
+  const safety = analyzeGlutenSafety(p);
   return {
-    status: 'UNKNOWN',
-    isGlutenFree: false,
-    badgeText: 'Inconnu / Données Incomplètes',
-    badgeTextAr: 'بيانات غير متوفرة',
-    reason: "Informations d'ingrédients insuffisantes sur Open Food Facts pour ce produit.",
-    reasonAr: 'المعلومات غير كافية لتحديد وجود الغلوتين بدقة.',
+    id: stableId(p),
+    source: 'Open Food Facts',
+    productNameFr: p.product_name_fr || p.product_name || 'Produit sans nom',
+    productNameAr: p.product_name_ar || '',
+    brand: p.brands || 'Marque non spécifiée',
+    category: 'PROCESSED',
+    barcode: p.code || fallbackBarcode,
+    isGlutenFree: safety.isGlutenFree,
+    status: safety.status,
+    badgeText: safety.badgeText,
+    badgeTextAr: safety.badgeTextAr,
+    notes: safety.reason,
+    notesAr: safety.reasonAr,
+    imageUrl: p.image_url || p.image_front_small_url || '',
+    ingredientsText: p.ingredients_text_fr || p.ingredients_text || '',
+    officialDocReference: 'Base internationale Open Food Facts',
   };
 };
 
@@ -99,37 +41,13 @@ export const analyzeGlutenSafety = (product) => {
  * Fetch product by barcode from Open Food Facts
  */
 export const fetchFromOpenFoodFactsByBarcode = async (barcode) => {
+  if (!isBarcode(barcode)) return null;
   try {
-    const url = `${OFF_BASE_URL}/api/v2/product/${encodeURIComponent(barcode)}.json`;
-    const response = await axios.get(url, {
+    const response = await axios.get(`${OFF_BASE_URL}/api/v2/product/${barcode}.json`, {
       timeout: 4500,
-      headers: {
-        'User-Agent': offUserAgent(),
-      },
+      headers: { 'User-Agent': offUserAgent() },
     });
-
-    if (response.data && response.data.status === 1 && response.data.product) {
-      const p = response.data.product;
-      const safety = analyzeGlutenSafety(p);
-      return {
-        id: `off_${p.code || barcode}`,
-        source: 'Open Food Facts',
-        productNameFr: p.product_name_fr || p.product_name || 'Produit sans nom',
-        productNameAr: p.product_name_ar || p.product_name || '',
-        brand: p.brands || 'Marque non spécifiée',
-        category: p.categories || 'PROCESSED',
-        barcode: p.code || barcode,
-        isGlutenFree: safety.isGlutenFree,
-        status: safety.status,
-        badgeText: safety.badgeText,
-        badgeTextAr: safety.badgeTextAr,
-        notes: safety.reason,
-        notesAr: safety.reasonAr,
-        imageUrl: p.image_url || p.image_front_small_url || '',
-        ingredientsText: p.ingredients_text_fr || p.ingredients_text || '',
-        officialDocReference: 'Base internationale Open Food Facts',
-      };
-    }
+    if (response.data?.status === 1 && response.data.product) return toProduct(response.data.product, barcode);
     return null;
   } catch (err) {
     console.warn(`[OpenFoodFacts] Barcode fetch notice: ${err.message}`);
@@ -142,37 +60,12 @@ export const fetchFromOpenFoodFactsByBarcode = async (barcode) => {
 const SEARCH_CACHE_TTL_MS = 60 * 60 * 1000;
 const searchCache = new Map();
 
-const mapSearchProducts = (products) =>
-  products
-    .filter((p) => p.product_name || p.product_name_fr)
-    .map((p) => {
-      const safety = analyzeGlutenSafety(p);
-      return {
-        id: `off_${p.code || Math.random()}`,
-        source: 'Open Food Facts',
-        productNameFr: p.product_name_fr || p.product_name || 'Produit',
-        productNameAr: p.product_name_ar || '',
-        brand: p.brands || 'Marque inconnue',
-        category: 'PROCESSED',
-        barcode: p.code || '',
-        isGlutenFree: safety.isGlutenFree,
-        status: safety.status,
-        badgeText: safety.badgeText,
-        badgeTextAr: safety.badgeTextAr,
-        notes: safety.reason,
-        notesAr: safety.reasonAr,
-        imageUrl: p.image_url || p.image_front_small_url || '',
-        ingredientsText: p.ingredients_text_fr || p.ingredients_text || '',
-        officialDocReference: 'Base internationale Open Food Facts',
-      };
-    });
-
 /**
  * Search Open Food Facts by text. Returns { ok, products }: ok is false when the
  * service could not be reached or refused the request (rate limit, outage).
  */
 export const searchOpenFoodFacts = async (query) => {
-  const term = (query || '').trim().toLowerCase();
+  const term = (query || '').trim().toLowerCase().slice(0, 100);
   if (term.length < 2) return { ok: true, products: [] };
 
   const cached = searchCache.get(term);
@@ -180,11 +73,10 @@ export const searchOpenFoodFacts = async (query) => {
 
   try {
     const url = `${OFF_BASE_URL}/cgi/search.pl?search_terms=${encodeURIComponent(term)}&search_simple=1&action=process&json=1&page_size=8`;
-    const response = await axios.get(url, {
-      timeout: 4500,
-      headers: { 'User-Agent': offUserAgent() },
-    });
-    const products = Array.isArray(response.data?.products) ? mapSearchProducts(response.data.products) : [];
+    const response = await axios.get(url, { timeout: 4500, headers: { 'User-Agent': offUserAgent() } });
+    const products = Array.isArray(response.data?.products)
+      ? response.data.products.filter((p) => p.product_name || p.product_name_fr).map((p) => toProduct(p))
+      : [];
     searchCache.set(term, { at: Date.now(), products });
     if (searchCache.size > 500) searchCache.delete(searchCache.keys().next().value);
     return { ok: true, products };
@@ -193,8 +85,3 @@ export const searchOpenFoodFacts = async (query) => {
     return { ok: false, products: [] };
   }
 };
-
-/**
- * Search products by query term in Open Food Facts (products only)
- */
-export const searchOpenFoodFactsByQuery = async (query) => (await searchOpenFoodFacts(query)).products;

@@ -8,6 +8,8 @@ import {
   setStoreActive,
   fetchUsers,
   setUserRole,
+  fetchAuditLog,
+  errorMessage,
 } from '../services/api';
 import { useAuth } from './AuthContext';
 import { t, PageHead, Spinner, Notice, EmptyState, Modal, storeType, StoreLogo } from './ui';
@@ -25,12 +27,12 @@ const ROLES = [
   { value: 'ADMIN', fr: 'Administrateur', ar: 'مدير' },
 ];
 
-const errorText = (err, fallback) => err.response?.data?.message || fallback;
+const errorText = errorMessage;
 
 /** Backoffice page for the marketplace: seller requests, stores and account roles */
 export default function BackofficeSellers({ lang }) {
   const tr = t(lang);
-  const [view, setView] = useState('requests'); // 'requests' | 'stores' | 'users'
+  const [view, setView] = useState('requests'); // 'requests' | 'stores' | 'users' | 'log'
   const [pendingCount, setPendingCount] = useState(0);
   const [toast, setToast] = useState(null);
 
@@ -66,6 +68,7 @@ export default function BackofficeSellers({ lang }) {
           ['requests', tr('Demandes', 'الطلبات'), pendingCount],
           ['stores', tr('Boutiques', 'المحلات'), 0],
           ['users', tr('Comptes', 'الحسابات'), 0],
+          ['log', tr('Journal', 'السجل'), 0],
         ].map(([id, label, count]) => (
           <button
             key={id}
@@ -84,6 +87,7 @@ export default function BackofficeSellers({ lang }) {
       {view === 'requests' && <RequestsView lang={lang} onPendingCount={setPendingCount} showToast={showToast} />}
       {view === 'stores' && <StoresView lang={lang} showToast={showToast} />}
       {view === 'users' && <UsersView lang={lang} showToast={showToast} />}
+      {view === 'log' && <AuditLogView lang={lang} />}
     </div>
   );
 }
@@ -226,6 +230,8 @@ function StoresView({ lang, showToast }) {
   const tr = t(lang);
   const [stores, setStores] = useState(null);
   const [error, setError] = useState(false);
+  const [toToggle, setToToggle] = useState(null);
+  const [busy, setBusy] = useState(false);
 
   const load = async () => {
     setError(false);
@@ -241,12 +247,16 @@ function StoresView({ lang, showToast }) {
   }, []);
 
   const toggle = async (store) => {
+    setBusy(true);
     try {
       const res = await setStoreActive(store._id, !store.isActive);
       setStores((list) => list.map((s) => (s._id === store._id ? { ...s, isActive: res.data.isActive } : s)));
       showToast(res.message);
+      setToToggle(null);
     } catch (err) {
       showToast(errorText(err, tr('La boutique n’a pas pu être modifiée.', 'تعذر تعديل المحل.')), 'error');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -267,11 +277,30 @@ function StoresView({ lang, showToast }) {
             </p>
             {s.owner && <p className="truncate text-xs text-ink-faint">{s.owner.fullName} · {s.owner.email}</p>}
           </div>
-          <button type="button" onClick={() => toggle(s)} className={s.isActive ? 'btn-quiet' : 'btn-primary'}>
+          <button type="button" onClick={() => setToToggle(s)} className={s.isActive ? 'btn-quiet' : 'btn-primary'}>
             {s.isActive ? tr('Suspendre', 'إيقاف') : tr('Réactiver', 'إعادة التفعيل')}
           </button>
         </li>
       ))}
+      <Modal
+        open={Boolean(toToggle)}
+        onClose={() => setToToggle(null)}
+        lang={lang}
+        width="max-w-md"
+        title={toToggle?.isActive ? tr('Suspendre cette boutique ?', 'إيقاف هذا المحل؟') : tr('Réactiver cette boutique ?', 'إعادة تفعيل هذا المحل؟')}
+      >
+        <p className="text-sm text-ink-soft">
+          {toToggle?.isActive
+            ? tr(`« ${toToggle?.name} » disparaîtra du marché et son vendeur ne pourra plus la modifier.`, `سيختفي «${toToggle?.name}» من السوق ولن يتمكن البائع من تعديله.`)
+            : tr(`« ${toToggle?.name} » sera de nouveau visible sur le marché.`, `سيظهر «${toToggle?.name}» من جديد في السوق.`)}
+        </p>
+        <div className="mt-6 flex justify-end gap-2">
+          <button type="button" className="btn-quiet" onClick={() => setToToggle(null)}>{tr('Annuler', 'إلغاء')}</button>
+          <button type="button" className={toToggle?.isActive ? 'btn-danger' : 'btn-primary'} onClick={() => toggle(toToggle)} disabled={busy}>
+            {toToggle?.isActive ? tr('Suspendre', 'إيقاف') : tr('Réactiver', 'إعادة التفعيل')}
+          </button>
+        </div>
+      </Modal>
     </ul>
   );
 }
@@ -283,6 +312,8 @@ function UsersView({ lang, showToast }) {
   const [role, setRole] = useState('');
   const [users, setUsers] = useState(null);
   const [error, setError] = useState(false);
+  const [pending, setPending] = useState(null); // { user, role } awaiting confirmation
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -302,12 +333,16 @@ function UsersView({ lang, showToast }) {
   }, [query, role]);
 
   const changeRole = async (u, next) => {
+    setBusy(true);
     try {
       const res = await setUserRole(u._id, next);
       setUsers((list) => list.map((x) => (x._id === u._id ? res.data : x)));
-      showToast(tr(`${u.email} : ${ROLES.find((r) => r.value === next).fr}`, `${u.email}: ${ROLES.find((r) => r.value === next).ar}`));
+      showToast(res.message || tr(`${u.email} : ${roleLabel(next, 'fr')}`, `${u.email}: ${roleLabel(next, 'ar')}`));
+      setPending(null);
     } catch (err) {
       showToast(errorText(err, tr('Le rôle n’a pas pu être changé.', 'تعذر تغيير الدور.')), 'error');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -342,7 +377,7 @@ function UsersView({ lang, showToast }) {
               </div>
               <select
                 value={u.role}
-                onChange={(e) => changeRole(u, e.target.value)}
+                onChange={(e) => setPending({ user: u, role: e.target.value })}
                 disabled={u._id === me?._id}
                 title={u._id === me?._id ? tr('Vous ne pouvez pas changer votre propre rôle', 'لا يمكنك تغيير دورك') : undefined}
                 className="field sm:w-44"
@@ -356,6 +391,93 @@ function UsersView({ lang, showToast }) {
           ))}
         </ul>
       )}
+
+      <Modal open={Boolean(pending)} onClose={() => setPending(null)} lang={lang} width="max-w-md" title={tr('Changer le rôle ?', 'تغيير الدور؟')}>
+        {pending && (
+          <>
+            <p className="text-sm text-ink-soft">
+              {tr(
+                `${pending.user.email} passera de « ${roleLabel(pending.user.role, 'fr')} » à « ${roleLabel(pending.role, 'fr')} ».`,
+                `سينتقل ${pending.user.email} من «${roleLabel(pending.user.role, 'ar')}» إلى «${roleLabel(pending.role, 'ar')}».`
+              )}
+            </p>
+            {pending.role === 'ADMIN' && (
+              <Notice tone="warning" title={tr('Accès complet', 'صلاحيات كاملة')}>
+                {tr('Un administrateur peut modifier toutes les adresses, boutiques et comptes.', 'يمكن للمدير تعديل كل العناوين والمحلات والحسابات.')}
+              </Notice>
+            )}
+            {pending.role === 'CLIENT' && pending.user.role === 'SELLER' && (
+              <p className="mt-2 text-sm text-ink-soft">{tr('Sa boutique sera suspendue.', 'سيتم إيقاف محله.')}</p>
+            )}
+            <div className="mt-6 flex justify-end gap-2">
+              <button type="button" className="btn-quiet" onClick={() => setPending(null)}>{tr('Annuler', 'إلغاء')}</button>
+              <button type="button" className="btn-primary" onClick={() => changeRole(pending.user, pending.role)} disabled={busy}>
+                {tr('Confirmer', 'تأكيد')}
+              </button>
+            </div>
+          </>
+        )}
+      </Modal>
     </div>
   );
 }
+
+const roleLabel = (value, lang) => {
+  const role = ROLES.find((r) => r.value === value) || ROLES[0];
+  return lang === 'ar' ? role.ar : role.fr;
+};
+
+const ACTION_LABELS = {
+  'seller_application.approve': ['Demande vendeur acceptée', 'قبول طلب بائع'],
+  'seller_application.reject': ['Demande vendeur refusée', 'رفض طلب بائع'],
+  'user.role': ['Rôle modifié', 'تغيير دور'],
+  'store.suspend': ['Boutique suspendue', 'إيقاف محل'],
+  'store.reactivate': ['Boutique réactivée', 'إعادة تفعيل محل'],
+  'spot.create': ['Adresse ajoutée', 'إضافة عنوان'],
+  'spot.update': ['Adresse modifiée', 'تعديل عنوان'],
+  'spot.delete': ['Adresse supprimée', 'حذف عنوان'],
+  'spot.verify': ['Adresse vérifiée', 'توثيق عنوان'],
+  'spot.unverify': ['Vérification retirée', 'سحب التوثيق'],
+  'proposal.approve': ['Proposition publiée', 'نشر اقتراح'],
+  'proposal.reject': ['Proposition refusée', 'رفض اقتراح'],
+};
+
+/** The latest admin actions (who did what, when) */
+function AuditLogView({ lang }) {
+  const tr = t(lang);
+  const [rows, setRows] = useState(null);
+  const [error, setError] = useState(false);
+  const dateFmt = new Intl.DateTimeFormat(lang === 'ar' ? 'ar-TN' : 'fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+
+  useEffect(() => {
+    fetchAuditLog()
+      .then((res) => setRows(res.data || []))
+      .catch(() => setError(true));
+  }, []);
+
+  if (error) return <Notice tone="error" title={tr('Le journal n’a pas pu être chargé.', 'تعذر تحميل السجل.')} />;
+  if (!rows) return <Spinner label={tr('Chargement du journal…', 'جاري تحميل السجل…')} />;
+  if (rows.length === 0) return <EmptyState title={tr('Aucune action enregistrée', 'لا توجد عمليات مسجلة')} />;
+
+  return (
+    <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-white/70 bg-canvas-paper/80 text-sm">
+      {rows.map((r) => {
+        const [fr, ar] = ACTION_LABELS[r.action] || [r.action, r.action];
+        const detail = r.details?.name || r.details?.email || '';
+        const roleChange = r.action === 'user.role' ? ` (${roleLabel(r.details?.from, lang)} → ${roleLabel(r.details?.to, lang)})` : '';
+        return (
+          <li key={r._id} className="flex flex-col gap-0.5 p-3 sm:flex-row sm:items-baseline sm:gap-4 sm:p-4">
+            <time className="shrink-0 tabular-nums text-ink-faint" dateTime={r.createdAt}>{dateFmt.format(new Date(r.createdAt))}</time>
+            <span className="min-w-0 flex-1">
+              <span className="font-medium">{tr(fr, ar)}</span>
+              {detail && <span className="text-ink-soft"> · {detail}</span>}
+              {roleChange}
+            </span>
+            <span className="truncate text-ink-faint" dir="ltr">{r.actorEmail || '—'}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
