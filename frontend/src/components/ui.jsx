@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, X, TriangleAlert, HelpCircle, LoaderCircle, SlidersHorizontal } from 'lucide-react';
+import { Check, X, TriangleAlert, HelpCircle, LoaderCircle, SlidersHorizontal, UtensilsCrossed, Croissant, Coffee, Palette } from 'lucide-react';
 
 // Translation helper: t(lang)('Français', 'العربية')
 export const t = (lang) => (fr, ar) => (lang === 'ar' ? ar : fr);
@@ -121,7 +121,7 @@ export function Notice({ tone = 'info', title, children, action }) {
     success: 'border-status-safe/60 bg-status-safe/15',
   };
   return (
-    <div className={`rounded-lg border px-4 py-3 text-sm text-ink ${tones[tone]}`} role={tone === 'error' ? 'alert' : undefined}>
+    <div className={`rounded-xl border px-4 py-3 text-sm text-ink ${tones[tone]}`} role={tone === 'error' ? 'alert' : undefined}>
       {title && <p className="font-medium">{title}</p>}
       {children && <div className={title ? 'mt-0.5 text-ink-soft' : ''}>{children}</div>}
       {action && <div className="mt-3">{action}</div>}
@@ -155,12 +155,12 @@ export function Modal({ open, onClose, title, subtitle, children, width = 'max-w
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[1000] flex animate-fade-in items-end justify-center bg-ink/50 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 z-[1000] flex animate-fade-in items-end justify-center bg-ink/40 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
-        className={`flex max-h-[92vh] w-full ${width} animate-sheet-up flex-col rounded-t-2xl sm:animate-pop-in border border-canvas-line bg-canvas-raised shadow-[0_20px_60px_rgba(47,38,29,0.35)] sm:rounded-xl`}
+        className={`flex max-h-[92vh] w-full ${width} animate-sheet-up flex-col rounded-t-3xl sm:animate-pop-in border border-white/60 bg-canvas-raised/90 backdrop-blur-xl shadow-[0_20px_60px_rgba(47,38,29,0.35)] sm:rounded-3xl`}
       >
         <div className="flex items-start justify-between gap-4 border-b border-canvas-line px-5 py-4 sm:px-6">
           <div>
@@ -185,6 +185,34 @@ export const SPOT_CATEGORIES = [
   { value: 'CAFE', fr: 'Café, salon de thé', ar: 'مقهى', color: '#A0763A' },
   { value: 'SUPERMARKET', fr: 'Épicerie, supermarché', ar: 'مغازة، متجر', color: '#6F8A8C' },
 ];
+
+/** Marketplace store types */
+export const STORE_TYPES = [
+  { value: 'RESTAURANT', fr: 'Restaurant', frPlural: 'Restaurants', ar: 'مطعم', arPlural: 'مطاعم', icon: UtensilsCrossed, color: '#E5702A' },
+  { value: 'BAKERY', fr: 'Boulangerie', frPlural: 'Boulangeries', ar: 'مخبزة', arPlural: 'مخابز', icon: Croissant, color: '#4E6127' },
+  { value: 'CAFE', fr: 'Café', frPlural: 'Cafés', ar: 'مقهى', arPlural: 'مقاهي', icon: Coffee, color: '#A0763A' },
+  { value: 'ARTISAN', fr: 'Artisan', frPlural: 'Artisans', ar: 'حرفي', arPlural: 'حرفيون', icon: Palette, color: '#6F8A8C' },
+];
+
+export const storeType = (value) => STORE_TYPES.find((s) => s.value === value) || STORE_TYPES[0];
+
+/** Prices are in Tunisian dinars, with millimes */
+export const formatPrice = (price, lang) =>
+  price == null ? '' : `${Number(price).toLocaleString(lang === 'ar' ? 'ar-TN' : 'fr-TN', { minimumFractionDigits: 0, maximumFractionDigits: 3 })} ${lang === 'ar' ? 'د.ت' : 'DT'}`;
+
+/** Store logo, or its type's icon on the type's colour when there is none */
+export function StoreLogo({ store, className = 'h-12 w-12' }) {
+  const type = storeType(store?.type);
+  const Icon = type.icon;
+  if (store?.logoUrl) {
+    return <img src={store.logoUrl} alt="" className={`${className} shrink-0 rounded-2xl object-cover ring-1 ring-white/70`} />;
+  }
+  return (
+    <span className={`${className} inline-flex shrink-0 items-center justify-center rounded-2xl text-white ring-1 ring-white/70`} style={{ background: type.color }} aria-hidden="true">
+      <Icon className="h-1/2 w-1/2" strokeWidth={1.75} />
+    </span>
+  );
+}
 
 export const spotCategory = (value) => SPOT_CATEGORIES.find((c) => c.value === value) || SPOT_CATEGORIES[2];
 

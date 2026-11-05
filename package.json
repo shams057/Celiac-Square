@@ -10,6 +10,7 @@
   ],
   "scripts": {
     "seed": "cd backend && npm run seed",
+    "set-role": "npm run set-role --workspace backend --",
     "server": "cd backend && npm run dev",
     "client": "cd frontend && npm run dev",
     "dev": "node -e \"const { spawn } = require('child_process'); spawn('npm', ['run', 'server'], { stdio: 'inherit', shell: true }); spawn('npm', ['run', 'client'], { stdio: 'inherit', shell: true });\"",

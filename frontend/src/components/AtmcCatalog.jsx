@@ -138,8 +138,8 @@ export default function AtmcCatalog({ lang = 'fr' }) {
               type="button"
               aria-pressed={active}
               onClick={() => setSelectedStatus(active ? 'ALL' : f.id)}
-              className={`flex flex-col items-start gap-3 rounded-xl border p-3 text-start transition-colors sm:flex-row sm:items-center sm:p-4 ${
-                active ? 'border-ink bg-canvas-paper' : 'border-canvas-line bg-canvas-raised hover:bg-canvas-paper'
+              className={`flex flex-col items-start gap-3 rounded-2xl border p-3 text-start transition-colors sm:flex-row sm:items-center sm:p-4 ${
+                active ? 'border-ink bg-canvas-paper' : 'border-white/50 bg-canvas-raised/60 hover:bg-canvas-paper/80'
               }`}
             >
               <StatusTile kind={f.kind} />
@@ -157,7 +157,7 @@ export default function AtmcCatalog({ lang = 'fr' }) {
       <div className="grid gap-6 lg:grid-cols-[15rem_1fr] lg:gap-8">
         {/* Rayons: white card on desktop, in the filters sheet on mobile */}
         <aside className="hidden lg:block">
-          <div className="rounded-xl border border-canvas-line bg-white p-2">
+          <div className="rounded-2xl border border-white/70 bg-canvas-paper/80 backdrop-blur-sm p-2">
             <p className="px-3 pb-1 pt-2 text-sm font-medium">{tr('Rayons', 'الأصناف')}</p>
             {categoryList}
           </div>
@@ -241,7 +241,7 @@ export default function AtmcCatalog({ lang = 'fr' }) {
               )}
             </EmptyState>
           ) : (
-            <ul className="divide-y divide-canvas-line overflow-hidden rounded-xl border border-canvas-line bg-white">
+            <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-white/70 bg-canvas-paper/80 backdrop-blur-sm">
               {filteredProducts.map((item) => {
                 const kind = statusKind(item.status);
                 const { head, rest } = splitName(lang === 'ar' ? item.name : item.nameFr || item.name);

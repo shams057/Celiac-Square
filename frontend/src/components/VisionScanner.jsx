@@ -222,7 +222,7 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
       />
 
       {/* Mode switch */}
-      <div className="grid grid-cols-2 gap-2 rounded-xl border border-canvas-line bg-canvas-raised p-1" role="tablist" aria-label={tr('Type de scan', 'نوع المسح')}>
+      <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/50 bg-canvas-raised/60 p-1" role="tablist" aria-label={tr('Type de scan', 'نوع المسح')}>
         {Object.entries(MODES).map(([id, m]) => {
           const Icon = m.icon;
           const active = mode === id;

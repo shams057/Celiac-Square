@@ -9,6 +9,9 @@ import mapRoutes from './routes/mapRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import visionRoutes from './routes/visionRoutes.js';
 import atmcRoutes from './routes/atmcRoutes.js';
+import authRoutes from './routes/authRoutes.js';
+import marketRoutes from './routes/marketRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 dotenv.config();
 
@@ -23,6 +26,9 @@ app.use(
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
+// Marketplace bodies carry resized photos as data URLs. Must come before the default
+// parser, which would reject them; a body parsed here is not parsed again.
+app.use('/api/market', express.json({ limit: '8mb' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -44,6 +50,9 @@ app.use('/api/map', mapRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/vision', visionRoutes);
 app.use('/api/atmc', atmcRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/market', marketRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check: says what is configured (never the values) and whether MongoDB answers
 app.get('/api/health', async (req, res) => {
@@ -83,9 +92,10 @@ app.use((req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(`[Server Error] ${err.stack || err.message}`);
-  res.status(500).json({
+  // body-parser errors (too large, invalid JSON) carry their own 4xx status
+  res.status(err.status || 500).json({
     success: false,
-    message: err.message || 'Erreur interne du serveur.',
+    message: err.status === 413 ? 'Les images envoyées sont trop lourdes.' : err.message || 'Erreur interne du serveur.',
   });
 });
 

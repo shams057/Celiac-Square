@@ -18,6 +18,16 @@ export const db = () => {
   return client;
 };
 
+/**
+ * A throwaway client for sign-in, sign-up and token refresh. Signing in stores the user's
+ * session on the client, so these calls must never run on the shared db() client,
+ * whose queries would then run as that user instead of with the secret key.
+ */
+export const authClient = () =>
+  createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+
 /** Cheap query used by the health check */
 export const pingDb = async () => {
   const { error } = await db().from('atmc_products').select('id', { head: true, count: 'exact' }).limit(1);

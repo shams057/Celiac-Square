@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "seed": "node src/seed/seedData.js"
+    "seed": "node src/seed/seedData.js",
+    "set-role": "node src/scripts/setRole.js"
   },
   "dependencies": {
     "@google/genai": "^2.32.0",

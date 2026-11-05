@@ -206,7 +206,7 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
       </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-[1.5fr_1fr]">
-        <div className="relative z-0 h-[55vh] min-h-[340px] overflow-hidden rounded-xl border border-canvas-line lg:sticky lg:top-24 lg:h-[620px]">
+        <div className="relative z-0 h-[55vh] min-h-[340px] overflow-hidden rounded-2xl border border-white/60 shadow-[0_8px_24px_-16px_rgba(47,38,29,0.3)] lg:sticky lg:top-24 lg:h-[620px]">
           <MapContainer center={TUNISIA_CENTER} zoom={TUNISIA_ZOOM} scrollWheelZoom className="h-full w-full">
             <FlyTo target={flyTarget} />
             <TileLayer

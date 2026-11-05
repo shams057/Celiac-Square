@@ -5,14 +5,29 @@ import VisionScanner from './components/VisionScanner';
 import ProductSearch from './components/ProductSearch';
 import AtmcCatalog from './components/AtmcCatalog';
 import TunisiaMap from './components/TunisiaMap';
-import BackofficeSpots from './components/BackofficeSpots';
+import Marketplace from './components/Marketplace';
+import AuthPanel from './components/AuthPanel';
+import SellerDashboard from './components/SellerDashboard';
+import BecomeSeller from './components/BecomeSeller';
+import Backoffice from './components/Backoffice';
 import SpotModal from './components/SpotModal';
 import Footer from './components/Footer';
+import { AuthProvider, useAuth } from './components/AuthContext';
 
-const TAB_ORDER = ['atmc', 'vision', 'search', 'map', 'backoffice'];
+// Dock tabs first, then pages reached from the account menu and the footer
+const TAB_ORDER = ['atmc', 'vision', 'search', 'map', 'market', 'account', 'seller', 'become-seller', 'backoffice'];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('atmc'); // 'atmc' | 'vision' | 'search' | 'map' | 'backoffice'
+  return (
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
+  );
+}
+
+function AppShell() {
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('atmc');
   const [searchInitialQuery, setSearchInitialQuery] = useState('');
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [mapRefreshKey, setMapRefreshKey] = useState(0);
@@ -51,7 +66,7 @@ export default function App() {
         setLang={setLang}
       />
 
-      <main id="main" className="mx-auto w-full max-w-6xl flex-1 overflow-x-clip px-4 pb-28 pt-6 sm:px-6 sm:pt-10 lg:pb-16">
+      <main id="main" className="mx-auto w-full max-w-6xl flex-1 overflow-x-clip px-4 pb-32 pt-6 sm:px-6 sm:pt-10">
         <div key={activeTab} className={slide}>
         {activeTab === 'atmc' && <AtmcCatalog lang={lang} />}
         {activeTab === 'vision' && <VisionScanner onSwitchToSearch={handleSwitchToSearch} lang={lang} />}
@@ -59,7 +74,11 @@ export default function App() {
         {activeTab === 'map' && (
           <TunisiaMap key={mapRefreshKey} onOpenSubmitModal={() => setIsSubmitModalOpen(true)} lang={lang} />
         )}
-        {activeTab === 'backoffice' && <BackofficeSpots lang={lang} />}
+        {activeTab === 'market' && <Marketplace lang={lang} />}
+        {activeTab === 'account' && <AuthPanel lang={lang} onDone={() => goTo('market')} />}
+        {activeTab === 'seller' && (user ? <SellerDashboard lang={lang} /> : <AuthPanel lang={lang} />)}
+        {activeTab === 'become-seller' && <BecomeSeller lang={lang} onOpenShop={() => goTo('seller')} />}
+        {activeTab === 'backoffice' && <Backoffice lang={lang} />}
         </div>
       </main>
 
@@ -70,7 +89,12 @@ export default function App() {
         lang={lang}
       />
 
-      <Footer lang={lang} onOpenBackoffice={() => goTo('backoffice')} />
+      <Footer
+        lang={lang}
+        isAdmin={user?.role === 'ADMIN'}
+        onOpenBackoffice={() => goTo('backoffice')}
+        onBecomeSeller={() => goTo('become-seller')}
+      />
       <Analytics />
     </div>
   );
