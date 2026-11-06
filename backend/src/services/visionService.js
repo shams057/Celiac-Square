@@ -1,47 +1,34 @@
 import crypto from 'crypto';
-import { GoogleGenAI } from '@google/genai';
 import { foldText } from '../utils/regex.js';
 import { findGlutenTerms, splitTraces, hasAmbiguousIngredient } from './glutenAnalysis.js';
+import { callBalanced, callConsensus, isAnyProviderConfigured } from './aiBalancer.js';
 
 /**
  * AI calls for the scanner: reading an ingredients list (photo, or text read by OCR
  * as a fallback) and judging whether it contains gluten.
  * Product identification from a photo lives in productVision.js and uses callVisionAI too.
  *
- * Provider: Ollama Cloud (Gemma 4 31B) when OLLAMA_API_KEY is set. It scored 30/30 on our test photos
- * (MODEL_BENCHMARK.md) in ~1 s. Gemini is only a backup, used when GEMINI_API_KEY is also set
- * and Ollama fails.
+ * Providers (Ollama Cloud, Gemini, Groq, and any other free tier whose key is set) are picked by
+ * aiBalancer.js: rotation with failover. The gluten verdict asks two or three providers at once
+ * and keeps the strictest answer when they disagree (see analyzeIngredients* below).
  */
-
-const OLLAMA_URL = 'https://ollama.com/api/chat';
-// Override with OLLAMA_MODEL in .env.
-const OLLAMA_DEFAULT_MODEL = 'gemma4:31b';
-// Fast "lite" models answer in ~1–4 s; the larger flash models took 20 s+ or timed out.
-// Override with GEMINI_MODEL in .env.
-const DEFAULT_MODELS = ['gemini-3.5-flash-lite', 'gemini-flash-lite-latest'];
-const TIMEOUT_MS = 15000;
 
 export const VERDICTS = ['CONTAINS_GLUTEN', 'MAY_CONTAIN', 'GLUTEN_FREE', 'UNREADABLE'];
 
-const hasOllama = () => Boolean(process.env.OLLAMA_API_KEY?.trim());
-const hasGemini = () => Boolean(process.env.GEMINI_API_KEY?.trim());
-export const isIngredientsAiConfigured = () => hasOllama() || hasGemini();
-export const isVisionAiConfigured = isIngredientsAiConfigured;
+export const isIngredientsAiConfigured = isAnyProviderConfigured;
+export const isVisionAiConfigured = isAnyProviderConfigured;
 
 export const clamp01 = (n) => Math.max(0, Math.min(1, Number.isFinite(n) ? n : 0));
 export const strings = (v) => (Array.isArray(v) ? v.filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim()) : []);
 export const text = (v, max = 400) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 
 // ---------------------------------------------------------------------------
-// Shared caller: model fallback, one retry on overload, cache of answers
+// Cache of answers: the same photo or text is never paid twice, and the verdict stays consistent
 // ---------------------------------------------------------------------------
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const CACHE_MAX = 1000;
 const answerCache = new Map();
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const isTransient = (err) => /\b(429|500|503)\b|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand|timed? ?out/i.test(String(err?.message || err));
 
 export const hashOf = (...parts) => {
   const h = crypto.createHash('sha256');
@@ -49,96 +36,19 @@ export const hashOf = (...parts) => {
   return h.digest('hex');
 };
 
-const parseJson = (raw) => JSON.parse(String(raw || '').replace(/```json|```/g, '').trim());
-
-/** Sends `parts` (text and inline images, Gemini-style) to Gemini and returns { json, model } */
-export const callGemini = async ({ parts }) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, httpOptions: { timeout: TIMEOUT_MS } });
-  const models = process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL, ...DEFAULT_MODELS] : DEFAULT_MODELS;
-
-  let lastError;
-  for (const model of [...new Set(models)]) {
-    // One retry with a short backoff when the model is overloaded, then the next model
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      try {
-        const response = await ai.models.generateContent({
-          model,
-          contents: [{ role: 'user', parts }],
-          config: { responseMimeType: 'application/json', temperature: 0 },
-        });
-        return { json: parseJson(response.text), model };
-      } catch (err) {
-        lastError = err;
-        console.warn(`[Gemini] ${model} attempt ${attempt + 1} failed: ${String(err.message).slice(0, 200)}`);
-        if (!isTransient(err)) break;
-        if (attempt === 0) await sleep(800 + Math.random() * 400);
-      }
-    }
-  }
-  throw lastError || new Error('Gemini call failed');
-};
-
-/** Same `parts` sent to Ollama Cloud: texts joined in order, images passed as base64 */
-export const callOllama = async ({ parts }) => {
-  const model = process.env.OLLAMA_MODEL?.trim() || OLLAMA_DEFAULT_MODEL;
-  const content = parts.filter((p) => p.text).map((p) => p.text).join('\n\n');
-  const images = parts.filter((p) => p.inlineData).map((p) => p.inlineData.data);
-
-  let lastError;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    try {
-      const res = await fetch(OLLAMA_URL, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${process.env.OLLAMA_API_KEY.trim()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model,
-          stream: false,
-          think: 'low',
-          format: 'json',
-          options: { temperature: 0 },
-          messages: [{ role: 'user', content, ...(images.length ? { images } : {}) }],
-        }),
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok || body.error) throw new Error(`${res.status} ${String(body.error || res.statusText).slice(0, 200)}`);
-      return { json: parseJson(body.message?.content), model };
-    } catch (err) {
-      lastError = err;
-      console.warn(`[Ollama] ${model} attempt ${attempt + 1} failed: ${String(err.message).slice(0, 200)}`);
-      if (!isTransient(err) && !/\b(502|504)\b|abort/i.test(String(err.message))) break;
-      if (attempt === 0) await sleep(800 + Math.random() * 400);
-    }
-  }
-  throw lastError || new Error('Ollama call failed');
-};
-
-/**
- * Sends `parts` to the configured AI (Ollama Cloud first, Gemini as backup) and returns { json, model }.
- * The same cacheKey gets the cached answer for 24 h: the same photo or text is never
- * paid twice, and the verdict stays consistent.
- */
-export const callVisionAI = async ({ parts, cacheKey }) => {
+const cached = async (cacheKey, compute) => {
   const hit = cacheKey && answerCache.get(cacheKey);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;
-
-  const providers = [hasOllama() && callOllama, hasGemini() && callGemini].filter(Boolean);
-  if (!providers.length) throw new Error('No AI provider configured');
-  let lastError;
-  for (const call of providers) {
-    try {
-      const value = await call({ parts });
-      if (cacheKey) {
-        answerCache.set(cacheKey, { at: Date.now(), value });
-        if (answerCache.size > CACHE_MAX) answerCache.delete(answerCache.keys().next().value);
-      }
-      return value;
-    } catch (err) {
-      lastError = err;
-    }
+  const value = await compute();
+  if (cacheKey) {
+    answerCache.set(cacheKey, { at: Date.now(), value });
+    if (answerCache.size > CACHE_MAX) answerCache.delete(answerCache.keys().next().value);
   }
-  throw lastError;
+  return value;
 };
+
+/** One answer from the next healthy provider (rotation + failover). Returns { json, model, provider }. */
+export const callVisionAI = ({ parts, cacheKey }) => cached(cacheKey, () => callBalanced({ parts }));
 
 // ---------------------------------------------------------------------------
 // Ingredients
@@ -252,23 +162,49 @@ const toVerdict = ({ json: parsed, model }, fallbackText = '') => {
   return applySafetyNet(result, result.ingredientsText);
 };
 
+// Strictest first: when the models disagree, the user is told the most cautious answer
+const STRICTNESS = { CONTAINS_GLUTEN: 3, MAY_CONTAIN: 2, UNREADABLE: 1, GLUTEN_FREE: 0 };
+const voteOf = (json) => (VERDICTS.includes(json?.verdict) ? json.verdict : 'UNREADABLE');
+
+/**
+ * Asks several providers (see callConsensus) and merges their verdicts:
+ * - every model agrees: that verdict;
+ * - they disagree: the strictest one, with low confidence;
+ * - only one model answered: its verdict, but GLUTEN_FREE is capped at 0.7 confidence,
+ *   since nobody double-checked it.
+ * Each answer also goes through the rules safety net first.
+ */
+export const mergeVerdicts = ({ answers, agreed }, fallbackText = '') => {
+  const verdicts = answers.map((a) => ({ ...toVerdict(a, fallbackText), provider: a.provider }));
+  const chosen = verdicts.reduce((a, b) => (STRICTNESS[b.verdict] > STRICTNESS[a.verdict] ? b : a));
+  const sameVerdict = verdicts.every((v) => v.verdict === chosen.verdict);
+  let confidence = Math.min(...verdicts.filter((v) => v.verdict === chosen.verdict).map((v) => v.confidence));
+  if (!sameVerdict) confidence = Math.min(confidence, 0.5);
+  else if (verdicts.length === 1 && chosen.verdict === 'GLUTEN_FREE') confidence = Math.min(confidence, 0.7);
+  return {
+    ...chosen,
+    confidence,
+    glutenIngredients: [...new Set(verdicts.flatMap((v) => v.glutenIngredients))],
+    traces: [...new Set(verdicts.flatMap((v) => v.traces))],
+    consensus: {
+      agreed: agreed && sameVerdict,
+      // `verdict` is after the rules safety net; `modelVerdict` is what the model itself said
+      votes: verdicts.map((v, i) => ({ provider: v.provider, model: v.model, verdict: v.verdict, modelVerdict: answers[i].vote, confidence: v.confidence })),
+    },
+  };
+};
+
 // The text is placed between <<< and >>>: markers inside it must not end the quoted block early
 const quoteSafe = (s) => s.replace(/<<<|>>>/g, ' ');
 
 /** Verdict from ingredients text read by OCR in the browser (fallback when photos cannot be sent) */
-export const analyzeIngredientsText = async (ingredients) => {
-  const answer = await callVisionAI({
-    parts: [{ text: `${TEXT_PROMPT}${quoteSafe(ingredients)}\n>>>` }],
-    cacheKey: hashOf('ingredients-text', ingredients.toLowerCase().replace(/\s+/g, ' ').trim()),
-  });
-  return toVerdict(answer, ingredients);
-};
+export const analyzeIngredientsText = (ingredients) =>
+  cached(hashOf('ingredients-text-v2', ingredients.toLowerCase().replace(/\s+/g, ' ').trim()), async () =>
+    mergeVerdicts(await callConsensus({ parts: [{ text: `${TEXT_PROMPT}${quoteSafe(ingredients)}\n>>>` }], vote: voteOf }), ingredients),
+  );
 
 /** Verdict from a photo of the ingredients list: the AI reads the list itself */
-export const analyzeIngredientsImage = async (image) => {
-  const answer = await callVisionAI({
-    parts: [{ inlineData: { mimeType: image.mimeType, data: image.base64 } }, { text: IMAGE_PROMPT }],
-    cacheKey: hashOf('ingredients-image', image.bytes),
-  });
-  return toVerdict(answer);
-};
+export const analyzeIngredientsImage = (image) =>
+  cached(hashOf('ingredients-image-v2', image.bytes), async () =>
+    mergeVerdicts(await callConsensus({ parts: [{ inlineData: { mimeType: image.mimeType, data: image.base64 } }, { text: IMAGE_PROMPT }], vote: voteOf })),
+  );

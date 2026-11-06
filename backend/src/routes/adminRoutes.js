@@ -4,6 +4,7 @@ import { toProfile, toStore, toSellerApplication } from '../models/mappers.js';
 import { containsPattern } from '../utils/regex.js';
 import { asyncRouter, clean, UUID_RE, badRequest } from '../utils/http.js';
 import { audit } from '../services/audit.js';
+import { providerStatus } from '../services/aiBalancer.js';
 
 const router = asyncRouter();
 
@@ -41,6 +42,8 @@ router.get('/health', async (req, res) => {
       geminiApiKey: Boolean(process.env.GEMINI_API_KEY),
       siteUrl: Boolean(process.env.SITE_URL),
     },
+    // AI providers in rotation: answers, failures and cooldown since the server started
+    aiProviders: providerStatus(),
     timestamp: new Date().toISOString(),
   });
 });
