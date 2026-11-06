@@ -626,12 +626,12 @@ function HowItWorks({ mode, lang }) {
     mode === 'product'
       ? [
           tr('Photographiez la face avant : marque et nom du produit bien visibles.', 'صوّر الواجهة الأمامية مع إظهار العلامة واسم المنتج.'),
-          tr('La photo, réduite, est envoyée à une IA (Google Gemini) qui reconnaît la marque et le produit, même sur un logo.', 'تُرسل الصورة مصغّرة إلى ذكاء اصطناعي (Google Gemini) يتعرف على العلامة والمنتج حتى من الشعار.'),
+          tr('La photo, réduite, est envoyée à une IA (Gemma, via Ollama Cloud) qui reconnaît la marque et le produit, même sur un logo.', 'تُرسل الصورة مصغّرة إلى ذكاء اصطناعي (Gemma عبر Ollama Cloud) يتعرف على العلامة والمنتج حتى من الشعار.'),
           tr('L’IA désigne la fiche du guide de l’ATMC ou de l’association qui le concerne ; le statut vient toujours du guide.', 'يحدد الذكاء الاصطناعي بطاقة الدليل المعنية، والحالة تأتي دائما من الدليل.'),
         ]
       : [
           tr('Photographiez toute la liste d’ingrédients, nette et bien éclairée.', 'صوّر قائمة المكونات كاملة وبوضوح وإضاءة جيدة.'),
-          tr('La photo, réduite, est envoyée à une IA (Google Gemini) qui lit la liste et y repère blé, orge, seigle, avoine, malt et traces. Nos propres règles relisent la liste : elles peuvent rendre le verdict plus strict, jamais plus permissif.', 'تُرسل الصورة مصغّرة إلى ذكاء اصطناعي (Google Gemini) يقرأ القائمة ويكشف القمح والشعير والشوفان والمالط والآثار. ثم تراجعها قواعدنا: قد تجعل الحكم أشد، ولا تجعله أبدا أكثر تساهلا.'),
+          tr('La photo, réduite, est envoyée à une IA (Gemma, via Ollama Cloud) qui lit la liste et y repère blé, orge, seigle, avoine, malt et traces. Nos propres règles relisent la liste : elles peuvent rendre le verdict plus strict, jamais plus permissif.', 'تُرسل الصورة مصغّرة إلى ذكاء اصطناعي (Gemma عبر Ollama Cloud) يقرأ القائمة ويكشف القمح والشعير والشوفان والمالط والآثار. ثم تراجعها قواعدنا: قد تجعل الحكم أشد، ولا تجعله أبدا أكثر تساهلا.'),
           tr('Vous obtenez un verdict avec sa probabilité. Vérifiez toujours l’étiquette.', 'تحصل على حكم مع احتماله. تحقق دائما من الملصق.'),
         ];
   return (

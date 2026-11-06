@@ -37,6 +37,7 @@ router.get('/health', async (req, res) => {
     config: {
       supabaseUrl: Boolean(process.env.SUPABASE_URL),
       supabaseSecretKey: Boolean(process.env.SUPABASE_SECRET_KEY),
+      ollamaApiKey: Boolean(process.env.OLLAMA_API_KEY),
       geminiApiKey: Boolean(process.env.GEMINI_API_KEY),
       siteUrl: Boolean(process.env.SITE_URL),
     },

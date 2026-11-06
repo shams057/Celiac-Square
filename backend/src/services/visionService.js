@@ -4,11 +4,18 @@ import { foldText } from '../utils/regex.js';
 import { findGlutenTerms, splitTraces, hasAmbiguousIngredient } from './glutenAnalysis.js';
 
 /**
- * Gemini calls for the scanner: reading an ingredients list (photo, or text read by OCR
+ * AI calls for the scanner: reading an ingredients list (photo, or text read by OCR
  * as a fallback) and judging whether it contains gluten.
- * Product identification from a photo lives in productVision.js and uses callGemini too.
+ * Product identification from a photo lives in productVision.js and uses callVisionAI too.
+ *
+ * Provider: Ollama Cloud (Gemma 4 31B) when OLLAMA_API_KEY is set. It scored 30/30 on our test photos
+ * (MODEL_BENCHMARK.md) in ~1 s. Gemini is only a backup, used when GEMINI_API_KEY is also set
+ * and Ollama fails.
  */
 
+const OLLAMA_URL = 'https://ollama.com/api/chat';
+// Override with OLLAMA_MODEL in .env.
+const OLLAMA_DEFAULT_MODEL = 'gemma4:31b';
 // Fast "lite" models answer in ~1–4 s; the larger flash models took 20 s+ or timed out.
 // Override with GEMINI_MODEL in .env.
 const DEFAULT_MODELS = ['gemini-3.5-flash-lite', 'gemini-flash-lite-latest'];
@@ -16,7 +23,9 @@ const TIMEOUT_MS = 15000;
 
 export const VERDICTS = ['CONTAINS_GLUTEN', 'MAY_CONTAIN', 'GLUTEN_FREE', 'UNREADABLE'];
 
-export const isIngredientsAiConfigured = () => Boolean(process.env.GEMINI_API_KEY?.trim());
+const hasOllama = () => Boolean(process.env.OLLAMA_API_KEY?.trim());
+const hasGemini = () => Boolean(process.env.GEMINI_API_KEY?.trim());
+export const isIngredientsAiConfigured = () => hasOllama() || hasGemini();
 export const isVisionAiConfigured = isIngredientsAiConfigured;
 
 export const clamp01 = (n) => Math.max(0, Math.min(1, Number.isFinite(n) ? n : 0));
@@ -40,15 +49,10 @@ export const hashOf = (...parts) => {
   return h.digest('hex');
 };
 
-/**
- * Sends `parts` (text and inline images) to Gemini and returns { json, model }.
- * The same cacheKey gets the cached answer for 24 h: the same photo or text is never
- * paid twice, and the verdict stays consistent.
- */
-export const callGemini = async ({ parts, cacheKey }) => {
-  const hit = cacheKey && answerCache.get(cacheKey);
-  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;
+const parseJson = (raw) => JSON.parse(String(raw || '').replace(/```json|```/g, '').trim());
 
+/** Sends `parts` (text and inline images, Gemini-style) to Gemini and returns { json, model } */
+export const callGemini = async ({ parts }) => {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY, httpOptions: { timeout: TIMEOUT_MS } });
   const models = process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL, ...DEFAULT_MODELS] : DEFAULT_MODELS;
 
@@ -62,12 +66,7 @@ export const callGemini = async ({ parts, cacheKey }) => {
           contents: [{ role: 'user', parts }],
           config: { responseMimeType: 'application/json', temperature: 0 },
         });
-        const value = { json: JSON.parse((response.text || '').replace(/```json|```/g, '').trim()), model };
-        if (cacheKey) {
-          answerCache.set(cacheKey, { at: Date.now(), value });
-          if (answerCache.size > CACHE_MAX) answerCache.delete(answerCache.keys().next().value);
-        }
-        return value;
+        return { json: parseJson(response.text), model };
       } catch (err) {
         lastError = err;
         console.warn(`[Gemini] ${model} attempt ${attempt + 1} failed: ${String(err.message).slice(0, 200)}`);
@@ -77,6 +76,68 @@ export const callGemini = async ({ parts, cacheKey }) => {
     }
   }
   throw lastError || new Error('Gemini call failed');
+};
+
+/** Same `parts` sent to Ollama Cloud: texts joined in order, images passed as base64 */
+export const callOllama = async ({ parts }) => {
+  const model = process.env.OLLAMA_MODEL?.trim() || OLLAMA_DEFAULT_MODEL;
+  const content = parts.filter((p) => p.text).map((p) => p.text).join('\n\n');
+  const images = parts.filter((p) => p.inlineData).map((p) => p.inlineData.data);
+
+  let lastError;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const res = await fetch(OLLAMA_URL, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${process.env.OLLAMA_API_KEY.trim()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          stream: false,
+          think: 'low',
+          format: 'json',
+          options: { temperature: 0 },
+          messages: [{ role: 'user', content, ...(images.length ? { images } : {}) }],
+        }),
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || body.error) throw new Error(`${res.status} ${String(body.error || res.statusText).slice(0, 200)}`);
+      return { json: parseJson(body.message?.content), model };
+    } catch (err) {
+      lastError = err;
+      console.warn(`[Ollama] ${model} attempt ${attempt + 1} failed: ${String(err.message).slice(0, 200)}`);
+      if (!isTransient(err) && !/\b(502|504)\b|abort/i.test(String(err.message))) break;
+      if (attempt === 0) await sleep(800 + Math.random() * 400);
+    }
+  }
+  throw lastError || new Error('Ollama call failed');
+};
+
+/**
+ * Sends `parts` to the configured AI (Ollama Cloud first, Gemini as backup) and returns { json, model }.
+ * The same cacheKey gets the cached answer for 24 h: the same photo or text is never
+ * paid twice, and the verdict stays consistent.
+ */
+export const callVisionAI = async ({ parts, cacheKey }) => {
+  const hit = cacheKey && answerCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;
+
+  const providers = [hasOllama() && callOllama, hasGemini() && callGemini].filter(Boolean);
+  if (!providers.length) throw new Error('No AI provider configured');
+  let lastError;
+  for (const call of providers) {
+    try {
+      const value = await call({ parts });
+      if (cacheKey) {
+        answerCache.set(cacheKey, { at: Date.now(), value });
+        if (answerCache.size > CACHE_MAX) answerCache.delete(answerCache.keys().next().value);
+      }
+      return value;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
 };
 
 // ---------------------------------------------------------------------------
@@ -196,16 +257,16 @@ const quoteSafe = (s) => s.replace(/<<<|>>>/g, ' ');
 
 /** Verdict from ingredients text read by OCR in the browser (fallback when photos cannot be sent) */
 export const analyzeIngredientsText = async (ingredients) => {
-  const answer = await callGemini({
+  const answer = await callVisionAI({
     parts: [{ text: `${TEXT_PROMPT}${quoteSafe(ingredients)}\n>>>` }],
     cacheKey: hashOf('ingredients-text', ingredients.toLowerCase().replace(/\s+/g, ' ').trim()),
   });
   return toVerdict(answer, ingredients);
 };
 
-/** Verdict from a photo of the ingredients list: Gemini reads the list itself */
+/** Verdict from a photo of the ingredients list: the AI reads the list itself */
 export const analyzeIngredientsImage = async (image) => {
-  const answer = await callGemini({
+  const answer = await callVisionAI({
     parts: [{ inlineData: { mimeType: image.mimeType, data: image.base64 } }, { text: IMAGE_PROMPT }],
     cacheKey: hashOf('ingredients-image', image.bytes),
   });

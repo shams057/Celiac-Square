@@ -6,7 +6,7 @@ import { analyzeIngredientsImage } from '../services/visionService.js';
 
 /**
  * Runs the photo scanner on the test photos and checks each answer.
- * Calls Gemini once or twice per photo (needs GEMINI_API_KEY and the database), so it is not part of npm test.
+ * Calls the scanner AI once or twice per photo (needs OLLAMA_API_KEY or GEMINI_API_KEY, and the database), so it is not part of npm test.
  *
  *   npm run bench:scanner -- [folder]      (default: ../test_data next to the app)
  */

@@ -72,7 +72,7 @@ export const fetchProductByBarcode = async (barcode) => {
   return res.data;
 };
 
-// Scanner. The photo (resized in the browser) is read by Gemini on the server; when the AI is
+// Scanner. The photo (resized in the browser) is read by the AI (Ollama Cloud) on the server; when the AI is
 // unavailable, the browser reads the text itself (OCR) and sends only the text.
 export const identifyProductPhoto = async (image) => {
   const res = await axios.post(`${API_BASE}/vision/identify`, { image }, { timeout: 45000 });

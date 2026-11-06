@@ -19,12 +19,12 @@ const SECTIONS = [
   },
   {
     fr: ['Le scanner', [
-      'La photo est réduite sur votre appareil, puis envoyée à notre serveur et à Google (Gemini), qui reconnaît le produit ou lit sa liste d’ingrédients. N’y photographiez rien de personnel.',
+      'La photo est réduite sur votre appareil, puis envoyée à notre serveur puis à Ollama Cloud (modèle Gemma ; en secours, Google Gemini), qui reconnaît le produit ou lit sa liste d’ingrédients. N’y photographiez rien de personnel.',
       'Elle n’est pas conservée : nous gardons seulement le résultat en mémoire, quelques heures, pour répondre plus vite si la même photo revient.',
       'Si l’IA ne répond pas, le texte est lu sur votre appareil et seul ce texte est envoyé.',
     ]],
     ar: ['الماسح', [
-      'تُصغَّر الصورة على جهازك ثم تُرسل إلى خادمنا وإلى Google (Gemini) للتعرف على المنتج أو قراءة مكوناته. لا تصوّر أي معلومات شخصية.',
+      'تُصغَّر الصورة على جهازك ثم تُرسل إلى خادمنا ثم إلى Ollama Cloud (نموذج Gemma، واحتياطيا Google Gemini) للتعرف على المنتج أو قراءة مكوناته. لا تصوّر أي معلومات شخصية.',
       'لا تُحفظ الصورة: نحتفظ بالنتيجة فقط في الذاكرة لبضع ساعات للرد بسرعة إن أُرسلت الصورة نفسها مجددا.',
       'إن لم يستجب الذكاء الاصطناعي، يُقرأ النص على جهازك ويُرسل النص وحده.',
     ]],

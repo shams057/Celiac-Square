@@ -25,7 +25,7 @@ Plateforme web et mobile pour manger sans gluten en Tunisie : le guide officiel 
 | Écran | Description |
 | --- | --- |
 | **Guide ATMC** | Les 241 produits du guide 2023 (autorisés, à vérifier, interdits), en français et en arabe, avec recherche tolérante aux fautes et filtres par rayon. |
-| **Scanner** | Deux modes. *Reconnaître le produit* : le texte de l’emballage est lu sur l’appareil (OCR Tesseract, gratuit) puis cherché dans les guides tunisiens. *Analyser les ingrédients* : la liste est lue sur l’appareil (OCR), puis seul le texte est envoyé à Google Gemini, qui renvoie le statut probable, un pourcentage de confiance et une courte explication. |
+| **Scanner** | Deux modes. *Reconnaître le produit* : la photo réduite est envoyée à une IA (Gemma 4 via Ollama Cloud, avec Google Gemini en secours) qui lit la marque et choisit la fiche des guides tunisiens ; le statut vient toujours du guide. *Analyser les ingrédients* : l’IA lit la liste et renvoie le statut probable, un pourcentage de confiance et une courte explication, que nos propres règles ne peuvent que rendre plus strict. Sans IA, le texte est lu sur l’appareil (OCR Tesseract). |
 | **Recherche** | Nom, marque ou code-barres. Résultats locaux instantanés, Open Food Facts ensuite. Insensible aux accents. |
 | **Carte** | Médecins, boulangeries, restaurants, cafés et épiceries sans gluten, filtrables par type et par ville. |
 | **Propositions** | Les visiteurs proposent des adresses ; elles arrivent dans une boîte de réception administrateur avant publication. |
@@ -50,7 +50,7 @@ app/
 │       ├── server.js       # Serveur local (port 5000)
 │       ├── config/db.js    # Client Supabase côté serveur
 │       ├── routes/         # /api/map, /api/products, /api/atmc, /api/vision, /api/auth, /api/market, /api/admin
-│       ├── services/       # Open Food Facts, vision (Gemini), photos du marché (Storage)
+│       ├── services/       # Open Food Facts, vision (Ollama Cloud / Gemini), photos du marché (Storage)
 │       ├── middleware/     # Comptes connectés, rôles, accès administrateur
 │       ├── seed/           # Données initiales et script de seed
 │       └── scripts/        # set-role : donner un rôle à un compte
@@ -126,8 +126,10 @@ Puis complétez `backend/.env` :
 | `SUPABASE_SECRET_KEY` | Oui | Clé secrète Supabase (serveur uniquement) |
 | `SITE_URL` | Production | Adresse publique du site, utilisée dans les e-mails de réinitialisation du mot de passe |
 | `CORS_ORIGINS` | Non | Autres origines autorisées à appeler l’API depuis un navigateur, séparées par des virgules. Les appels du site lui-même (même origine) n’en ont pas besoin |
-| `GEMINI_API_KEY` | Non | Active l’analyse des ingrédients. La reconnaissance de produit (OCR) fonctionne sans |
-| `GEMINI_MODEL` | Non | Modèle Gemini (par défaut `gemini-3.5-flash-lite`, avec repli sur `gemini-flash-lite-latest`) |
+| `OLLAMA_API_KEY` | Non | Clé Ollama Cloud : active la reconnaissance par IA et l’analyse des ingrédients. Sans clé IA, le scanner lit le texte sur l’appareil (OCR) |
+| `OLLAMA_MODEL` | Non | Modèle Ollama Cloud (par défaut `gemma4:31b`, voir `MODEL_BENCHMARK.md`) |
+| `GEMINI_API_KEY` | Non | Secours : utilisé seulement si Ollama ne répond pas |
+| `GEMINI_MODEL` | Non | Modèle Gemini de secours (par défaut `gemini-3.5-flash-lite`, avec repli sur `gemini-flash-lite-latest`) |
 | `OFF_USER_AGENT` | Non | Identifiant envoyé à Open Food Facts, par exemple `CeliacSquare/1.0 (contact@exemple.com)` |
 | `PORT` | Non | Port de l’API locale (par défaut `5000`) |
 
@@ -175,7 +177,7 @@ Reconnectez-vous : le lien *Back-office* apparaît en bas de page. Ensuite, les 
 2. Sur [vercel.com](https://vercel.com), **Add New → Project**, importez le dépôt.
    - **Root Directory :** la racine du dépôt (là où se trouve `vercel.json`).
    - **Framework Preset :** *Other*. Les commandes viennent de `vercel.json`.
-3. Dans **Settings → Environment Variables**, ajoutez pour *Production* (et *Preview* si besoin) les mêmes variables que `backend/.env`. Marquez `SUPABASE_SECRET_KEY` et `GEMINI_API_KEY` comme **Sensitive**, et définissez `SITE_URL`. L’ancien `ADMIN_TOKEN` n’est plus utilisé : supprimez-le. Les limites de débit de l’API sont gardées en mémoire par instance ; pour des limites strictes, ajoutez une règle *Rate limiting* dans **Firewall**.
+3. Dans **Settings → Environment Variables**, ajoutez pour *Production* (et *Preview* si besoin) les mêmes variables que `backend/.env`. Marquez `SUPABASE_SECRET_KEY`, `OLLAMA_API_KEY` et `GEMINI_API_KEY` comme **Sensitive**, et définissez `SITE_URL`. L’ancien `ADMIN_TOKEN` n’est plus utilisé : supprimez-le. Les limites de débit de l’API sont gardées en mémoire par instance ; pour des limites strictes, ajoutez une règle *Rate limiting* dans **Firewall**.
 4. Déployez. Chaque `git push` sur `main` redéploie automatiquement.
 5. Vérifiez `https://<votre-domaine>/api/health`.
 
@@ -239,7 +241,7 @@ L’APK local est signé avec la clé de débogage : il convient pour vos appare
 | GET | `/api/atmc/stats` | Public | Totaux autorisés / à vérifier / interdits |
 | GET | `/api/products/search` | Public | Recherche (`q`, `sources=local\|off\|all`) |
 | GET | `/api/products/barcode/:code` | Public | Recherche par code-barres |
-| POST | `/api/vision/identify` | Public | Reconnaît le produit sur une photo de l’emballage (`{ "image": "data:image/jpeg;base64,…" }`) et choisit la fiche du guide (Gemini) |
+| POST | `/api/vision/identify` | Public | Reconnaît le produit sur une photo de l’emballage (`{ "image": "data:image/jpeg;base64,…" }`) et choisit la fiche du guide (IA : Ollama Cloud, secours Gemini) |
 | POST | `/api/vision/match` | Public | Repli sans IA : trouve le produit à partir du texte lu par OCR dans le navigateur (`{ "text": "…" }`) |
 | POST | `/api/vision/ingredients` | Public | Estime si un produit contient du gluten à partir d’une photo de ses ingrédients (`{ "image" }`) ou, en repli, du texte OCR (`{ "text" }`). Nos règles peuvent rendre le verdict plus strict, jamais plus permissif |
 | GET | `/api/map/spots` | Public | Adresses (`category`, `city`, `isVerified`, `q`) |
@@ -302,7 +304,7 @@ Limites de débit (par IP) : 300 requêtes/min sur l’API, 10 connexions ou ins
 | `/api/health` indique `supabaseSecretKey: false` sur Vercel | La variable n’existe pas pour l’environnement *Production*, ou aucun redéploiement n’a suivi son ajout. |
 | La base est vide | Lancez `npm run seed -- --yes-wipe-database` avec le bon `backend/.env`. |
 | « Open Food Facts ne répond pas » | Le service limite le nombre de recherches. Les résultats locaux restent affichés ; réessayez après une minute. |
-| « L’analyse des ingrédients n’est pas configurée » | `GEMINI_API_KEY` absente. La reconnaissance de produit, elle, n’en a pas besoin. |
+| « L’analyse des ingrédients n’est pas configurée » | Ni `OLLAMA_API_KEY` ni `GEMINI_API_KEY`. La reconnaissance de produit, elle, n’en a pas besoin. |
 | La reconnaissance de produit reste sur « Préparation de la lecture… » | Le moteur OCR (~3 Mo) se télécharge à la première utilisation ; il faut une connexion internet, ensuite il est en cache. |
 | Pas de lien *Back-office* en bas de page | Le compte n’est pas administrateur : `npm run set-role -- <email> ADMIN`, puis déconnexion et reconnexion. |
 | « Confirmez d’abord votre adresse e-mail » | L’option *Confirm email* est active dans Supabase : ouvrez le lien reçu, ou désactivez l’option. |

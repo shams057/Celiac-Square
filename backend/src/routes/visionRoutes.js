@@ -13,7 +13,7 @@ const AI_DOWN = {
   code: 'AI_UNAVAILABLE',
   message: 'Le service d’analyse ne répond pas pour le moment. Réessayez dans un instant.',
 };
-const AI_OFF = { success: false, code: 'AI_NOT_CONFIGURED', message: 'L’analyse par IA n’est pas configurée (GEMINI_API_KEY).' };
+const AI_OFF = { success: false, code: 'AI_NOT_CONFIGURED', message: 'L’analyse par IA n’est pas configurée (OLLAMA_API_KEY).' };
 
 /** The photo in the body, or a 400 already sent */
 const photoOf = (req, res) => {
@@ -38,7 +38,7 @@ const CONFIRM_BELOW = 0.7;
 /**
  * POST /api/vision/identify
  * Body: { image: dataURL } — photo of the front of the package.
- * Gemini reads the package and picks the guide entry; the status comes from the database.
+ * The AI reads the package and picks the guide entry; the status comes from the database.
  * On AI_UNAVAILABLE the browser falls back to OCR + /match.
  */
 router.post('/identify', async (req, res) => {
@@ -96,9 +96,9 @@ router.post('/match', async (req, res) => {
 
 /**
  * POST /api/vision/ingredients
- * Body: { image: dataURL } — photo of the ingredients list, read by Gemini,
+ * Body: { image: dataURL } — photo of the ingredients list, read by the AI,
  *    or { text } — the list read by OCR in the browser (fallback).
- * Gemini estimates whether the product contains gluten; our own rules can only make the verdict stricter.
+ * The AI estimates whether the product contains gluten; our own rules can only make the verdict stricter.
  */
 router.post('/ingredients', async (req, res) => {
   if (!isIngredientsAiConfigured()) return res.status(503).json(AI_OFF);

@@ -1,11 +1,11 @@
 import { loadCatalogue } from './productMatcher.js';
-import { callGemini, hashOf, clamp01, strings, text } from './visionService.js';
+import { callVisionAI, hashOf, clamp01, strings, text } from './visionService.js';
 
 /**
  * Identifies a product from a photo of its package and finds the guide entry that covers it.
  *
  * OCR (Tesseract) could not read stylised logos on coloured packaging (Délice, Tropico, Lindt):
- * Gemini reads the package AND chooses the entry from the whole guide (~5 000 tokens), in one call.
+ * The AI reads the package AND chooses the entry from the whole guide (~5 000 tokens), in one call.
  * The model only names an entry: the gluten status always comes from the database.
  */
 
@@ -68,8 +68,8 @@ export const identifyProductFromImage = async (image) => {
   const guide = catalogueLines(entries);
   const byCode = new Map(entries.map((e) => [e.code, e]));
 
-  const { json: p, model } = await callGemini({
-    // The guide comes first: an identical prefix lets Gemini reuse its cache between photos
+  const { json: p, model } = await callVisionAI({
+    // The guide comes first: an identical prefix lets the provider reuse its prompt cache between photos
     parts: [{ text: PROMPT_HEAD + guide + PROMPT_TAIL }, { inlineData: { mimeType: image.mimeType, data: image.base64 } }],
     cacheKey: hashOf('identify', guide, image.bytes),
   });
