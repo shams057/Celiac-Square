@@ -10,6 +10,16 @@ import { audit } from '../services/audit.js';
 const router = asyncRouter();
 
 const CATEGORIES = ['DOCTOR', 'CAFE', 'RESTAURANT', 'ARTISAN', 'SUPERMARKET'];
+
+/**
+ * A spot can belong to several categories (a café that is also a bakery). The first one is the main
+ * category: it sets the marker icon and is mirrored in the single `category` column.
+ * Accepts an array or a single value; returns known categories, uppercased, without duplicates, in order.
+ */
+export const normalizeCategories = (value) => {
+  const list = (Array.isArray(value) ? value : [value]).map((c) => clean(c).toUpperCase());
+  return [...new Set(list)].filter((c) => CATEGORIES.includes(c));
+};
 const MAX_SPOTS = 1000;
 
 const validCoords = (c) =>
@@ -53,7 +63,15 @@ const verification = (req, isVerified) =>
 const spotFields = (body) => {
   const row = {};
   if (body.name !== undefined) row.name = clean(body.name);
-  if (body.category !== undefined) row.category = clean(body.category).toUpperCase();
+  if (body.categories !== undefined || body.category !== undefined) {
+    // An explicit main category goes first; the rest keep their order
+    const categories = normalizeCategories([
+      ...(body.category !== undefined ? [body.category] : []),
+      ...(Array.isArray(body.categories) ? body.categories : body.categories !== undefined ? [body.categories] : []),
+    ]);
+    row.categories = categories;
+    row.category = categories[0] || '';
+  }
   if (body.city !== undefined) row.city = clean(body.city);
   if (body.address !== undefined) row.address = clean(body.address);
   if (body.phone !== undefined) row.phone = clean(body.phone);
@@ -87,7 +105,7 @@ router.get('/spots', async (req, res) => {
     .order('is_verified', { ascending: false })
     .order('name')
     .limit(MAX_SPOTS);
-  if (CATEGORIES.includes(category)) query = query.eq('category', category);
+  if (CATEGORIES.includes(category)) query = query.contains('categories', [category]);
   if (city && city !== 'ALL') query = query.ilike('city', exactPattern(city.slice(0, MAX_LEN.city)));
   if (isVerified === 'true' || isVerified === 'false') query = query.eq('is_verified', isVerified === 'true');
   if (q) query = query.ilike('search_text', containsPattern(q));
@@ -114,7 +132,7 @@ router.post('/spots', requireAdmin, async (req, res) => {
   if (!row.name || !row.category || row.lng === undefined || !row.city || !row.address) {
     return badRequest(res, 'Veuillez renseigner les champs obligatoires (nom, catégorie, ville, coordonnées, adresse).');
   }
-  if (!CATEGORIES.includes(row.category)) return badRequest(res, 'Catégorie inconnue.');
+  if (!row.categories?.length) return badRequest(res, 'Catégorie inconnue.');
   const long = lengthProblem(row);
   if (long) return badRequest(res, long);
   if (!row.submitted_by) row.submitted_by = 'Backoffice Admin';
@@ -133,7 +151,7 @@ router.put('/spots/:id', requireAdmin, async (req, res) => {
   const spot = await findById('spots', req.params.id);
   if (!spot) return res.status(404).json({ success: false, message: 'Lieu introuvable.' });
   const row = spotFields(req.body);
-  if (row.category !== undefined && !CATEGORIES.includes(row.category)) return badRequest(res, 'Catégorie inconnue.');
+  if (row.categories !== undefined && !row.categories.length) return badRequest(res, 'Choisissez au moins une catégorie connue.');
   for (const required of ['name', 'city', 'address']) {
     if (row[required] !== undefined && !row[required]) return badRequest(res, 'Le nom, la ville et l’adresse sont obligatoires.');
   }
@@ -247,6 +265,7 @@ router.post('/proposals/:id/approve', requireAdmin, async (req, res) => {
   const row = {
     name: proposal.name,
     category: proposal.category,
+    categories: [proposal.category],
     city: proposal.city,
     address: proposal.address,
     phone: proposal.phone,
@@ -260,7 +279,7 @@ router.post('/proposals/:id/approve', requireAdmin, async (req, res) => {
     ...verification(req, true),
   };
   if (row.lng == null || row.lat == null) return badRequest(res, 'Indiquez la position exacte (latitude et longitude) du lieu.');
-  if (!CATEGORIES.includes(row.category)) return badRequest(res, 'Catégorie inconnue.');
+  if (!row.categories.length || !CATEGORIES.includes(row.category)) return badRequest(res, 'Catégorie inconnue.');
   const long = lengthProblem(row);
   if (long) return badRequest(res, long);
 

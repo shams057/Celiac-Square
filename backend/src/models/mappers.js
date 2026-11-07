@@ -7,6 +7,8 @@ export const toSpot = (r) => ({
   _id: r.id,
   name: r.name,
   category: r.category,
+  // Main category first; rows written before categories existed only have `category`
+  categories: Array.isArray(r.categories) && r.categories.length ? r.categories : [r.category],
   location: { type: 'Point', coordinates: [r.lng, r.lat] },
   city: r.city,
   address: r.address,

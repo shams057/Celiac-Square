@@ -70,3 +70,11 @@ test('scanner photos are checked before they reach the AI', async () => {
   assert.throws(() => parseImageDataUrl('data:image/svg+xml;base64,PHN2Zz4=', 1024), /Format/);
   assert.throws(() => parseImageDataUrl(`data:image/png;base64,${png}`, 4), /dépasse/);
 });
+
+test('spot categories keep the main one first, drop unknown values and duplicates', async () => {
+  const { normalizeCategories } = await import('../src/routes/mapRoutes.js');
+  assert.deepEqual(normalizeCategories(['cafe', 'ARTISAN', 'CAFE', 'bar', '']), ['CAFE', 'ARTISAN']);
+  assert.deepEqual(normalizeCategories('restaurant'), ['RESTAURANT']);
+  assert.deepEqual(normalizeCategories(['nope']), []);
+  assert.deepEqual(normalizeCategories(undefined), []);
+});

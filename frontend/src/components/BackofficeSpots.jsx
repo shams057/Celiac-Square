@@ -27,7 +27,7 @@ const PRESET_COORDINATES = [
 
 const EMPTY_SPOT_FORM = {
   name: '',
-  category: 'RESTAURANT',
+  categories: ['RESTAURANT'], // main category first
   city: 'Tunis',
   address: '',
   latitude: '36.8065',
@@ -126,7 +126,7 @@ export default function BackofficeSpots({ lang = 'fr' }) {
     setFormData({
       ...EMPTY_SPOT_FORM,
       name: proposal.name,
-      category: proposal.category,
+      categories: [proposal.category],
       city: proposal.city,
       address: proposal.address,
       longitude: String(coords[0]),
@@ -164,7 +164,7 @@ export default function BackofficeSpots({ lang = 'fr' }) {
     const q = filterQuery.trim().toLowerCase();
     return spots.filter((spot) => {
       if (q && ![spot.name, spot.address, spot.notes, spot.speciality].some((v) => v?.toLowerCase().includes(q))) return false;
-      if (filterCategory !== 'ALL' && spot.category !== filterCategory) return false;
+      if (filterCategory !== 'ALL' && !(spot.categories || [spot.category]).includes(filterCategory)) return false;
       if (filterCity !== 'ALL' && spot.city?.toLowerCase() !== filterCity.toLowerCase()) return false;
       if (filterVerified === 'VERIFIED' && !spot.isVerified) return false;
       if (filterVerified === 'PENDING' && spot.isVerified) return false;
@@ -187,7 +187,7 @@ export default function BackofficeSpots({ lang = 'fr' }) {
     setFormError('');
     setFormData({
       name: spot.name || '',
-      category: spot.category || 'RESTAURANT',
+      categories: spot.categories?.length ? spot.categories : [spot.category || 'RESTAURANT'],
       city: spot.city || 'Tunis',
       address: spot.address || '',
       longitude: String(coords[0]),
@@ -210,11 +210,16 @@ export default function BackofficeSpots({ lang = 'fr' }) {
       setFormError(tr('Saisissez la latitude et la longitude exactes du lieu (clic droit sur Google Maps → coordonnées).', 'أدخل خط العرض وخط الطول الدقيقين للمكان.'));
       return;
     }
+    if (!formData.categories.length) {
+      setFormError(tr('Choisissez au moins une catégorie.', 'اختر صنفا واحدا على الأقل.'));
+      return;
+    }
     setFormSubmitting(true);
     setFormError('');
     const payload = {
       name: formData.name.trim(),
-      category: formData.category,
+      category: formData.categories[0],
+      categories: formData.categories,
       city: formData.city.trim(),
       address: formData.address.trim(),
       coordinates: [lng, lat],
@@ -283,6 +288,14 @@ export default function BackofficeSpots({ lang = 'fr' }) {
   };
 
   const set = (key) => (e) => setFormData({ ...formData, [key]: e.target.value });
+  // Categories keep their order: the first one is the main category (marker icon)
+  const toggleCategory = (value) =>
+    setFormData((f) => ({
+      ...f,
+      categories: f.categories.includes(value) ? f.categories.filter((c) => c !== value) : [...f.categories, value],
+    }));
+  const setMainCategory = (value) =>
+    setFormData((f) => ({ ...f, categories: [value, ...f.categories.filter((c) => c !== value)] }));
   const hasFilters = filterQuery || filterCategory !== 'ALL' || filterCity !== 'ALL' || filterVerified !== 'ALL';
 
   return (
@@ -441,16 +454,18 @@ export default function BackofficeSpots({ lang = 'fr' }) {
       ) : (
         <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-white/70 bg-canvas-paper/80 backdrop-blur-sm">
           {filteredSpots.map((spot) => {
-            const cat = spotCategory(spot.category);
+            const cats = (spot.categories?.length ? spot.categories : [spot.category]).map(spotCategory);
             const coords = spot.location?.coordinates || [0, 0];
             return (
               <li key={spot._id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:gap-5">
                 <div className="min-w-0 flex-1">
                   <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="h-3 w-3 rounded-[2px]" style={{ background: cat.color }} aria-hidden="true" />
-                      {tr(cat.fr, cat.ar)}
-                    </span>
+                    {cats.map((cat) => (
+                      <span key={cat.value} className="inline-flex items-center gap-1.5">
+                        <span className="h-3 w-3 rounded-[2px]" style={{ background: cat.color }} aria-hidden="true" />
+                        {tr(cat.fr, cat.ar)}
+                      </span>
+                    ))}
                     <span>{spot.city}</span>
                     <button
                       type="button"
@@ -536,21 +551,48 @@ export default function BackofficeSpots({ lang = 'fr' }) {
             <input id="bo-name" maxLength={120} required value={formData.name} onChange={set('name')} className="field" />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="bo-category" className="field-label">{tr('Catégorie', 'الصنف')}</label>
-              <select id="bo-category" value={formData.category} onChange={set('category')} className="field">
-                {SPOT_CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>
+          <fieldset>
+            <legend className="field-label">{tr('Catégories (une ou plusieurs)', 'الأصناف (واحد أو أكثر)')}</legend>
+            <div className="flex flex-wrap gap-2">
+              {SPOT_CATEGORIES.map((c) => {
+                const checked = formData.categories.includes(c.value);
+                return (
+                  <label
+                    key={c.value}
+                    className={`chip cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ink has-[:focus-visible]:ring-offset-2 ${checked ? 'border-ink bg-ink text-canvas-paper hover:text-canvas-paper' : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={checked}
+                      onChange={() => toggleCategory(c.value)}
+                    />
+                    <span className="h-3 w-3 rounded-[2px]" style={{ background: c.color }} aria-hidden="true" />
                     {tr(c.fr, c.ar)}
-                  </option>
-                ))}
-              </select>
+                  </label>
+                );
+              })}
             </div>
-            <div>
-              <label htmlFor="bo-city" className="field-label">{tr('Ville', 'المدينة')}</label>
-              <input id="bo-city" maxLength={80} required value={formData.city} onChange={set('city')} className="field" />
-            </div>
+            {formData.categories.length > 1 && (
+              <div className="mt-3 sm:w-1/2">
+                <label htmlFor="bo-main-category" className="field-label">{tr('Catégorie principale (icône sur la carte)', 'الصنف الرئيسي (الأيقونة على الخريطة)')}</label>
+                <select id="bo-main-category" value={formData.categories[0]} onChange={(e) => setMainCategory(e.target.value)} className="field">
+                  {formData.categories.map((value) => {
+                    const c = spotCategory(value);
+                    return (
+                      <option key={value} value={value}>
+                        {tr(c.fr, c.ar)}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            )}
+          </fieldset>
+
+          <div>
+            <label htmlFor="bo-city" className="field-label">{tr('Ville', 'المدينة')}</label>
+            <input id="bo-city" maxLength={80} required value={formData.city} onChange={set('city')} className="field sm:w-1/2" />
           </div>
 
           <div>

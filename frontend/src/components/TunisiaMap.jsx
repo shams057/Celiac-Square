@@ -42,6 +42,9 @@ const markerIcon = (category, isVerified, active) => {
   return iconCache[key];
 };
 
+/** Every category of a spot, main one first (older rows only carry `category`) */
+const spotCategories = (spot) => (spot.categories?.length ? spot.categories : [spot.category]);
+
 const verifiedDate = (iso, lang) =>
   new Date(iso).toLocaleDateString(lang === 'ar' ? 'ar-TN' : 'fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -102,7 +105,9 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
   const counts = useMemo(() => {
     const c = {};
     spots.forEach((s) => {
-      c[s.category] = (c[s.category] || 0) + 1;
+      spotCategories(s).forEach((cat) => {
+        c[cat] = (c[cat] || 0) + 1;
+      });
     });
     return c;
   }, [spots]);
@@ -224,7 +229,8 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
                 <Marker
                   key={spot._id}
                   position={[lat, lng]}
-                  icon={markerIcon(spot.category, spot.isVerified, activeId === spot._id)}
+                  // While filtering, a café that is also a bakery shows the bakery icon under "Boulangerie"
+                  icon={markerIcon(spotCategories(spot).includes(selectedCategory) ? selectedCategory : spotCategories(spot)[0], spot.isVerified, activeId === spot._id)}
                   title={`${spot.name}, ${spot.city}`}
                   keyboard
                   eventHandlers={{
@@ -236,7 +242,7 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
                       el.setAttribute('role', 'button');
                       el.setAttribute(
                         'aria-label',
-                        `${spot.name}, ${spot.city} — ${tr(spotCategory(spot.category).fr, spotCategory(spot.category).ar)}${spot.isVerified ? `, ${tr('vérifiée', 'موثق')}` : ''}`
+                        `${spot.name}, ${spot.city} — ${spotCategories(spot).map((v) => tr(spotCategory(v).fr, spotCategory(v).ar)).join(', ')}${spot.isVerified ? `, ${tr('vérifiée', 'موثق')}` : ''}`
                       );
                     },
                   }}
@@ -289,7 +295,7 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
           ) : (
             <ul className="space-y-2">
               {spots.map((spot) => {
-                const cat = spotCategory(spot.category);
+                const cats = spotCategories(spot).map(spotCategory);
                 const active = activeId === spot._id;
                 const cover = spotCover(spot);
                 return (
@@ -305,8 +311,12 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
                       )}
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-2 text-sm text-ink-soft">
-                          <span className="h-3 w-3 shrink-0 rounded-[2px]" style={{ background: cat.color }} aria-hidden="true" />
-                          {tr(cat.fr, cat.ar)}, {spot.city}
+                          <span className="flex shrink-0 gap-0.5" aria-hidden="true">
+                            {cats.map((cat) => (
+                              <span key={cat.value} className="h-3 w-3 rounded-[2px]" style={{ background: cat.color }} />
+                            ))}
+                          </span>
+                          {cats.map((cat) => tr(cat.fr, cat.ar)).join(' · ')}, {spot.city}
                           {spot.isVerified && (
                             <span
                               className="ms-auto inline-flex items-center gap-1 text-status-safe-ink"

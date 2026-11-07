@@ -121,6 +121,7 @@ export const spotsSeed = [
   {
     name: 'La Seine — La Marsa',
     category: 'CAFE',
+    categories: ['CAFE', 'ARTISAN'],
     location: { type: 'Point', coordinates: [10.329816, 36.8842791] },
     city: 'La Marsa',
     address: 'Résidence Hannibal, rue Abdelhafidh El Mekki, 2070 La Marsa',
@@ -141,6 +142,7 @@ export const spotsSeed = [
   {
     name: 'La Seine — El Menzah 6',
     category: 'CAFE',
+    categories: ['CAFE', 'ARTISAN'],
     location: { type: 'Point', coordinates: [10.1646779, 36.8455049] },
     city: 'El Menzah',
     address: '2 rue Tahar Memmi, El Menzah 6, 2091 Ariana',
@@ -163,6 +165,7 @@ export const spotsSeed = [
   {
     name: 'Lily Delights',
     category: 'CAFE',
+    categories: ['CAFE', 'ARTISAN'],
     location: { type: 'Point', coordinates: [10.5790589, 36.4049319] },
     city: 'Hammamet',
     address: 'Rue Dag Hammarskjöld, 8050 Hammamet',
@@ -610,7 +613,8 @@ export function buildAtmcRows(dataDir = DATA_DIR) {
 export const spotRows = () =>
   spotsSeed.map((s) => ({
     name: s.name,
-    category: s.category,
+    category: (s.categories || [s.category])[0],
+    categories: s.categories || [s.category],
     lng: s.location.coordinates[0],
     lat: s.location.coordinates[1],
     city: s.city,
