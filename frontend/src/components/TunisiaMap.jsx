@@ -2,9 +2,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { Stethoscope, Croissant, UtensilsCrossed, Coffee, ShoppingBag, Phone, Clock, Search, BadgeCheck, LocateFixed, Plus } from 'lucide-react';
+import { Stethoscope, Croissant, UtensilsCrossed, Coffee, ShoppingBag, Phone, Clock, Search, BadgeCheck, LocateFixed, Plus, Images } from 'lucide-react';
 import { fetchSpots, fetchCities } from '../services/api';
 import { t, PageHead, EmptyState, FilterSheet, SPOT_CATEGORIES, spotCategory } from './ui';
+import SpotDetails, { spotCover, CrossContaminationBadge } from './SpotDetails';
 
 const CATEGORY_ICONS = {
   DOCTOR: Stethoscope,
@@ -208,7 +209,7 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
         </FilterSheet>
       </div>
 
-      <div className="grid items-start gap-4 lg:grid-cols-[1.5fr_1fr]">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <div role="region" aria-label={tr('Carte des adresses. La liste qui suit présente les mêmes lieux.', 'خريطة العناوين. القائمة التالية تعرض نفس الأماكن.')} className="relative z-0 h-[55vh] min-h-[340px] overflow-hidden rounded-2xl border border-white/60 shadow-[0_8px_24px_-16px_rgba(47,38,29,0.3)] lg:sticky lg:top-24 lg:h-[620px]">
           <MapContainer center={TUNISIA_CENTER} zoom={TUNISIA_ZOOM} scrollWheelZoom className="h-full w-full">
             <FlyTo target={flyTarget} />
@@ -241,7 +242,9 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
                   }}
                 >
                   <Popup>
+                    {spotCover(spot) && <img src={spotCover(spot).src} alt="" loading="lazy" className="mb-2 h-24 w-full rounded-md object-cover" />}
                     <p className="font-medium">{spot.name}</p>
+                    {spot.crossContaminationRisk && <p className="text-status-warning-ink">{tr('Risque de contamination croisée', 'خطر التلوث التبادلي')}</p>}
                     <p className="text-ink-soft">{spot.address}</p>
                     {spot.phone && (
                       <a href={`tel:${spot.phone.replace(/[^\d+]/g, '')}`} className="mt-1 inline-block text-status-safe-ink underline">
@@ -264,7 +267,7 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
           </button>
         </div>
 
-        <div>
+        <div className="min-w-0">
           <p className="mb-2 text-sm text-ink-soft" aria-live="polite">
             {loading ? tr('Chargement…', 'جاري التحميل…') : `${spots.length} ${tr(spots.length > 1 ? 'adresses' : 'adresse', 'عنوان')}`}
           </p>
@@ -288,52 +291,70 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
               {spots.map((spot) => {
                 const cat = spotCategory(spot.category);
                 const active = activeId === spot._id;
+                const cover = spotCover(spot);
                 return (
-                  <li key={spot._id}>
-                    <button
-                      type="button"
-                      onClick={() => focusSpot(spot)}
-                      aria-pressed={active}
-                      className={`w-full rounded-xl border p-4 text-start transition-colors ${
-                        active ? 'border-ink bg-white ring-1 ring-ink' : 'border-canvas-line bg-white hover:border-ink-faint'
-                      }`}
-                    >
-                      <span className="flex items-center gap-2 text-sm text-ink-soft">
-                        <span className="h-3 w-3 shrink-0 rounded-[2px]" style={{ background: cat.color }} aria-hidden="true" />
-                        {tr(cat.fr, cat.ar)}, {spot.city}
-                        {spot.isVerified && (
-                          <span
-                            className="ms-auto inline-flex items-center gap-1 text-status-safe-ink"
-                            title={spot.verifiedAt ? tr(`Vérifiée par l’équipe le ${verifiedDate(spot.verifiedAt, lang)}`, `وثقه الفريق في ${verifiedDate(spot.verifiedAt, lang)}`) : undefined}
-                          >
-                            <BadgeCheck className="h-4 w-4" aria-hidden="true" />
-                            {spot.verifiedAt
-                              ? tr(`Vérifiée le ${verifiedDate(spot.verifiedAt, lang)}`, `موثق في ${verifiedDate(spot.verifiedAt, lang)}`)
-                              : tr('Vérifiée', 'موثق')}
-                          </span>
-                        )}
-                      </span>
-                      <span className="mt-1.5 block font-medium leading-snug">{spot.name}</span>
-                      <span className="mt-0.5 block text-sm text-ink-soft">{spot.address}</span>
-                      {spot.speciality && <span className="mt-2 block text-sm">{spot.speciality}</span>}
-                      {active && spot.notes && <span className="mt-2 block border-s-2 border-status-safe ps-3 text-sm text-ink-soft">{spot.notes}</span>}
-                      {(spot.phone || spot.hours) && (
-                        <span className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-soft">
-                          {spot.phone && (
-                            <span className="inline-flex items-center gap-1.5 tabular-nums" dir="ltr">
-                              <Phone className="h-3.5 w-3.5" />
-                              {spot.phone}
-                            </span>
-                          )}
-                          {spot.hours && (
-                            <span className="inline-flex items-center gap-1.5">
-                              <Clock className="h-3.5 w-3.5" />
-                              {spot.hours}
+                  <li
+                    key={spot._id}
+                    className={`overflow-hidden rounded-xl border bg-white transition-colors ${
+                      active ? 'border-ink ring-1 ring-ink' : 'border-canvas-line hover:border-ink-faint'
+                    }`}
+                  >
+                    <button type="button" onClick={() => focusSpot(spot)} aria-expanded={active} className="flex w-full gap-3 p-4 text-start">
+                      {cover && (
+                        <img src={cover.src} alt="" loading="lazy" decoding="async" className="h-16 w-16 shrink-0 rounded-lg object-cover sm:h-20 sm:w-20" />
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-2 text-sm text-ink-soft">
+                          <span className="h-3 w-3 shrink-0 rounded-[2px]" style={{ background: cat.color }} aria-hidden="true" />
+                          {tr(cat.fr, cat.ar)}, {spot.city}
+                          {spot.isVerified && (
+                            <span
+                              className="ms-auto inline-flex items-center gap-1 text-status-safe-ink"
+                              title={spot.verifiedAt ? tr(`Vérifiée par l’équipe le ${verifiedDate(spot.verifiedAt, lang)}`, `وثقه الفريق في ${verifiedDate(spot.verifiedAt, lang)}`) : undefined}
+                            >
+                              <BadgeCheck className="h-4 w-4" aria-hidden="true" />
+                              {spot.verifiedAt
+                                ? tr(`Vérifiée le ${verifiedDate(spot.verifiedAt, lang)}`, `موثق في ${verifiedDate(spot.verifiedAt, lang)}`)
+                                : tr('Vérifiée', 'موثق')}
                             </span>
                           )}
                         </span>
-                      )}
+                        <span className="mt-1.5 block font-medium leading-snug">{spot.name}</span>
+                        <span className="mt-0.5 block text-sm text-ink-soft">{spot.address}</span>
+                        {spot.crossContaminationRisk && (
+                          <span className="mt-2 block">
+                            <CrossContaminationBadge lang={lang} />
+                          </span>
+                        )}
+                        {spot.speciality && <span className="mt-2 block text-sm">{spot.speciality}</span>}
+                        {active && spot.notes && (
+                          <span className={`mt-2 block border-s-2 ps-3 text-sm text-ink-soft ${spot.crossContaminationRisk ? 'border-status-warning' : 'border-status-safe'}`}>{spot.notes}</span>
+                        )}
+                        {(spot.phone || spot.hours) && (
+                          <span className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-soft">
+                            {spot.phone && (
+                              <span className="inline-flex items-center gap-1.5 tabular-nums" dir="ltr">
+                                <Phone className="h-3.5 w-3.5" />
+                                {spot.phone}
+                              </span>
+                            )}
+                            {spot.hours && (
+                              <span className="inline-flex items-center gap-1.5">
+                                <Clock className="h-3.5 w-3.5" />
+                                {spot.hours}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                        {!active && spot.media?.length > 0 && (
+                          <span className="mt-2 inline-flex items-center gap-1.5 text-sm text-status-safe-ink">
+                            <Images className="h-3.5 w-3.5" aria-hidden="true" />
+                            {tr(`${spot.media.length} photos et vidéos${spot.media.some((m) => m.kind === 'menu') ? ', menu' : ''}`, `${spot.media.length} صور وفيديوهات`)}
+                          </span>
+                        )}
+                      </span>
                     </button>
+                    {active && <SpotDetails spot={spot} lang={lang} />}
                   </li>
                 );
               })}

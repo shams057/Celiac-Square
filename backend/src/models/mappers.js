@@ -19,6 +19,10 @@ export const toSpot = (r) => ({
   reviewCount: r.review_count ?? 0,
   verifiedAt: r.verified_at ?? null,
   notes: r.notes,
+  crossContaminationRisk: r.cross_contamination_risk ?? false,
+  // Photos, menu pages and videos served from /spots/<slug>/ ({ type, src, kind?, poster?, alt, credit? })
+  media: Array.isArray(r.media) ? r.media : [],
+  links: Array.isArray(r.links) ? r.links : [],
   submittedBy: r.submitted_by,
   createdAt: r.created_at,
   updatedAt: r.updated_at,

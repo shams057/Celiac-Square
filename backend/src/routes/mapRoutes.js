@@ -61,6 +61,7 @@ const spotFields = (body) => {
   if (body.hours !== undefined) row.hours = clean(body.hours);
   if (body.notes !== undefined) row.notes = clean(body.notes);
   if (body.submittedBy !== undefined) row.submitted_by = clean(body.submittedBy);
+  if (body.crossContaminationRisk !== undefined) row.cross_contamination_risk = Boolean(body.crossContaminationRisk);
   if (validCoords(body.coordinates)) {
     row.lng = Number(body.coordinates[0]);
     row.lat = Number(body.coordinates[1]);
