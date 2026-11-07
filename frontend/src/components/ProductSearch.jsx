@@ -1,11 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { Search, LoaderCircle, X } from 'lucide-react';
-import { searchProducts } from '../services/api';
+import { searchProducts, fetchAtmcProducts } from '../services/api';
 import { t, statusKind, STATUS, StatusTile, PageHead, Notice, EmptyState } from './ui';
+import { SourceLine, SaveButton, ReportButton, atmcAsProduct, productTargetType, productTargetId } from './community';
 
-const SOURCE_LOCAL = ['Association Tunisienne de la Cœliaque', 'Guide Officiel ATMC 2023'];
-const isLocal = (item) => SOURCE_LOCAL.includes(item.source);
+const fold = (str) =>
+  (str || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 
+/** Offline: the search runs on the copy of the ATMC guide saved on the device (see src/sw.js) */
+const searchSavedGuide = async (query) => {
+  const res = await fetchAtmcProducts({ category: 'ALL', status: 'ALL' });
+  if (!res?.offlineCopy || !Array.isArray(res.data)) return null;
+  const q = fold(query.trim());
+  const rows = q ? res.data.filter((p) => fold(`${p.nameFr} ${p.name} ${p.brand} ${p.categoryFr}`).includes(q)) : [];
+  return rows.slice(0, 40).map((row) => ({
+    ...atmcAsProduct(row),
+    id: row._id,
+    // The Arabic text is already the product's Arabic name: the category is the useful note
+    notes: row.categoryFr,
+    notesAr: row.categoryAr,
+  }));
+};
 
 export default function ProductSearch({ initialQuery = '', lang }) {
   const tr = t(lang);
@@ -18,6 +36,7 @@ export default function ProductSearch({ initialQuery = '', lang }) {
   const [offState, setOffState] = useState('idle'); // 'idle' | 'loading' | 'ok' | 'unavailable'
   const [offRetry, setOffRetry] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => {
     if (initialQuery) {
@@ -44,10 +63,19 @@ export default function ProductSearch({ initialQuery = '', lang }) {
     searchProducts(localQuery, 'local')
       .then((res) => {
         if (cancelled) return;
+        setOffline(false);
         if (res?.success) setLocalItems(res.layerB || []);
         else setErrorMsg('failed');
       })
-      .catch(() => !cancelled && setErrorMsg('network'))
+      .catch(async () => {
+        // No connection: fall back to the guide saved on the device
+        const rows = await searchSavedGuide(localQuery).catch(() => null);
+        if (cancelled) return;
+        if (rows) {
+          setOffline(true);
+          setLocalItems(rows);
+        } else setErrorMsg('network');
+      })
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
@@ -118,7 +146,7 @@ export default function ProductSearch({ initialQuery = '', lang }) {
         {offState === 'loading' && <p>{tr('Recherche dans Open Food Facts…', 'جاري البحث في Open Food Facts…')}</p>}
       </div>
 
-      {offState === 'unavailable' && (
+      {offState === 'unavailable' && !offline && (
         <Notice
           tone="warning"
           title={tr('Open Food Facts ne répond pas pour le moment.', 'Open Food Facts لا يستجيب حاليا.')}
@@ -132,6 +160,12 @@ export default function ProductSearch({ initialQuery = '', lang }) {
             'Les résultats des guides tunisiens sont affichés. Le service limite le nombre de recherches : réessayez dans une minute.',
             'تُعرض نتائج الأدلة التونسية. الخدمة تحدّ من عدد عمليات البحث: أعد المحاولة بعد دقيقة.'
           )}
+        </Notice>
+      )}
+
+      {offline && (
+        <Notice tone="info" title={tr('Hors ligne : recherche dans le guide ATMC enregistré sur cet appareil', 'غير متصل: البحث في دليل الجمعية المحفوظ على هذا الجهاز')}>
+          {tr('Open Food Facts et les fiches de l’association reviendront avec la connexion.', 'ستعود نتائج Open Food Facts وبطاقات الجمعية مع عودة الاتصال.')}
         </Notice>
       )}
 
@@ -154,7 +188,6 @@ export default function ProductSearch({ initialQuery = '', lang }) {
         <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-white/70 bg-canvas-paper/80 backdrop-blur-sm">
           {items.map((item, idx) => {
             const k = statusKind(item.status);
-            const local = isLocal(item);
             const label = lang === 'ar' ? item.badgeTextAr || STATUS[k].ar : item.badgeText || STATUS[k].fr;
             const notes = lang === 'ar' ? item.notesAr || item.notes : item.notes;
             return (
@@ -176,8 +209,15 @@ export default function ProductSearch({ initialQuery = '', lang }) {
                   <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-faint">
                     {item.brand && <span dir="auto">{item.brand}</span>}
                     {item.barcode && <span className="tabular-nums">{item.barcode}</span>}
-                    <span>{local ? tr('Source : guide tunisien', 'المصدر: دليل تونسي') : tr('Source : Open Food Facts — vérifiez l’étiquette', 'المصدر: Open Food Facts — تحقق من الملصق')}</span>
+                    <SourceLine item={item} lang={lang} />
                   </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1">
+                    <SaveButton item={item} lang={lang} />
+                    <ReportButton
+                      target={{ type: productTargetType(item), id: productTargetId(item), label: item.productNameFr || item.productNameAr }}
+                      lang={lang}
+                    />
+                  </div>
                 </div>
               </li>
             );

@@ -10,7 +10,8 @@
     "seed": "node src/seed/seedData.js",
     "set-role": "node src/scripts/setRole.js",
     "test": "node --test 'test/*.test.js'",
-    "bench:scanner": "node src/scripts/benchScanner.js"
+    "bench:scanner": "node src/scripts/benchScanner.js",
+    "atmc:import": "node src/scripts/importAtmc.js"
   },
   "dependencies": {
     "@google/genai": "^2.32.0",

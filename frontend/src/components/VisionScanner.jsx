@@ -1,9 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, ImageUp, Video, RotateCcw, Search, ScanText, ListChecks, TriangleAlert } from 'lucide-react';
-import { identifyProductPhoto, matchProductText, analyzeIngredients, isAiUnavailable } from '../services/api';
+import { Camera, ImageUp, Video, RotateCcw, Search, ScanText, ListChecks, TriangleAlert, ScanBarcode, History } from 'lucide-react';
+import { identifyProductPhoto, matchProductText, analyzeIngredients, isAiUnavailable, fetchProductByBarcode } from '../services/api';
 import { resizeImage } from '../services/images';
 import { readText } from '../services/ocr';
+import { detectBarcode, preloadBarcodeReader } from '../services/barcode';
+import { addToHistory } from '../services/history';
+import { navigate, pathFor } from '../services/router';
 import { t, statusKind, STATUS, StatusTile, PageHead, Notice } from './ui';
+import { SourceLine, SaveButton, ReportButton, productTargetType, productTargetId } from './community';
 
 // Phone photos are often 4–12 MB: they are shrunk before reading, and again (1280 px JPEG) before upload
 const MAX_SIDE = 1600;
@@ -38,8 +42,8 @@ const MODES = {
     icon: ScanText,
     fr: 'Reconnaître le produit',
     ar: 'التعرف على المنتج',
-    hintFr: 'Photo de la face avant : l’IA reconnaît la marque et le produit, puis le cherche dans le guide.',
-    hintAr: 'صورة الواجهة: يتعرف الذكاء الاصطناعي على العلامة والمنتج ثم يبحث عنه في الدليل.',
+    hintFr: 'Visez le code-barres, ou la face avant : le code-barres est lu en premier, sinon l’IA reconnaît la marque et le produit.',
+    hintAr: 'وجّه الكاميرا نحو الرمز الشريطي أو الواجهة: يُقرأ الرمز الشريطي أولا، وإلا يتعرف الذكاء الاصطناعي على العلامة والمنتج.',
   },
   ingredients: {
     icon: ListChecks,
@@ -48,6 +52,37 @@ const MODES = {
     hintFr: 'Photo de la liste d’ingrédients : l’IA la lit et indique si le produit contient du gluten.',
     hintAr: 'صورة قائمة المكونات: يحدد الذكاء الاصطناعي إن كان المنتج يحتوي على الغلوتين.',
   },
+};
+
+// What a scan result is worth in the history (status, label, detail)
+const INGREDIENT_STATUS = { CONTAINS_GLUTEN: 'UNSAFE', MAY_CONTAIN: 'WARNING', GLUTEN_FREE: 'WARNING', UNREADABLE: 'UNKNOWN' };
+
+const remember = (result, lang) => {
+  const tr = t(lang);
+  if (!result) return;
+  const { mode, data } = result;
+  if (mode === 'barcode') {
+    const p = data.product;
+    addToHistory({
+      mode,
+      label: p ? `${p.productNameFr}${p.brand && !/non spécifiée/.test(p.brand) ? ` — ${p.brand}` : ''}` : tr(`Code-barres ${data.barcode}`, `الرمز الشريطي ${data.barcode}`),
+      status: p ? p.status : 'UNKNOWN',
+      detail: p ? p.badgeText : tr('Introuvable', 'غير موجود'),
+      query: data.barcode,
+    });
+  } else if (mode === 'product') {
+    const label = data.productLabel || data.identifiedProduct;
+    if (!label) return;
+    addToHistory({ mode, label, status: data.matchedProduct ? (data.matchType === 'category' ? 'WARNING' : data.glutenStatus) : 'UNKNOWN', query: data.searchQuery || data.identifiedProduct || '' });
+  } else if (mode === 'ingredients' && data.verdict !== 'UNREADABLE') {
+    const text = (data.ingredientsText || '').trim().replace(/\s+/g, ' ');
+    addToHistory({
+      mode,
+      label: text ? `${tr('Ingrédients', 'المكونات')} : ${text.slice(0, 70)}${text.length > 70 ? '…' : ''}` : tr('Liste d’ingrédients', 'قائمة المكونات'),
+      status: INGREDIENT_STATUS[data.verdict] || 'UNKNOWN',
+      detail: tr(INGREDIENT_VERDICTS[data.verdict]?.fr, INGREDIENT_VERDICTS[data.verdict]?.ar),
+    });
+  }
 };
 
 export default function VisionScanner({ onSwitchToSearch, lang }) {
@@ -68,6 +103,10 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
   const captureInputRef = useRef(null);
   const galleryInputRef = useRef(null);
 
+  // The barcode reader is loaded while the user frames the photo
+  useEffect(() => {
+    preloadBarcodeReader();
+  }, []);
 
   const stopCamera = () => {
     const stream = videoRef.current?.srcObject;
@@ -116,6 +155,32 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
 
   useEffect(() => () => previewUrl && URL.revokeObjectURL(previewUrl), [previewUrl]);
 
+  // Live viewfinder in product mode: a barcode in view is read without pressing the shutter
+  useEffect(() => {
+    if (!liveCamera || !streamActive || mode !== 'product') return undefined;
+    let stopped = false;
+    let timer;
+    const tick = async () => {
+      const video = videoRef.current;
+      if (stopped || !video || video.readyState < 2) {
+        if (!stopped) timer = setTimeout(tick, 400);
+        return;
+      }
+      const code = await detectBarcode(video);
+      if (stopped) return;
+      if (code) {
+        captureSnapshot(code);
+        return;
+      }
+      timer = setTimeout(tick, 350);
+    };
+    timer = setTimeout(tick, 400);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+    };
+  }, [liveCamera, streamActive, mode]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // The photo as sent to the server: about 100–300 kB
   const toUpload = (image) => resizeImage(image, 1280, 0.85);
 
@@ -135,15 +200,39 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
     return res.data;
   };
 
-  const identifyProduct = async (image) => {
+  /**
+   * Barcode lookup (the association's list, then Open Food Facts).
+   * Returns a 'barcode' result, or null when the code is in neither (the photo then goes to the AI).
+   */
+  const lookUpBarcode = async (code) => {
+    setBusy({ label: tr(`Code-barres ${code} : recherche…`, `الرمز الشريطي ${code}: جاري البحث…`) });
+    try {
+      const res = await fetchProductByBarcode(code);
+      return res?.success && res.data ? { mode: 'barcode', data: { barcode: code, product: res.data } } : null;
+    } catch (err) {
+      if (err.response?.status === 404) return null;
+      throw err;
+    }
+  };
+
+  const identifyProduct = async (image, knownBarcode) => {
+    // 1. A barcode is the most reliable way to name the product
+    setBusy({ label: tr('Recherche d’un code-barres…', 'جاري البحث عن رمز شريطي…') });
+    const code = knownBarcode || (await detectBarcode(image));
+    if (code) {
+      const found = await lookUpBarcode(code);
+      if (found) return found;
+    }
+    // 2. Otherwise the AI recognises the package
     setBusy({ label: tr('Reconnaissance du produit…', 'جاري التعرف على المنتج…') });
+    const unknownBarcode = code ? { unknownBarcode: code } : {};
     try {
       const res = await identifyProductPhoto(await toUpload(image));
       if (!res?.success) throw new Error(res?.message || 'failed');
-      return { mode: 'product', data: res.data };
+      return { mode: 'product', data: { ...res.data, ...unknownBarcode } };
     } catch (err) {
       if (!isAiUnavailable(err) && err.response?.data?.code !== 'AI_NOT_CONFIGURED') throw err;
-      return { mode: 'product', data: { ...(await identifyByOcr(image)), aiUnavailable: true } };
+      return { mode: 'product', data: { ...(await identifyByOcr(image)), aiUnavailable: true, ...unknownBarcode } };
     }
   };
 
@@ -177,14 +266,16 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
     }
   };
 
-  const analyze = async (file, scanMode = mode) => {
+  const analyze = async (file, scanMode = mode, knownBarcode = null) => {
     setLiveCamera(false);
     setErrorMsg('');
     setResult(null);
     try {
       const image = await shrinkImage(file);
       setPhoto(image);
-      setResult(scanMode === 'product' ? await identifyProduct(image) : await checkIngredients(image));
+      const next = scanMode === 'product' ? await identifyProduct(image, knownBarcode) : await checkIngredients(image);
+      setResult(next);
+      remember(next, lang);
     } catch (err) {
       console.error('Scan error:', err);
       const status = err.response?.status;
@@ -194,24 +285,29 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
     }
   };
 
-  const startWith = (file) => {
+  const startWith = (file, knownBarcode = null) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
       setErrorMsg(tr('Ce fichier n’est pas une image.', 'هذا الملف ليس صورة.'));
       return;
     }
     setPreviewUrl(URL.createObjectURL(file));
-    analyze(file);
+    analyze(file, mode, knownBarcode);
   };
 
-  const captureSnapshot = () => {
+  // knownBarcode: set when the live viewfinder already read a barcode in this frame
+  const captureSnapshot = (knownBarcode = null) => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
     canvas.width = video.videoWidth || 640;
     canvas.height = video.videoHeight || 480;
     canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob((blob) => blob && startWith(new File([blob], `capture_${Date.now()}.jpg`, { type: 'image/jpeg' })), 'image/jpeg', 0.9);
+    canvas.toBlob(
+      (blob) => blob && startWith(new File([blob], `capture_${Date.now()}.jpg`, { type: 'image/jpeg' }), typeof knownBarcode === 'string' ? knownBarcode : null),
+      'image/jpeg',
+      0.9
+    );
   };
 
   const handleDrop = (e) => {
@@ -237,6 +333,30 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
   const analyzeSamePhotoAsIngredients = () => {
     setMode('ingredients');
     if (photo) analyze(photo, 'ingredients');
+  };
+
+  // The barcode matched the wrong product: ask the AI about the same photo, ignoring the barcode
+  const identifySamePhotoWithAi = async () => {
+    if (!photo) return;
+    setErrorMsg('');
+    setResult(null);
+    try {
+      setBusy({ label: tr('Reconnaissance du produit…', 'جاري التعرف على المنتج…') });
+      let next;
+      try {
+        const res = await identifyProductPhoto(await toUpload(photo));
+        next = { mode: 'product', data: res.data };
+      } catch (err) {
+        if (!isAiUnavailable(err) && err.response?.data?.code !== 'AI_NOT_CONFIGURED') throw err;
+        next = { mode: 'product', data: { ...(await identifyByOcr(photo)), aiUnavailable: true } };
+      }
+      setResult(next);
+      remember(next, lang);
+    } catch {
+      setErrorMsg(tr('Le service d’analyse ne répond pas pour le moment. Réessayez dans un instant.', 'خدمة التحليل لا تستجيب حاليا. أعد المحاولة بعد لحظة.'));
+    } finally {
+      setBusy(null);
+    }
   };
 
   const current = MODES[mode];
@@ -310,10 +430,16 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
                 <video ref={videoRef} playsInline autoPlay muted className="h-full w-full object-cover" />
                 <canvas ref={canvasRef} className="hidden" />
                 <div className="pointer-events-none absolute inset-[12%] rounded-lg border-2 border-canvas-paper/70" />
+                {mode === 'product' && streamActive && (
+                  <p className="absolute inset-x-0 top-3 mx-auto w-fit rounded-full bg-ink/70 px-3 py-1 text-xs text-canvas-paper">
+                    <ScanBarcode className="me-1.5 inline h-3.5 w-3.5" aria-hidden="true" />
+                    {tr('Code-barres lu automatiquement', 'يُقرأ الرمز الشريطي تلقائيا')}
+                  </p>
+                )}
                 <div className="absolute inset-x-0 bottom-4 flex justify-center">
                   <button
                     type="button"
-                    onClick={captureSnapshot}
+                    onClick={() => captureSnapshot()}
                     disabled={!streamActive}
                     className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-canvas-paper bg-accent text-ink disabled:opacity-50"
                     aria-label={tr('Prendre la photo', 'التقط الصورة')}
@@ -359,6 +485,18 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
 
           {cameraError && <Notice tone="warning">{cameraError}</Notice>}
 
+          <a
+            href={pathFor('saved')}
+            onClick={(e) => {
+              e.preventDefault();
+              navigate(pathFor('saved'));
+            }}
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-ink underline-offset-4 hover:underline"
+          >
+            <History className="h-4 w-4" aria-hidden="true" />
+            {tr('Mes derniers scans', 'آخر عمليات المسح')}
+          </a>
+
           <p className="text-sm text-ink-soft">
             {tr('Pas de photo possible ?', 'لا يمكنك التصوير؟')}{' '}
             <button type="button" onClick={() => onSwitchToSearch?.('')} className="font-medium text-ink underline underline-offset-4">
@@ -375,6 +513,8 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
                 ? tr('Le serveur ne répond pas. Vérifiez votre connexion puis réessayez.', 'الخادم لا يستجيب. تحقق من الاتصال ثم أعد المحاولة.')
                 : errorMsg}
             </Notice>
+          ) : result?.mode === 'barcode' ? (
+            <BarcodeVerdict result={result.data} lang={lang} onSearch={onSwitchToSearch} onUseAi={identifySamePhotoWithAi} />
           ) : result?.mode === 'product' ? (
             <ProductVerdict result={result.data} lang={lang} onSearch={onSwitchToSearch} onAnalyzeIngredients={analyzeSamePhotoAsIngredients} />
           ) : result?.mode === 'ingredients' ? (
@@ -398,6 +538,78 @@ function FallbackNotice({ lang }) {
         'قُرئ النص على جهازك، وهذا أقل دقة مع الشعارات. أعد المحاولة بعد لحظة لنتيجة أفضل.'
       )}
     </Notice>
+  );
+}
+
+/** Product found from its barcode: the association's list or Open Food Facts */
+function BarcodeVerdict({ result, lang, onSearch, onUseAi }) {
+  const tr = t(lang);
+  const p = result.product;
+  const kind = statusKind(p.status);
+  const meta = STATUS[kind];
+  const Icon = meta.icon;
+  const isOff = p.source === 'Open Food Facts';
+  const label = lang === 'ar' ? p.badgeTextAr || meta.ar : p.badgeText || meta.fr;
+  const notes = lang === 'ar' ? p.notesAr || p.notes : p.notes;
+  const name = lang === 'ar' && p.productNameAr ? p.productNameAr : p.productNameFr;
+
+  return (
+    <div className="space-y-4">
+      <div className={`animate-verdict rounded-xl p-6 ${VERDICT_BLOCK[kind]}`}>
+        <span className="flex h-14 w-14 items-center justify-center rounded-tile bg-ink/10">
+          <Icon className="h-8 w-8" strokeWidth={2.5} />
+        </span>
+        <p className="mt-6 text-[2rem] font-semibold leading-tight tracking-[-0.02em] sm:text-[2.5rem]">{label}</p>
+        <p dir="auto" className="mt-3 text-left text-lg rtl:text-right">
+          {name}
+          {p.brand && !/non spécifiée/.test(p.brand) ? ` — ${p.brand}` : ''}
+        </p>
+        <p className="mt-1 inline-flex items-center gap-1.5 text-sm tabular-nums opacity-80">
+          <ScanBarcode className="h-4 w-4" aria-hidden="true" />
+          {tr(`Code-barres ${result.barcode}`, `الرمز الشريطي ${result.barcode}`)}
+        </p>
+      </div>
+
+      {isOff && (
+        <Notice tone="warning" title={tr('Fiche Open Food Facts : vérifiez l’étiquette', 'بطاقة Open Food Facts: تحقق من الملصق')}>
+          {tr(
+            'Ces fiches sont remplies par des bénévoles et notre lecture des ingrédients est automatique. Seul l’emballage fait foi.',
+            'يملأ هذه البطاقات متطوعون وقراءتنا للمكونات آلية. العلبة وحدها هي المرجع.'
+          )}
+        </Notice>
+      )}
+
+      {(notes || p.ingredientsText) && (
+        <div className="panel space-y-2 p-4 text-sm">
+          {notes && <p dir="auto" className="text-left rtl:text-right">{notes}</p>}
+          {p.ingredientsText && (
+            <details>
+              <summary className="cursor-pointer font-medium">{tr('Ingrédients (Open Food Facts)', 'المكونات (Open Food Facts)')}</summary>
+              <p dir="auto" className="mt-2 text-left leading-relaxed text-ink-soft rtl:text-right">{p.ingredientsText}</p>
+            </details>
+          )}
+          <p className="text-xs text-ink-faint">
+            <SourceLine item={p} lang={lang} />
+          </p>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <SaveButton item={p} lang={lang} />
+        <ReportButton target={{ type: productTargetType(p), id: productTargetId(p) || result.barcode, label: `${p.productNameFr} (${result.barcode})` }} lang={lang} />
+      </div>
+
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <button type="button" onClick={onUseAi} className="btn-quiet flex-1">
+          <ScanText className="h-4 w-4" />
+          {tr('Pas le bon produit ? Reconnaître la photo', 'ليس المنتج الصحيح؟ تعرّف على الصورة')}
+        </button>
+        <button type="button" onClick={() => onSearch?.(p.productNameFr)} className="btn-quiet flex-1">
+          <Search className="h-4 w-4" />
+          {tr('Chercher dans les guides', 'ابحث في الأدلة')}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -441,6 +653,11 @@ function ProductVerdict({ result, lang, onSearch, onAnalyzeIngredients }) {
   return (
     <div className="space-y-4">
       {result.aiUnavailable && <FallbackNotice lang={lang} />}
+      {result.unknownBarcode && (
+        <Notice tone="info" title={tr(`Code-barres ${result.unknownBarcode} inconnu`, `الرمز الشريطي ${result.unknownBarcode} غير معروف`)}>
+          {tr('Il n’est ni dans les guides tunisiens ni dans Open Food Facts : le produit a été reconnu sur la photo.', 'غير موجود في الأدلة التونسية ولا في Open Food Facts: تم التعرف على المنتج من الصورة.')}
+        </Notice>
+      )}
       {result.looksLikeIngredients && (
         <Notice
           tone="info"
@@ -479,8 +696,23 @@ function ProductVerdict({ result, lang, onSearch, onAnalyzeIngredients }) {
       {notes && (
         <div className="panel space-y-2 p-4 text-sm">
           <p dir="auto" className="text-left rtl:text-right">{notes}</p>
-          <p className="text-ink-soft">{tr('Source :', 'المصدر:')} {match.source}</p>
+          <p className="text-xs text-ink-faint">
+            <SourceLine item={match} lang={lang} />
+          </p>
         </div>
+      )}
+
+      {match && !category && (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <SaveButton item={match} lang={lang} />
+          <ReportButton target={{ type: productTargetType(match), id: productTargetId(match), label: match.productNameFr }} lang={lang} />
+        </div>
+      )}
+      {(!match || category) && (recognised || result.identifiedProduct) && (
+        <ReportButton
+          target={{ type: 'SCAN', label: `${tr('Scan produit', 'مسح منتج')} : ${recognised || result.identifiedProduct}` }}
+          lang={lang}
+        />
       )}
 
       {result.requiresFallback && result.candidates?.length > 0 && (
@@ -533,7 +765,9 @@ function ProductVerdict({ result, lang, onSearch, onAnalyzeIngredients }) {
 const INGREDIENT_VERDICTS = {
   CONTAINS_GLUTEN: { kind: 'unsafe', fr: 'Contient du gluten', ar: 'يحتوي على الغلوتين' },
   MAY_CONTAIN: { kind: 'warning', fr: 'Risque de gluten', ar: 'خطر الغلوتين' },
-  GLUTEN_FREE: { kind: 'safe', fr: 'Sans gluten d’après les ingrédients', ar: 'بدون غلوتين حسب المكونات' },
+  // Never green: an ingredients list read from a photo cannot vouch for a product (traces, misread words,
+  // recipe changes). Green is kept for the guides' own verdicts.
+  GLUTEN_FREE: { kind: 'warning', fr: 'Gluten non détecté', ar: 'لم يُكتشف الغلوتين' },
   UNREADABLE: { kind: 'unknown', fr: 'Liste illisible', ar: 'القائمة غير مقروءة' },
 };
 
@@ -608,6 +842,22 @@ function IngredientsVerdict({ result, lang }) {
         </span>
       </p>
 
+      {result.verdict === 'GLUTEN_FREE' && (
+        <p className="text-sm text-ink-soft">
+          {tr(
+            'Aucun ingrédient contenant du gluten n’a été trouvé dans la liste. Ce n’est pas une certification : vérifiez la mention « sans gluten » et l’absence de traces sur l’emballage.',
+            'لم يُعثر على أي مكوّن يحتوي على الغلوتين في القائمة. هذا ليس شهادة: تحقق من عبارة «بدون غلوتين» وغياب الآثار على العلبة.'
+          )}
+        </p>
+      )}
+
+      {readable && (
+        <ReportButton
+          target={{ type: 'SCAN', label: `${tr('Analyse des ingrédients', 'تحليل المكونات')} : ${tr(v.fr, v.ar)}${result.ingredientsText ? ` — ${result.ingredientsText.trim().slice(0, 200)}` : ''}` }}
+          lang={lang}
+        />
+      )}
+
       {result.ingredientsText?.trim() && (
         <details className="panel p-4 text-sm">
           <summary className="cursor-pointer font-medium">{tr('Ingrédients lus sur la photo', 'المكونات المقروءة من الصورة')}</summary>
@@ -625,14 +875,14 @@ function HowItWorks({ mode, lang }) {
   const steps =
     mode === 'product'
       ? [
-          tr('Photographiez la face avant : marque et nom du produit bien visibles.', 'صوّر الواجهة الأمامية مع إظهار العلامة واسم المنتج.'),
-          tr('La photo, réduite, est envoyée à une IA (Gemma, via Ollama Cloud) qui reconnaît la marque et le produit, même sur un logo.', 'تُرسل الصورة مصغّرة إلى ذكاء اصطناعي (Gemma عبر Ollama Cloud) يتعرف على العلامة والمنتج حتى من الشعار.'),
+          tr('Photographiez le code-barres ou la face avant. Un code-barres est cherché d’abord dans les fiches de l’association, puis dans Open Food Facts.', 'صوّر الرمز الشريطي أو الواجهة. يُبحث عن الرمز أولا في بطاقات الجمعية ثم في Open Food Facts.'),
+          tr('Sans code-barres connu, la photo, réduite, est envoyée à une IA (Gemma, via Ollama Cloud) qui reconnaît la marque et le produit, même sur un logo.', 'إن لم يُعرف الرمز الشريطي، تُرسل الصورة مصغّرة إلى ذكاء اصطناعي (Gemma عبر Ollama Cloud) يتعرف على العلامة والمنتج حتى من الشعار.'),
           tr('L’IA désigne la fiche du guide de l’ATMC ou de l’association qui le concerne ; le statut vient toujours du guide.', 'يحدد الذكاء الاصطناعي بطاقة الدليل المعنية، والحالة تأتي دائما من الدليل.'),
         ]
       : [
           tr('Photographiez toute la liste d’ingrédients, nette et bien éclairée.', 'صوّر قائمة المكونات كاملة وبوضوح وإضاءة جيدة.'),
           tr('La photo, réduite, est envoyée à une IA (Gemma, via Ollama Cloud) qui lit la liste et y repère blé, orge, seigle, avoine, malt et traces. Nos propres règles relisent la liste : elles peuvent rendre le verdict plus strict, jamais plus permissif.', 'تُرسل الصورة مصغّرة إلى ذكاء اصطناعي (Gemma عبر Ollama Cloud) يقرأ القائمة ويكشف القمح والشعير والشوفان والمالط والآثار. ثم تراجعها قواعدنا: قد تجعل الحكم أشد، ولا تجعله أبدا أكثر تساهلا.'),
-          tr('Vous obtenez un verdict avec sa probabilité. Vérifiez toujours l’étiquette.', 'تحصل على حكم مع احتماله. تحقق دائما من الملصق.'),
+          tr('Vous obtenez un verdict avec sa probabilité. L’IA ne dit jamais « sans gluten » : au mieux « gluten non détecté ». Vérifiez toujours l’étiquette.', 'تحصل على حكم مع احتماله. لا يقول الذكاء الاصطناعي أبدا «بدون غلوتين»، بل في أحسن الأحوال «لم يُكتشف الغلوتين». تحقق دائما من الملصق.'),
         ];
   return (
     <div key={mode} className="panel animate-fade-in p-5 sm:p-6">

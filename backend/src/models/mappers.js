@@ -123,6 +123,8 @@ export const toAtmcProduct = (r) => ({
   items: r.items,
   rawText: r.raw_text,
   source: r.source,
+  // Guide edition (first day of the publication month); rows loaded before the column existed are the Dec 2023 guide
+  edition: r.edition ?? '2023-12-01',
 });
 
 export const toAssociationProduct = (r) => ({
@@ -138,4 +140,19 @@ export const toAssociationProduct = (r) => ({
   notesAr: r.notes_ar,
   officialDocReference: r.official_doc_reference,
   keywords: r.keywords,
+  updatedAt: r.updated_at ?? r.created_at ?? null,
+});
+
+export const toReport = (r) => ({
+  _id: r.id,
+  targetType: r.target_type,
+  targetId: r.target_id,
+  targetLabel: r.target_label,
+  reason: r.reason,
+  message: r.message,
+  status: r.status,
+  // Present when the query embeds the reporter: profiles!reports_reporter_id_fkey(email, full_name)
+  reporter: r.reporter ? { email: r.reporter.email, fullName: r.reporter.full_name } : null,
+  resolvedAt: r.resolved_at,
+  createdAt: r.created_at,
 });

@@ -7,7 +7,7 @@ import { foldText } from '../utils/regex.js';
  * Rules, in order:
  *   1. A gluten cereal in the allergens or the ingredients      -> UNSAFE
  *   2. A gluten cereal in the traces ("peut contenir…")          -> CROSS_CONTAMINATION_RISK
- *   3. A gluten-free certification (and nothing above)          -> SAFE
+ *   3. A gluten-free label on Open Food Facts (and nothing above) -> SAFE, worded "labelled", not "certified"
  *   4. An ambiguous ingredient ("farine", "amidon" with no cereal) -> WARNING
  *   5. Ingredients listed, nothing found                         -> WARNING (never SAFE: OFF data can be
  *                                                                   incomplete or out of date)
@@ -119,10 +119,11 @@ const RESULTS = {
   CERTIFIED: () => ({
     status: 'SAFE',
     isGlutenFree: true,
-    badgeText: 'Certifié sans gluten',
-    badgeTextAr: 'معتمد خالٍ من الغلوتين',
-    reason: 'Le produit porte un label ou une certification sans gluten. Vérifiez qu’il figure bien sur l’emballage.',
-    reasonAr: 'المنتج يحمل علامة خالٍ من الغلوتين. تأكد من وجودها على العلبة.',
+    // The label comes from Open Food Facts' volunteer tags, not from a certification body we checked
+    badgeText: 'Étiqueté sans gluten',
+    badgeTextAr: 'مُعلَّم بدون غلوتين',
+    reason: 'Sur Open Food Facts, ce produit est indiqué comme portant la mention « sans gluten » (information saisie par des bénévoles). Vérifiez que la mention ou le logo figure bien sur votre emballage.',
+    reasonAr: 'حسب Open Food Facts يحمل هذا المنتج عبارة «بدون غلوتين» (معلومة أدخلها متطوعون). تأكد من وجود العبارة أو الشعار على علبتك.',
   }),
   AMBIGUOUS: (word) => ({
     status: 'WARNING',

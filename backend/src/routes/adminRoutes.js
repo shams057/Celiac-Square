@@ -1,6 +1,6 @@
-import { db, unwrap, isDbConfigured, pingDb } from '../config/db.js';
+import { db, unwrap, isDbConfigured, pingDb, isMissingTable, FEATURE_UNAVAILABLE } from '../config/db.js';
 import { requireAdmin } from '../middleware/adminAuth.js';
-import { toProfile, toStore, toSellerApplication } from '../models/mappers.js';
+import { toProfile, toStore, toSellerApplication, toReport } from '../models/mappers.js';
 import { containsPattern } from '../utils/regex.js';
 import { asyncRouter, clean, UUID_RE, badRequest } from '../utils/http.js';
 import { audit } from '../services/audit.js';
@@ -204,6 +204,48 @@ router.patch('/stores/:id', async (req, res) => {
   if (!updated) return res.status(404).json({ success: false, message: 'Boutique introuvable.' });
   await audit(req, updated.is_active ? 'store.reactivate' : 'store.suspend', updated.id, { name: updated.name });
   return res.json({ success: true, message: updated.is_active ? 'Boutique réactivée.' : 'Boutique suspendue.', data: toStore(updated) });
+});
+
+const REPORT_STATUSES = ['OPEN', 'RESOLVED', 'DISMISSED'];
+
+/**
+ * GET /api/admin/reports?status=OPEN|RESOLVED|DISMISSED|ALL
+ * Problems reported by users (label changed, place closed…), newest first
+ */
+router.get('/reports', async (req, res) => {
+  const status = clean(req.query.status).toUpperCase() || 'OPEN';
+  let query = db()
+    .from('reports')
+    .select('*, reporter:profiles!reports_reporter_id_fkey(email, full_name)')
+    .order('created_at', { ascending: false })
+    .limit(500);
+  if (REPORT_STATUSES.includes(status)) query = query.eq('status', status);
+  const [rows, open] = await Promise.all([query, db().from('reports').select('id', { count: 'exact', head: true }).eq('status', 'OPEN')]);
+  if (isMissingTable(rows.error)) return res.status(503).json(FEATURE_UNAVAILABLE);
+  const data = unwrap(rows).map(toReport);
+  return res.json({ success: true, count: data.length, openCount: open.count ?? 0, data });
+});
+
+/**
+ * PATCH /api/admin/reports/:id
+ * Body: { status: OPEN | RESOLVED | DISMISSED }
+ */
+router.patch('/reports/:id', async (req, res) => {
+  if (!UUID_RE.test(req.params.id)) return res.status(404).json({ success: false, message: 'Signalement introuvable.' });
+  const status = clean(req.body?.status).toUpperCase();
+  if (!REPORT_STATUSES.includes(status)) return badRequest(res, 'Statut inconnu.');
+  const closed = status !== 'OPEN';
+  const { data, error } = await db()
+    .from('reports')
+    .update({ status, resolved_at: closed ? new Date().toISOString() : null, resolved_by: closed ? req.user.id : null })
+    .eq('id', req.params.id)
+    .select();
+  if (isMissingTable(error)) return res.status(503).json(FEATURE_UNAVAILABLE);
+  if (error) throw new Error(error.message);
+  if (!data[0]) return res.status(404).json({ success: false, message: 'Signalement introuvable.' });
+  await audit(req, `report.${status.toLowerCase()}`, data[0].id, { target: data[0].target_label });
+  const messages = { OPEN: 'Signalement rouvert.', RESOLVED: 'Signalement marqué comme traité.', DISMISSED: 'Signalement classé sans suite.' };
+  return res.json({ success: true, message: messages[status], data: toReport(data[0]) });
 });
 
 /**

@@ -15,7 +15,8 @@
     "client": "cd frontend && npm run dev",
     "dev": "node scripts/dev.mjs",
     "build": "npm run build --workspace frontend",
-    "test": "npm test --workspace backend"
+    "test": "npm test --workspace backend",
+    "atmc:import": "npm run atmc:import --workspace backend --"
   },
   "keywords": [
     "celiac",

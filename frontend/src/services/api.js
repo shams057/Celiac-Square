@@ -18,6 +18,12 @@ axios.interceptors.response.use((res) => {
 // Admin routes use the signed-in admin's session, attached by services/session.js
 const adminRequest = async (config) => (await axios(config)).data;
 
+/**
+ * The response body, plus `offlineCopy`: the date of the saved copy when the service worker
+ * answered offline (see src/sw.js), otherwise null.
+ */
+const withOfflineInfo = (res) => ({ ...res.data, offlineCopy: res.headers?.['x-offline-copy'] || null });
+
 export const fetchSpots = async (filters = {}) => {
   const params = new URLSearchParams();
   if (filters.category && filters.category !== 'ALL') params.append('category', filters.category);
@@ -26,7 +32,7 @@ export const fetchSpots = async (filters = {}) => {
   if (filters.q) params.append('q', filters.q);
 
   const res = await axios.get(`${API_BASE}/map/spots?${params.toString()}`);
-  return res.data;
+  return withOfflineInfo(res);
 };
 
 export const fetchCities = async () => {
@@ -103,7 +109,7 @@ export const fetchAtmcProducts = async (filters = {}) => {
   if (filters.q) params.append('q', filters.q);
 
   const res = await axios.get(`${API_BASE}/atmc/products?${params.toString()}`);
-  return res.data;
+  return withOfflineInfo(res);
 };
 
 export const fetchAtmcCategories = async () => {
@@ -179,7 +185,27 @@ export const fetchAdminStores = () => adminRequest({ method: 'get', url: `${API_
 export const setStoreActive = (id, isActive) =>
   adminRequest({ method: 'patch', url: `${API_BASE}/admin/stores/${id}`, data: { isActive } });
 
+export const fetchReports = (status = 'OPEN') => adminRequest({ method: 'get', url: `${API_BASE}/admin/reports`, params: { status } });
+
+export const setReportStatus = (id, status) => adminRequest({ method: 'patch', url: `${API_BASE}/admin/reports/${id}`, data: { status } });
+
 export const fetchAuditLog = () => adminRequest({ method: 'get', url: `${API_BASE}/admin/audit-log` });
+
+// Community ---------------------------------------------------------------
+
+/** report: { targetType, targetId?, targetLabel?, reason, message?, website? (honeypot) } */
+export const sendReport = async (report) => (await axios.post(`${API_BASE}/reports`, report)).data;
+
+export const fetchSaved = async () => (await axios.get(`${API_BASE}/me/saved`)).data;
+
+export const saveProduct = async (key, snapshot) => (await axios.put(`${API_BASE}/me/saved/${encodeURIComponent(key)}`, snapshot)).data;
+
+export const unsaveProduct = async (key) => (await axios.delete(`${API_BASE}/me/saved/${encodeURIComponent(key)}`)).data;
+
+export const fetchMySpotFeedback = async (spotId) => (await axios.get(`${API_BASE}/map/spots/${spotId}/feedback/mine`)).data;
+
+/** answers: { reacted, dedicatedKitchen, staffAware }, each true, false or null */
+export const sendSpotFeedback = async (spotId, answers) => (await axios.put(`${API_BASE}/map/spots/${spotId}/feedback`, answers)).data;
 
 /** The message to show for a failed request: the API's own message for 4xx, a fallback otherwise */
 export const errorMessage = (err, fallback) => {

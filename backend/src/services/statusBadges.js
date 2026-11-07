@@ -4,8 +4,9 @@
  */
 const BADGES = {
   ASSOCIATION: {
-    SAFE: ['Sans gluten (autorisé ATC)', 'خالٍ من الغلوتين (مرخص ATC)'],
-    UNSAFE: ['Contient du gluten (interdit ATC)', 'يحتوي على الغلوتين (ممنوع ATC)'],
+    // Celiac Square's own fiches (association_products), not an ATMC document: no "ATC" in the label
+    SAFE: ['Sans gluten', 'خالٍ من الغلوتين'],
+    UNSAFE: ['Contient du gluten', 'يحتوي على الغلوتين'],
     CROSS_CONTAMINATION_RISK: ['Risque de contamination croisée', 'خطر التلوث المتبادل'],
     WARNING: ['À vérifier', 'للتثبت'],
     UNKNOWN: ['Statut inconnu', 'الحالة غير معروفة'],

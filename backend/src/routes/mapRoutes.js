@@ -1,8 +1,9 @@
-import { db, unwrap } from '../config/db.js';
+import { db, unwrap, isMissingTable, FEATURE_UNAVAILABLE } from '../config/db.js';
 import { toSpot, toProposal } from '../models/mappers.js';
 import { containsPattern, exactPattern } from '../utils/regex.js';
 import { asyncRouter, clean, UUID_RE, MAX_LEN, tooLong, badRequest } from '../utils/http.js';
 import { requireAdmin } from '../middleware/adminAuth.js';
+import { requireUser } from '../middleware/auth.js';
 import { limits } from '../middleware/rateLimit.js';
 import { cached, invalidate } from '../services/cache.js';
 import { audit } from '../services/audit.js';
@@ -89,6 +90,33 @@ const spotFields = (body) => {
 
 const invalidateSpots = () => invalidate('map:');
 
+const FEEDBACK_QUESTIONS = { reacted: 'reacted', dedicatedKitchen: 'dedicated_kitchen', staffAware: 'staff_aware' };
+
+/**
+ * Totals of the community answers per spot: { spotId: { answers, reacted: { yes, no }, … } }.
+ * Individual answers are never published. Empty when the table does not exist yet.
+ */
+const loadFeedbackSummary = () =>
+  cached('map:feedback', 2 * 60 * 1000, async () => {
+    const { data, error } = await db().from('spot_feedback').select('spot_id, reacted, dedicated_kitchen, staff_aware').limit(20000);
+    if (isMissingTable(error)) return {};
+    if (error) throw new Error(error.message);
+    const out = {};
+    for (const row of data) {
+      const s =
+        out[row.spot_id] ||
+        (out[row.spot_id] = { answers: 0, ...Object.fromEntries(Object.keys(FEEDBACK_QUESTIONS).map((k) => [k, { yes: 0, no: 0 }])) });
+      s.answers += 1;
+      for (const [key, column] of Object.entries(FEEDBACK_QUESTIONS)) {
+        if (row[column] === true) s[key].yes += 1;
+        if (row[column] === false) s[key].no += 1;
+      }
+    }
+    return out;
+  });
+
+const withFeedback = (spots, summary) => spots.map((s) => ({ ...s, feedback: summary[s._id] || null }));
+
 /**
  * GET /api/map/spots
  * Filters: category, city, isVerified, q (search query)
@@ -110,7 +138,8 @@ router.get('/spots', async (req, res) => {
   if (isVerified === 'true' || isVerified === 'false') query = query.eq('is_verified', isVerified === 'true');
   if (q) query = query.ilike('search_text', containsPattern(q));
 
-  const spots = unwrap(await query).map(toSpot);
+  const [rows, summary] = await Promise.all([query, loadFeedbackSummary().catch(() => ({}))]);
+  const spots = withFeedback(unwrap(rows).map(toSpot), summary);
   return res.json({ success: true, count: spots.length, data: spots });
 });
 
@@ -120,7 +149,57 @@ router.get('/spots', async (req, res) => {
 router.get('/spots/:id', async (req, res) => {
   const spot = await findById('spots', req.params.id);
   if (!spot) return res.status(404).json({ success: false, message: 'Lieu non trouvé.' });
-  return res.json({ success: true, data: toSpot(spot) });
+  const summary = await loadFeedbackSummary().catch(() => ({}));
+  return res.json({ success: true, data: withFeedback([toSpot(spot)], summary)[0] });
+});
+
+/** true, false or null ("don't know") from the request body */
+const answerOf = (v) => (v === true || v === 'yes' ? true : v === false || v === 'no' ? false : null);
+
+/**
+ * GET /api/map/spots/:id/feedback/mine
+ * The signed-in user's own answers for this place (null when they have not answered)
+ */
+router.get('/spots/:id/feedback/mine', requireUser, async (req, res) => {
+  if (!UUID_RE.test(req.params.id)) return res.status(404).json({ success: false, message: 'Lieu introuvable.' });
+  const { data, error } = await db()
+    .from('spot_feedback')
+    .select('reacted, dedicated_kitchen, staff_aware, updated_at')
+    .eq('spot_id', req.params.id)
+    .eq('user_id', req.user.id)
+    .maybeSingle();
+  if (isMissingTable(error)) return res.status(503).json(FEATURE_UNAVAILABLE);
+  if (error) throw new Error(error.message);
+  return res.json({
+    success: true,
+    data: data ? { reacted: data.reacted, dedicatedKitchen: data.dedicated_kitchen, staffAware: data.staff_aware, updatedAt: data.updated_at } : null,
+  });
+});
+
+/**
+ * PUT /api/map/spots/:id/feedback
+ * Body: { reacted, dedicatedKitchen, staffAware }: true, false or null (don't know).
+ * One answer per account and place; answering again replaces it.
+ */
+router.put('/spots/:id/feedback', requireUser, async (req, res) => {
+  const spot = await findById('spots', req.params.id);
+  if (!spot) return res.status(404).json({ success: false, message: 'Lieu introuvable.' });
+  const row = {
+    spot_id: spot.id,
+    user_id: req.user.id,
+    reacted: answerOf(req.body?.reacted),
+    dedicated_kitchen: answerOf(req.body?.dedicatedKitchen),
+    staff_aware: answerOf(req.body?.staffAware),
+  };
+  if (row.reacted === null && row.dedicated_kitchen === null && row.staff_aware === null) {
+    return badRequest(res, 'Répondez à au moins une question.');
+  }
+  const { error } = await db().from('spot_feedback').upsert(row, { onConflict: 'spot_id,user_id' });
+  if (isMissingTable(error)) return res.status(503).json(FEATURE_UNAVAILABLE);
+  if (error) throw new Error(error.message);
+  invalidate('map:feedback');
+  const summary = await loadFeedbackSummary();
+  return res.json({ success: true, message: 'Merci pour votre retour !', data: summary[spot.id] || null });
 });
 
 /**

@@ -12,7 +12,7 @@ const router = asyncRouter();
 // Every product route may call Open Food Facts, which rate-limits our server's IP
 router.use(limits.productSearch);
 
-const ASSOCIATION_SOURCE = 'Association Tunisienne de la Cœliaque';
+const ASSOCIATION_SOURCE = 'Fiches Celiac Square';
 
 const fromAssociation = (p) => {
   const [badgeText, badgeTextAr] = associationBadge(p.status);
@@ -32,6 +32,10 @@ const fromAssociation = (p) => {
     notesAr: p.notesAr,
     officialDocReference: p.officialDocReference,
     imageUrl: null,
+    // How fresh the verdict is: the last time the association's entry was edited
+    sourceDate: p.updatedAt,
+    sourceDateKind: 'updated',
+    productKey: `assoc:${p._id}`,
   };
 };
 
@@ -53,6 +57,10 @@ const fromAtmc = (item) => {
     notesAr: item.categoryAr,
     officialDocReference: item.source,
     imageUrl: null,
+    // How fresh the verdict is: the guide edition it comes from
+    sourceDate: item.edition,
+    sourceDateKind: 'edition',
+    productKey: `atmc:${item._id}`,
   };
 };
 
@@ -128,7 +136,7 @@ router.get('/barcode/:barcode', async (req, res) => {
   }
 
   const [localRow] = unwrap(await db().from('association_products').select('*').eq('barcode', barcode).limit(1));
-  if (localRow) return res.json({ success: true, source: ASSOCIATION_SOURCE, data: toAssociationProduct(localRow) });
+  if (localRow) return res.json({ success: true, source: ASSOCIATION_SOURCE, data: fromAssociation(toAssociationProduct(localRow)) });
 
   const offProduct = await fetchFromOpenFoodFactsByBarcode(barcode);
   if (offProduct) return res.json({ success: true, source: 'Open Food Facts', data: offProduct });

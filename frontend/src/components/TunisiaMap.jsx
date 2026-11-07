@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, CircleMarker, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { Stethoscope, Croissant, UtensilsCrossed, Coffee, ShoppingBag, Phone, Clock, Search, BadgeCheck, LocateFixed, Plus, Images } from 'lucide-react';
+import { Stethoscope, Croissant, UtensilsCrossed, Coffee, ShoppingBag, Phone, Clock, Search, BadgeCheck, LocateFixed, Plus, Images, Crosshair, LoaderCircle } from 'lucide-react';
 import { fetchSpots, fetchCities } from '../services/api';
-import { t, PageHead, EmptyState, FilterSheet, SPOT_CATEGORIES, spotCategory } from './ui';
+import { openState, formatTime, distanceKm, DAY_NAMES } from '../services/hours';
+import { t, PageHead, EmptyState, FilterSheet, Notice, SPOT_CATEGORIES, spotCategory } from './ui';
 import SpotDetails, { spotCover, CrossContaminationBadge } from './SpotDetails';
 
 const CATEGORY_ICONS = {
@@ -48,6 +49,22 @@ const spotCategories = (spot) => (spot.categories?.length ? spot.categories : [s
 const verifiedDate = (iso, lang) =>
   new Date(iso).toLocaleDateString(lang === 'ar' ? 'ar-TN' : 'fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
 
+/** "Ouvert · ferme à 22 h" / "Fermé · ouvre demain à 10 h", or null when the hours cannot be read */
+const openLabel = (state, lang) => {
+  if (!state) return null;
+  const tr = t(lang);
+  if (state.open) return tr(`Ouvert · ferme à ${formatTime(state.closesAt)}`, `مفتوح · يغلق على ${formatTime(state.closesAt)}`);
+  if (!state.opensAt) return tr('Fermé', 'مغلق');
+  const { day, minutes, today, tomorrow } = state.opensAt;
+  const time = formatTime(minutes);
+  if (today) return tr(`Fermé · ouvre à ${time}`, `مغلق · يفتح على ${time}`);
+  if (tomorrow) return tr(`Fermé · ouvre demain à ${time}`, `مغلق · يفتح غدا على ${time}`);
+  return tr(`Fermé · ouvre ${DAY_NAMES.fr[day]} à ${time}`, `مغلق · يفتح ${DAY_NAMES.ar[day]} على ${time}`);
+};
+
+const formatKm = (km, lang) =>
+  km < 1 ? `${Math.round(km * 1000 / 50) * 50} m` : `${km.toLocaleString(lang === 'ar' ? 'ar-TN' : 'fr-FR', { maximumFractionDigits: km < 10 ? 1 : 0 })} km`;
+
 function FlyTo({ target }) {
   const map = useMap();
   useEffect(() => {
@@ -69,6 +86,18 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeId, setActiveId] = useState(null);
   const [flyTarget, setFlyTarget] = useState(null);
+  const [openNow, setOpenNow] = useState(false);
+  // "Near me": the user's position (never sent to the server), and the state of the request
+  const [userPos, setUserPos] = useState(null);
+  const [locating, setLocating] = useState(false);
+  const [locateError, setLocateError] = useState('');
+  const [offlineCopy, setOfflineCopy] = useState(null);
+  // Re-evaluates "open now" every minute
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => setSearchQuery(searchInput.trim()), 300);
@@ -93,6 +122,7 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
       .then((res) => {
         if (cancelled) return;
         setSpots(res?.data || []);
+        setOfflineCopy(res?.offlineCopy || null);
         setLoadError(false);
       })
       .catch(() => !cancelled && setLoadError(true))
@@ -101,6 +131,47 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
       cancelled = true;
     };
   }, [selectedCategory, selectedCity, verifiedOnly, searchQuery]);
+
+  // Opening state and distance per spot; "open now" and "near me" filter and sort the list and the map
+  const shownSpots = useMemo(() => {
+    let list = spots.map((spot) => {
+      const [lng, lat] = spot.location?.coordinates || [];
+      return {
+        ...spot,
+        openState: openState(spot.hours, now),
+        distance: userPos && lat !== undefined ? distanceKm(userPos, [lat, lng]) : null,
+      };
+    });
+    if (openNow) list = list.filter((s) => s.openState?.open);
+    if (userPos) list = [...list].sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
+    return list;
+  }, [spots, now, openNow, userPos]);
+
+  const locate = () => {
+    setLocateError('');
+    if (!navigator.geolocation) {
+      setLocateError(tr('Votre navigateur ne donne pas accès à la position.', 'متصفحك لا يتيح تحديد الموقع.'));
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const p = [pos.coords.latitude, pos.coords.longitude];
+        setUserPos(p);
+        setLocating(false);
+        setFlyTarget({ center: p, zoom: 12 });
+      },
+      (err) => {
+        setLocating(false);
+        setLocateError(
+          err.code === 1
+            ? tr('Position refusée. Autorisez la localisation pour ce site dans votre navigateur.', 'تم رفض تحديد الموقع. اسمح به لهذا الموقع في متصفحك.')
+            : tr('Position introuvable pour le moment. Réessayez dehors ou choisissez une ville.', 'تعذر تحديد الموقع حاليا. أعد المحاولة أو اختر مدينة.')
+        );
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 5 * 60 * 1000 }
+    );
+  };
 
   const counts = useMemo(() => {
     const c = {};
@@ -112,7 +183,7 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
     return c;
   }, [spots]);
 
-  const activeFilterCount = (selectedCategory !== 'ALL' ? 1 : 0) + (selectedCity !== 'ALL' ? 1 : 0) + (verifiedOnly ? 1 : 0);
+  const activeFilterCount = (selectedCategory !== 'ALL' ? 1 : 0) + (selectedCity !== 'ALL' ? 1 : 0) + (verifiedOnly ? 1 : 0) + (openNow ? 1 : 0);
 
   const categoryChips = (
     <>
@@ -153,6 +224,28 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
     </label>
   );
 
+  const openNowToggle = (
+    <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-canvas-line bg-canvas-paper px-3.5 py-2.5 text-[15px]" title={tr('D’après les horaires indiqués, heure de Tunisie', 'حسب الأوقات المذكورة، بتوقيت تونس')}>
+      <input type="checkbox" checked={openNow} onChange={(e) => setOpenNow(e.target.checked)} className="h-4 w-4 accent-[#4E6127]" />
+      {tr('Ouvert maintenant', 'مفتوح الآن')}
+    </label>
+  );
+
+  const nearMeButton = (
+    <button
+      type="button"
+      onClick={locate}
+      className="btn-quiet h-full whitespace-nowrap px-3 sm:px-4"
+      aria-pressed={Boolean(userPos)}
+      aria-label={tr('Près de moi', 'بالقرب مني')}
+      title={tr('Trier par distance (votre position reste sur l’appareil)', 'الترتيب حسب المسافة (يبقى موقعك على الجهاز)')}
+      disabled={locating}
+    >
+      {locating ? <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Crosshair className="h-4 w-4" aria-hidden="true" />}
+      <span className="hidden sm:inline">{tr('Près de moi', 'بالقرب مني')}</span>
+    </button>
+  );
+
   const focusSpot = (spot) => {
     setActiveId(spot._id);
     const [lng, lat] = spot.location?.coordinates || [];
@@ -185,7 +278,7 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
         {categoryChips}
       </div>
 
-      <div className="flex gap-2 lg:grid lg:grid-cols-[1fr_auto_auto] lg:gap-3">
+      <div className="flex gap-2 lg:grid lg:grid-cols-[1fr_auto_auto_auto_auto] lg:gap-3">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-faint" />
           <input
@@ -199,6 +292,8 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
         </div>
         <div className="hidden lg:block">{citySelect}</div>
         <div className="hidden lg:block">{verifiedToggle}</div>
+        <div className="hidden lg:block">{openNowToggle}</div>
+        <div className="shrink-0">{nearMeButton}</div>
         <FilterSheet lang={lang} activeCount={activeFilterCount} className="shrink-0">
           <div className="space-y-5">
             <div>
@@ -210,9 +305,17 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
               {citySelect}
             </div>
             {verifiedToggle}
+            {openNowToggle}
           </div>
         </FilterSheet>
       </div>
+
+      {locateError && <Notice tone="warning">{locateError}</Notice>}
+      {offlineCopy && (
+        <Notice tone="info" title={tr('Hors ligne : adresses enregistrées sur cet appareil', 'غير متصل: عناوين محفوظة على هذا الجهاز')}>
+          {tr('La liste est celle de votre dernière visite. Le fond de carte a besoin d’internet.', 'القائمة هي نفسها في زيارتك الأخيرة. الخريطة تحتاج إلى الإنترنت.')}
+        </Notice>
+      )}
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <div role="region" aria-label={tr('Carte des adresses. La liste qui suit présente les mêmes lieux.', 'خريطة العناوين. القائمة التالية تعرض نفس الأماكن.')} className="relative z-0 h-[55vh] min-h-[340px] overflow-hidden rounded-2xl border border-white/60 shadow-[0_8px_24px_-16px_rgba(47,38,29,0.3)] lg:sticky lg:top-24 lg:h-[620px]">
@@ -222,7 +325,12 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            {spots.map((spot) => {
+            {userPos && (
+              <CircleMarker center={userPos} radius={8} pathOptions={{ color: '#F3F0E6', weight: 3, fillColor: '#2F6FDB', fillOpacity: 1 }}>
+                <Popup>{tr('Vous êtes ici', 'أنت هنا')}</Popup>
+              </CircleMarker>
+            )}
+            {shownSpots.map((spot) => {
               const [lng, lat] = spot.location?.coordinates || [];
               if (lat === undefined) return null;
               return (
@@ -275,11 +383,24 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
 
         <div className="min-w-0">
           <p className="mb-2 text-sm text-ink-soft" aria-live="polite">
-            {loading ? tr('Chargement…', 'جاري التحميل…') : `${spots.length} ${tr(spots.length > 1 ? 'adresses' : 'adresse', 'عنوان')}`}
+            {loading
+              ? tr('Chargement…', 'جاري التحميل…')
+              : `${shownSpots.length} ${tr(shownSpots.length > 1 ? 'adresses' : 'adresse', 'عنوان')}${userPos ? tr(', de la plus proche à la plus lointaine', '، من الأقرب إلى الأبعد') : ''}`}
           </p>
           {loadError ? (
             <EmptyState title={tr('Les adresses n’ont pas pu être chargées', 'تعذر تحميل العناوين')}>
               {tr('Vérifiez votre connexion, puis changez un filtre pour réessayer.', 'تحقق من الاتصال ثم غيّر أحد المرشحات لإعادة المحاولة.')}
+            </EmptyState>
+          ) : !loading && spots.length > 0 && shownSpots.length === 0 ? (
+            <EmptyState
+              title={tr('Aucune adresse ouverte en ce moment', 'لا يوجد عنوان مفتوح الآن')}
+              action={
+                <button type="button" onClick={() => setOpenNow(false)} className="btn-quiet">
+                  {tr('Voir toutes les adresses', 'عرض كل العناوين')}
+                </button>
+              }
+            >
+              {tr('D’après les horaires indiqués. Les lieux sans horaires lisibles ne sont pas comptés.', 'حسب الأوقات المذكورة. لا تُحتسب الأماكن التي لا تُقرأ أوقاتها.')}
             </EmptyState>
           ) : !loading && spots.length === 0 ? (
             <EmptyState
@@ -294,8 +415,9 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
             </EmptyState>
           ) : (
             <ul className="space-y-2">
-              {spots.map((spot) => {
+              {shownSpots.map((spot) => {
                 const cats = spotCategories(spot).map(spotCategory);
+                const open = openLabel(spot.openState, lang);
                 const active = activeId === spot._id;
                 const cover = spotCover(spot);
                 return (
@@ -329,7 +451,10 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
                             </span>
                           )}
                         </span>
-                        <span className="mt-1.5 block font-medium leading-snug">{spot.name}</span>
+                        <span className="mt-1.5 flex items-baseline justify-between gap-3">
+                          <span className="font-medium leading-snug">{spot.name}</span>
+                          {spot.distance != null && <span className="shrink-0 text-sm tabular-nums text-ink-soft">{formatKm(spot.distance, lang)}</span>}
+                        </span>
                         <span className="mt-0.5 block text-sm text-ink-soft">{spot.address}</span>
                         {spot.crossContaminationRisk && (
                           <span className="mt-2 block">
@@ -349,8 +474,14 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
                               </span>
                             )}
                             {spot.hours && (
-                              <span className="inline-flex items-center gap-1.5">
+                              <span className="inline-flex flex-wrap items-center gap-x-1.5">
                                 <Clock className="h-3.5 w-3.5" />
+                                {open && (
+                                  <span className={`font-medium ${spot.openState.open ? 'text-status-safe-ink' : 'text-ink'}`}>
+                                    {open}
+                                    {' · '}
+                                  </span>
+                                )}
                                 {spot.hours}
                               </span>
                             )}

@@ -14,11 +14,14 @@ import Backoffice from './components/Backoffice';
 import Privacy from './components/Privacy';
 import SpotModal from './components/SpotModal';
 import Footer from './components/Footer';
+import SavedProducts from './components/SavedProducts';
+import { SavedProvider } from './components/community';
+import { WifiOff } from 'lucide-react';
 import { AuthProvider, useAuth } from './components/AuthContext';
 import { navigate, pathFor, useRoute } from './services/router';
 
 // Dock tabs first, then pages reached from the account menu and the footer
-const TAB_ORDER = ['atmc', 'vision', 'search', 'map', 'market', 'account', 'reset-password', 'seller', 'become-seller', 'backoffice', 'privacy'];
+const TAB_ORDER = ['atmc', 'vision', 'search', 'map', 'market', 'account', 'reset-password', 'seller', 'become-seller', 'backoffice', 'privacy', 'saved'];
 
 const PAGE_TITLES = {
   atmc: ['Guide ATMC', 'دليل الجمعية'],
@@ -32,6 +35,7 @@ const PAGE_TITLES = {
   'become-seller': ['Devenir vendeur', 'كن بائعا'],
   backoffice: ['Back-office', 'فضاء الإدارة'],
   privacy: ['Confidentialité', 'الخصوصية'],
+  saved: ['Mes produits', 'منتجاتي'],
 };
 
 const SITE = {
@@ -60,13 +64,32 @@ const setMeta = (selector, value) => {
 export default function App() {
   return (
     <AuthProvider>
-      <AppShell />
+      <SavedProvider>
+        <AppShell />
+      </SavedProvider>
     </AuthProvider>
   );
 }
 
+/** navigator.onLine, kept up to date */
+function useOnline() {
+  const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine !== false));
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
+  }, []);
+  return online;
+}
+
 function AppShell() {
   const { user } = useAuth();
+  const online = useOnline();
   const route = useRoute();
   const activeTab = route.tab;
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
@@ -151,6 +174,8 @@ function AppShell() {
         return <Backoffice lang={lang} />;
       case 'privacy':
         return <Privacy lang={lang} />;
+      case 'saved':
+        return <SavedProducts lang={lang} />;
       default:
         return <AtmcCatalog lang={lang} />;
     }
@@ -163,6 +188,17 @@ function AppShell() {
       </a>
 
       <Navbar activeTab={activeTab} setActiveTab={goTo} onOpenSubmitModal={() => setIsSubmitModalOpen(true)} lang={lang} setLang={setLang} />
+
+      {!online && (
+        <div role="status" className="mx-auto mt-2 flex w-[calc(100%-2rem)] max-w-6xl items-start gap-2.5 rounded-xl border border-status-warning/60 bg-status-warning/15 px-4 py-2.5 text-sm">
+          <WifiOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            {lang === 'ar'
+              ? 'أنت غير متصل. دليل الجمعية والعناوين المحفوظة متاحة؛ البحث والماسح يحتاجان إلى الإنترنت.'
+              : 'Vous êtes hors ligne. Le guide ATMC et les adresses déjà consultées restent disponibles ; la recherche et le scanner ont besoin d’internet.'}
+          </span>
+        </div>
+      )}
 
       <main id="main" ref={mainRef} className="mx-auto w-full max-w-6xl flex-1 overflow-x-clip px-4 pb-32 pt-6 sm:px-6 sm:pt-10">
         <div key={activeTab} className={slide}>

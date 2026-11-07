@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -25,8 +26,32 @@ const vercelHeaders = () => {
   }
 };
 
+// Files from public/ that the offline app needs (the spot photos and videos are cached when viewed)
+const PUBLIC_PRECACHE = ['/manifest.webmanifest', '/favicon.svg', '/logo-mark.svg', '/icons/icon-192.png', '/icons/apple-touch-icon.png'];
+
+/**
+ * Builds /sw.js from src/sw.js: fills in the list of built files to cache at install and a version
+ * that changes with them, so a new deploy replaces the old offline copy of the app.
+ */
+const serviceWorker = () => ({
+  name: 'service-worker',
+  apply: 'build',
+  generateBundle(_options, bundle) {
+    // The barcode reader's WebAssembly (about 1 MB) is left out: it loads on first use, and needs the network anyway
+    const files = Object.keys(bundle)
+      .filter((name) => !name.endsWith('.map') && !name.endsWith('.html') && !name.endsWith('.wasm'))
+      .map((name) => `/${name}`);
+    const precache = [...files, ...PUBLIC_PRECACHE];
+    const version = createHash('sha256').update(precache.join('\n')).digest('hex').slice(0, 12);
+    const source = readFileSync(new URL('./src/sw.js', import.meta.url), 'utf8')
+      .replace("'__SW_VERSION__'", JSON.stringify(version))
+      .replace('__SW_PRECACHE__', JSON.stringify(precache));
+    this.emitFile({ type: 'asset', fileName: 'sw.js', source });
+  },
+});
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), serviceWorker()],
   server: { port: 3000, proxy },
   preview: { port: 4173, proxy, headers: vercelHeaders() },
 });

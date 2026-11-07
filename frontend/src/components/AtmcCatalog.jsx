@@ -3,6 +3,7 @@ import Fuse from 'fuse.js';
 import { Search, X } from 'lucide-react';
 import { fetchAtmcProducts, fetchAtmcCategories, fetchAtmcStats } from '../services/api';
 import { t, statusKind, STATUS, StatusTile, PageHead, Notice, EmptyState, FilterSheet } from './ui';
+import { SaveButton, ReportButton, atmcAsProduct } from './community';
 
 // Lowercase without accents, so "the" matches "Thé"
 const fold = (str) =>
@@ -31,6 +32,8 @@ export default function AtmcCatalog({ lang = 'fr' }) {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+  // Date of the copy saved on the device, when the guide was loaded without a connection
+  const [offlineCopy, setOfflineCopy] = useState(null);
 
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
@@ -50,9 +53,23 @@ export default function AtmcCatalog({ lang = 'fr' }) {
         fetchAtmcStats(),
       ]);
       if (prodRes?.data) setProducts(prodRes.data);
+      setOfflineCopy(prodRes?.offlineCopy || null);
       if (catRes?.data) setCategories(catRes.data);
       if (statRes?.data) setStats(statRes.data);
     } catch (err) {
+      // Offline without a saved copy of the categories or counts: the product list alone is enough
+      if (products.length === 0) {
+        try {
+          const prodRes = await fetchAtmcProducts({ category: 'ALL', status: 'ALL' });
+          if (prodRes?.data?.length) {
+            setProducts(prodRes.data);
+            setOfflineCopy(prodRes.offlineCopy || null);
+            return;
+          }
+        } catch {
+          // fall through to the error
+        }
+      }
       console.error('Failed to load ATMC data:', err);
       setErrorMsg('load');
     } finally {
@@ -212,6 +229,16 @@ export default function AtmcCatalog({ lang = 'fr' }) {
             )}
           </div>
 
+          {offlineCopy && !loading && (
+            <Notice tone="info" title={tr('Hors ligne : copie du guide enregistrée sur cet appareil', 'غير متصل: نسخة من الدليل محفوظة على هذا الجهاز')}>
+              {offlineCopy !== 'unknown' &&
+                tr(
+                  `Téléchargée le ${new Date(offlineCopy).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}. Les corrections publiées depuis n’y figurent peut-être pas.`,
+                  `حُمّلت في ${new Date(offlineCopy).toLocaleDateString('ar-TN', { day: 'numeric', month: 'long', year: 'numeric' })}. قد لا تتضمن التصحيحات المنشورة بعد ذلك.`
+                )}
+            </Notice>
+          )}
+
           {loading ? (
             <ListSkeleton label={tr('Chargement du guide…', 'جاري تحميل الدليل…')} />
           ) : errorMsg ? (
@@ -258,6 +285,10 @@ export default function AtmcCatalog({ lang = 'fr' }) {
                     <div className="hidden shrink-0 text-end sm:block">
                       <p className={`text-sm font-medium ${STATUS[kind].text}`}>{lang === 'ar' ? STATUS[kind].ar : STATUS[kind].fr}</p>
                       <p className="mt-0.5 text-xs text-ink-faint">{categoryLabel(item)}</p>
+                    </div>
+                    <div className="-my-1.5 -me-2 flex shrink-0 items-center">
+                      <SaveButton item={atmcAsProduct(item)} lang={lang} iconOnly />
+                      <ReportButton target={{ type: 'ATMC_PRODUCT', id: item._id, label: item.nameFr || item.name }} lang={lang} iconOnly />
                     </div>
                   </li>
                 );

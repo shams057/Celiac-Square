@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { MapPin, Store, Lock } from 'lucide-react';
+import { MapPin, Store, Lock, Flag } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import BackofficeSpots from './BackofficeSpots';
 import BackofficeSellers from './BackofficeSellers';
+import BackofficeReports from './BackofficeReports';
 import { t } from './ui';
 
 const SECTIONS = [
+  { id: 'reports', icon: Flag, fr: 'Signalements', ar: 'البلاغات' },
   { id: 'spots', icon: MapPin, fr: 'Adresses', ar: 'العناوين' },
   { id: 'sellers', icon: Store, fr: 'Vendeurs et comptes', ar: 'البائعون والحسابات' },
 ];
@@ -14,7 +16,8 @@ const SECTIONS = [
 export default function Backoffice({ lang }) {
   const tr = t(lang);
   const { user } = useAuth();
-  const [section, setSection] = useState('sellers');
+  const [section, setSection] = useState('reports');
+  const [openReports, setOpenReports] = useState(null);
 
   if (user?.role !== 'ADMIN') {
     return (
@@ -44,10 +47,19 @@ export default function Backoffice({ lang }) {
           >
             <Icon className="h-4 w-4" />
             {tr(fr, ar)}
+            {id === 'reports' && openReports > 0 && (
+              <span className="rounded-full bg-status-unsafe px-1.5 text-xs font-medium tabular-nums text-white">{openReports}</span>
+            )}
           </button>
         ))}
       </div>
-      {section === 'spots' ? <BackofficeSpots lang={lang} /> : <BackofficeSellers lang={lang} />}
+      {section === 'reports' ? (
+        <BackofficeReports lang={lang} onCountChange={setOpenReports} />
+      ) : section === 'spots' ? (
+        <BackofficeSpots lang={lang} />
+      ) : (
+        <BackofficeSellers lang={lang} />
+      )}
     </div>
   );
 }

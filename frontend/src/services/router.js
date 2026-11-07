@@ -17,6 +17,7 @@ export const ROUTES = {
   'become-seller': '/devenir-vendeur',
   backoffice: '/admin',
   privacy: '/confidentialite',
+  saved: '/mes-produits',
 };
 
 const STORE_RE = /^\/marche\/boutique\/([0-9a-f-]{36})\/?$/i;

@@ -11,81 +11,9 @@ const DATA_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../
 
 export const spotsSeed = [
   // --- DOCTORS ---
-  {
-    name: 'Dr. Sofiene Ben Khelil (Gastro-entérologue)',
-    category: 'DOCTOR',
-    location: {
-      type: 'Point',
-      coordinates: [10.1815, 36.8065], // [lng, lat] Tunis Centre
-    },
-    city: 'Tunis',
-    address: 'Centre Urbain Nord, Clinique Alyssa, 1082 Tunis',
-    phone: '+216 71 820 400',
-    speciality: 'Gastro-entérologie adulte & Maladie Cœliaque',
-    hours: 'Lun-Ven: 08:30 - 16:30, Sam: 08:30 - 12:30',
-    isVerified: true,
-    notes: 'Référent de l’Association Tunisienne de la Cœliaque. Prise en charge des biopsies duodénales et suivi diététique.',
-  },
-  {
-    name: 'Dr. Amel Trabelsi (Pédiatre Spécialiste Cœliaque)',
-    category: 'DOCTOR',
-    location: {
-      type: 'Point',
-      coordinates: [10.1972, 36.8522], // Ariana
-    },
-    city: 'Ariana',
-    address: 'Avenue Habib Bourguiba, Immeuble El Hana, Ariana',
-    phone: '+216 71 700 890',
-    speciality: 'Pédiatrie & Nutrition Infantile Sans Gluten',
-    hours: 'Lun-Sam: 09:00 - 17:00',
-    isVerified: true,
-    notes: 'Dépistage précoce chez l’enfant et protocole d’exclusion stricte du gluten sans carences.',
-  },
-  {
-    name: 'Dr. Karim Jlassi (Gastro-entérologue & Hépatologue)',
-    category: 'DOCTOR',
-    location: {
-      type: 'Point',
-      coordinates: [10.6369, 35.8256], // Sousse
-    },
-    city: 'Sousse',
-    address: 'Boulevard 14 Janvier, Centre Médical La Corniche, Sousse',
-    phone: '+216 73 228 110',
-    speciality: 'Gastro-entérologie & Endoscopie digestive',
-    hours: 'Lun-Ven: 08:30 - 16:00',
-    isVerified: true,
-    notes: 'Diagnostics sérologiques cœliaques (Anti-transglutaminase IgA) et endoscopies digestives.',
-  },
-  {
-    name: 'Dr. Monia Charfi (Nutritionniste Diététicienne)',
-    category: 'DOCTOR',
-    location: {
-      type: 'Point',
-      coordinates: [10.7602, 34.7405], // Sfax
-    },
-    city: 'Sfax',
-    address: 'Route de Téniour Km 1.5, Immeuble Ibn Sina, Sfax',
-    phone: '+216 74 405 550',
-    speciality: 'Diététique clinique & Régime sans gluten',
-    hours: 'Lun-Sam: 09:00 - 15:00',
-    isVerified: true,
-    notes: 'Plans de rééquilibrage nutritionnel et accompagnement pour les cœliaques nouvellement diagnostiqués.',
-  },
-  {
-    name: 'Dr. Riadh Bouzidi (Gastro-entérologue)',
-    category: 'DOCTOR',
-    location: {
-      type: 'Point',
-      coordinates: [9.8739, 37.2744], // Bizerte
-    },
-    city: 'Bizerte',
-    address: 'Rue Habib Thameur, Centre Médical du Nord, Bizerte',
-    phone: '+216 72 431 220',
-    speciality: 'Pathologies digestives & Intolérances alimentaires',
-    hours: 'Lun-Ven: 09:00 - 16:00',
-    isVerified: true,
-    notes: 'Suivi régulier et bilan annuel pour les patients atteints de maladie cœliaque.',
-  },
+  // None yet. The first prototype seeded five doctors that were never verified; they were taken off
+  // the "verified" list in November 2026 (backup: removed_doctors_2026-11-07.json, outside the repo).
+  // Add real doctors through the back office once they have agreed to be listed.
 
   // --- GLUTEN-FREE PLACES ---
   // Addresses, hours and phones from each place's Google Maps listing (November 2026).
@@ -278,10 +206,10 @@ export const associationProductsSeed = [
     isGlutenFree: false,
     status: 'UNSAFE',
     brand: 'Artisanal / Vrac / Marques locales',
-    barcode: '6191000100011',
+    barcode: '', // placeholder code removed (Nov 2026): it could match a real product
     notes: 'STRICTEMENT INTERDIT pour les malades cœliaques. Élaboré à partir de semoule de blé dur riche en gluten. Ne jamais consommer même lavé ou rincé.',
     notesAr: 'ممنوع قطعا لمرضى حساسية القمح والسلياك. مصنوع من سميد القمح الصلب الغني بالغلوتين.',
-    officialDocReference: 'Guide ATC - Chapitre Céréales Majeures',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['couscous', 'smid', 'semoule', 'ble', 'wheat', 'كسكسي', 'سميد'],
   },
   {
@@ -291,10 +219,10 @@ export const associationProductsSeed = [
     isGlutenFree: true,
     status: 'SAFE',
     brand: 'Diététique Agréée',
-    barcode: '6192000200022',
-    notes: 'AUTORISÉ SANS RESTRICTION. Fabriqué à 100% avec de la farine de maïs sur des lignes strictement certifiées sans gluten par l’ATC.',
+    barcode: '', // placeholder code removed (Nov 2026): it could match a real product
+    notes: 'Sans gluten si l’emballage porte la mention ou le logo « sans gluten » : à base de farine de maïs. Vérifiez la mention sur chaque paquet.',
     notesAr: 'مرخص ومسموح به. مصنوع 100% من الذرة في خطوط إنتاج معزولة وخالية من التلوث.',
-    officialDocReference: 'Guide ATC - Liste Blanche Céréales Alternatives',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['couscous mais', 'corn couscous', 'sans gluten', 'ذرة', 'خال من الغلوتين'],
   },
   {
@@ -307,7 +235,7 @@ export const associationProductsSeed = [
     barcode: '',
     notes: 'STRICTEMENT INTERDIT. L’orge contient de la hordéine, une forme de gluten hautement toxique pour la muqueuse intestinale des personnes cœliaques.',
     notesAr: 'ممنوع كليا. الشعير يحتوي على الغلوتين ولا يناسب مرضى السلياك نهائيا.',
-    officialDocReference: 'Guide ATC - Chapitre Céréales Toxiques',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['orge', 'malthouth', 'barley', 'شعير', 'ملثوث'],
   },
   {
@@ -320,7 +248,7 @@ export const associationProductsSeed = [
     barcode: '',
     notes: 'ATTENTION RISQUE ÉLEVÉ. La graine de sorgho est naturellement sans gluten, mais les moulins traditionnels en Tunisie broient également du blé et de l’orge. N’acheter que le Drou3 certifié en paquet scellé portant le logo sans gluten.',
     notesAr: 'تنبيه: حبة الدرع خالية طبيعيا من الغلوتين لكن طحنها في المطاحن الشعبية المشتركة يسبب تلوثا خطيرا. اشتري فقط المعلب المعتمد.',
-    officialDocReference: 'Alerte ATC - Moulins et Contamination Croisée',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['drou3', 'droua', 'sorgho', 'sorghum', 'درع', 'سحلب'],
   },
   {
@@ -330,10 +258,10 @@ export const associationProductsSeed = [
     isGlutenFree: true,
     status: 'SAFE',
     brand: 'Certifiée Sans Gluten',
-    barcode: '6193000300033',
+    barcode: '', // placeholder code removed (Nov 2026): it could match a real product
     notes: 'AUTORISÉ. Idéal pour la pâtisserie, la préparation des crêpes et l’épaississement des sauces. Vérifier l’emballage pour la mention sans gluten.',
     notesAr: 'مرخص ومسموح. ممتاز لصنع الحلويات والخبز الخالي من الغلوتين.',
-    officialDocReference: 'Guide ATC - Liste des Farines Pures',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['farine de riz', 'rice flour', 'ارز', 'فرينة رز'],
   },
 
@@ -348,7 +276,7 @@ export const associationProductsSeed = [
     barcode: '',
     notes: 'STRICTEMENT INTERDIT. Préparée traditionnellement avec de la farine de blé blanche et de la semoule. Ne pas consommer le brik à l’œuf classique.',
     notesAr: 'ممنوع منعا باتا. ورقة الملسوقة التقليدية مصنوعة من السميد والفرينة (القمح).',
-    officialDocReference: 'Guide ATC - Produits du Ramadan',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['malsouka', 'brik', 'feuille brik', 'borek', 'ملسوقة', 'بريك'],
   },
   {
@@ -357,11 +285,11 @@ export const associationProductsSeed = [
     category: 'PASTRY',
     isGlutenFree: true,
     status: 'SAFE',
-    brand: 'Ateliers Spécialisés ATC',
-    barcode: '6194000400044',
+    brand: 'Ateliers spécialisés sans gluten',
+    barcode: '', // placeholder code removed (Nov 2026): it could match a real product
     notes: 'AUTORISÉ. Confectionné artisanalement dans un atelier dédié à base de farine de riz et fécule de tapioca. Parfait pour les briks tunisiens sécurisés.',
     notesAr: 'مرخص ومناسب للبريك التونسي. مصنوع في ورشة معزولة بالأرز ودقيق التابيوكا.',
-    officialDocReference: 'Guide ATC - Substituts Festifs',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['malsouka sans gluten', 'brik sans gluten', 'ملسوقة خالية من الغلوتين'],
   },
   {
@@ -374,7 +302,7 @@ export const associationProductsSeed = [
     barcode: '',
     notes: 'STRICTEMENT INTERDIT. La pâte est principalement composée de semoule de blé dur et frite dans des huiles parfois partagées. Consommer uniquement la version artisanale dédiée certifiée.',
     notesAr: 'ممنوع كليا. عجين المقروض بالسميد القمحي.',
-    officialDocReference: 'Guide ATC - Pâtisseries Orientales',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['makroudh', 'makroud', 'kairouan', 'dates', 'مقروض', 'حلويات'],
   },
   {
@@ -387,7 +315,7 @@ export const associationProductsSeed = [
     barcode: '',
     notes: 'STRICTEMENT INTERDIT. Composée de blé et orge torréfiés moulus avec épices. Danger extrême pour les cœliaques.',
     notesAr: 'ممنوع بشدة. مزيج حبوب القمح والشعير المحمصة المطحونة.',
-    officialDocReference: 'Guide ATC - Produits du Terroir',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['bsissa', 'bsisa', 'orge', 'ble', 'بسيسة'],
   },
   {
@@ -396,11 +324,11 @@ export const associationProductsSeed = [
     category: 'GRAINS',
     isGlutenFree: true,
     status: 'SAFE',
-    brand: 'Marques Terroir Agréées ATC',
-    barcode: '6195000500055',
+    brand: 'Marques du terroir',
+    barcode: '', // placeholder code removed (Nov 2026): it could match a real product
     notes: 'AUTORISÉ. Préparée exclusivement avec des pois chiches torréfiés, sorgho garanti et graines de fenouil nettoyées avec soin.',
     notesAr: 'مرخص ومسموح. تركيبة صحية خالية من القمح من الحمص والبهارات النقية.',
-    officialDocReference: 'Guide ATC - Recettes Sécurisées',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['bsissa sans gluten', 'chickpea bsissa', 'بسيسة خالية من الغلوتين'],
   },
 
@@ -412,10 +340,10 @@ export const associationProductsSeed = [
     isGlutenFree: true,
     status: 'SAFE',
     brand: 'Toutes marques locales & Huileries',
-    barcode: '6196000600066',
+    barcode: '', // placeholder code removed (Nov 2026): it could match a real product
     notes: 'NATURELLEMENT SANS GLUTEN. Les huiles pures (olive, tournesol, maïs) 100% végétales sans arômes ajoutés ne contiennent aucun gluten.',
     notesAr: 'خالٍ من الغلوتين بطبيعته. زيت الزيتون الصافي مسموح به ولا يحمل أي مخاطر.',
-    officialDocReference: 'Guide ATC - Huiles et Matières Grasses Pures',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['huile d olive', 'olive oil', 'zit', 'zitouna', 'chemlali', 'زيت زيتون'],
   },
   {
@@ -425,10 +353,10 @@ export const associationProductsSeed = [
     isGlutenFree: true,
     status: 'SAFE',
     brand: 'Le Phare du Cap Bon (SCAPCB)',
-    barcode: '6191500700101',
+    barcode: '', // placeholder code removed (Nov 2026): it could match a real product
     notes: 'AUTORISÉ. Composition : Piments rouges, ail, sel, coriandre et carvi. Ne contient ni additif ni farine de liaison.',
     notesAr: 'مرخص ومسموح. مكونات نقية من الفلفل والثوم والبهارات الطبيعية دون إضافات.',
-    officialDocReference: 'Liste Officielle Produits Conditionnés ATC',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['harissa', 'cap bon', 'scapcb', 'piment', 'هريسة', 'كاب بون'],
   },
   {
@@ -441,7 +369,7 @@ export const associationProductsSeed = [
     barcode: '',
     notes: 'RISQUE DE CONTAMINATION. Les cuillères de service peuvent toucher du pain ou le matériel de broyage peut être partagé avec du blé. Préférer les bocaux scellés.',
     notesAr: 'خطر تلوث متبادل في الأسواق الشعبية بالخبز وأواني الغرف المشتركة.',
-    officialDocReference: 'Recommandation Sécurité Marchés ATC',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['harissa arbi', 'vrac', 'souk', 'هريسة عربي'],
   },
   {
@@ -452,9 +380,9 @@ export const associationProductsSeed = [
     status: 'CROSS_CONTAMINATION_RISK',
     brand: 'Vrac / Épiciers',
     barcode: '',
-    notes: 'VIGILANCE INDISPENSABLE. Les graines d’épices vendues en sacs ouverts au souk sont fréquemment mélangées avec des grains de blé lors des récoltes et du stockage. L’ATC conseille : Acheter en graines entières, trier minutieusement grain par grain, laver et sécher avant de moudre chez soi dans un moulin propre.',
+    notes: 'VIGILANCE INDISPENSABLE. Les graines d’épices vendues en sacs ouverts au souk sont fréquemment mélangées avec des grains de blé lors des récoltes et du stockage. Conseil : Acheter en graines entières, trier minutieusement grain par grain, laver et sécher avant de moudre chez soi dans un moulin propre.',
     notesAr: 'تحذير شديد: بهارات الأسواق تختلط بحبوب القمح. يجب اقتناء الحبوب كاملة وغربلتها حبة بحبة وغسلها ثم طحنها منزليا.',
-    officialDocReference: 'Guide Hygiène Épices ATC',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['epices', 'tebel', 'karouia', 'tabel', 'spices', 'توابل', 'بهارات', 'كروية'],
   },
 
@@ -469,7 +397,7 @@ export const associationProductsSeed = [
     barcode: '',
     notes: 'NATURELLEMENT SANS GLUTEN. La viande crue pure ne contient aucun gluten. Attention toutefois à la planche à découper du boucher si celui-ci prépare du merguez ou des escalopes panées.',
     notesAr: 'خالٍ من الغلوتين بطبيعته. اللحوم الطازجة غير المتبلة آمنة تماما.',
-    officialDocReference: 'Guide Boucherie Sécurisée ATC',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['viande', 'boeuf', 'agneau', 'meat', 'لحم', 'قصاب'],
   },
   {
@@ -482,7 +410,7 @@ export const associationProductsSeed = [
     barcode: '',
     notes: 'RISQUE MAJEUR. De nombreux bouchers ajoutent de la chapelure de pain ou de la semoule pour lier la farce, ou utilisent des mélanges d’épices contaminés. Ne consommer que des merguez certifiées 100% viande et épices garanties sans gluten.',
     notesAr: 'خطر تلوث كبير: يستعمل بعض القصابين فتات الخبز (شابلور) أو سميد وتوابل ملوثة.',
-    officialDocReference: 'Alerte Charcuterie & Merguez ATC',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['merguez', 'sausage', 'saucisse', 'مرقاز'],
   },
 
@@ -494,10 +422,10 @@ export const associationProductsSeed = [
     isGlutenFree: true,
     status: 'SAFE',
     brand: 'Forêts Tunisiennes / Vrac pur',
-    barcode: '6197000700077',
+    barcode: '', // placeholder code removed (Nov 2026): it could match a real product
     notes: 'AUTORISÉ AVEC PRÉCAUTION. La graine de pin d’Alep est sans gluten. Pour préparer l’Assida du Mouled en toute sécurité, utiliser de la farine d’amidon de maïs (Maïzena) ou farine de riz, et NE JAMAIS utiliser la farine de blé conventionnelle.',
     notesAr: 'مسموح وطبيعي. لكن يجب استعمال النشا أو فرينة الأرز في إعداد العصيدة وتجنب فرينة القمح.',
-    officialDocReference: 'Guide Mouled & Assida ATC',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['zgougou', 'pin alep', 'assida', 'زقوقو', 'عصيدة'],
   },
 
@@ -512,7 +440,7 @@ export const associationProductsSeed = [
     barcode: '8076809545440',
     notes: 'PRODUIT CERTIFIÉ ÉPI BARRÉ. Formulé à base de maïs blanc, maïs jaune et riz. Très répandu dans les supermarchés tunisiens (Carrefour, Géant, Monoprix).',
     notesAr: 'منتج معتمد عالميا ومحليا. مصنوع من الذرة والأرز.',
-    officialDocReference: 'Base Produits Certifiés ATC / AFDIAG',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['barilla', 'spaghetti', 'senza glutine', 'pates', 'باريلا', 'مقرونة'],
   },
   {
@@ -525,7 +453,7 @@ export const associationProductsSeed = [
     barcode: '8008698002018',
     notes: 'LABEL INTERNATIONAL SANS GLUTEN. Pain de mie blanc garanti sans gluten et sans blé, enrichi en fibres.',
     notesAr: 'خبز توست آمن 100% ومطابق لأعلى معايير السلامة لمرضى السلياك.',
-    officialDocReference: 'Base Produits Certifiés ATC',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['schar', 'pain blanc', 'pan blanco', 'toast', 'شار', 'خبز'],
   },
   {
@@ -535,10 +463,10 @@ export const associationProductsSeed = [
     isGlutenFree: true,
     status: 'SAFE',
     brand: 'Délice Danone',
-    barcode: '6194001900123',
+    barcode: '', // placeholder code removed (Nov 2026): it could match a real product
     notes: 'AUTORISÉ. Ingrédients : Lait frais pasteurisé, ferments lactiques vivants. Aucun épaississant ni amidon modifié de blé.',
     notesAr: 'مسموح وآمن. حليب مبستر مع خمائر اللبن دون أي نشا مضاف.',
-    officialDocReference: 'Guide Produits Laitiers Simples ATC',
+    officialDocReference: "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: ['delice', 'danone', 'yaourt', 'lait', 'ديليس', 'ياغورت'],
   },
 ];
@@ -553,8 +481,9 @@ export function slugify(text) {
 }
 
 // French translations of the Arabic entries, keyed by original text
+// (ATMC2023.json -> ATMC2023.fr.json, next to it)
 export function loadAtmcTranslations(dataFilePath) {
-  const frPath = path.join(path.dirname(dataFilePath), 'ATMC2023.fr.json');
+  const frPath = dataFilePath.replace(/\.json$/i, '.fr.json');
   if (!fs.existsSync(frPath)) return {};
   return JSON.parse(fs.readFileSync(frPath, 'utf8')).translations || {};
 }
@@ -580,11 +509,32 @@ const ATMC_STATUSES = [
   { key: 'not_allowed', status: 'NOT_ALLOWED', labelFr: 'Contient du Gluten (Interdit ATMC)', labelAr: 'يحتوي على الغلوتين (ممنوع ATMC)' },
 ];
 
-export function buildAtmcRows(dataDir = DATA_DIR) {
-  const dataFile = path.join(dataDir, 'ATMC2023.json');
+const FRENCH_MONTHS = ['janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'aout', 'septembre', 'octobre', 'novembre', 'decembre'];
+
+/**
+ * The guide edition as a date (first day of the month) from "Décembre 2023", "2025-06" or "2024".
+ * Returns null when it cannot be read.
+ */
+export function parseEdition(text) {
+  const value = String(text || '').trim();
+  const iso = /^(\d{4})-(\d{2})(?:-\d{2})?$/.exec(value);
+  if (iso) return `${iso[1]}-${iso[2]}-01`;
+  const folded = value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const year = /(\d{4})/.exec(folded)?.[1];
+  if (!year) return null;
+  const month = FRENCH_MONTHS.findIndex((m) => folded.includes(m));
+  return `${year}-${String(month >= 0 ? month + 1 : 1).padStart(2, '0')}-01`;
+}
+
+/**
+ * Rows of atmc_products from a guide file (same format as Data/ATMC2023.json).
+ * `edition` overrides the file's publication_date (YYYY-MM-DD).
+ */
+export function buildAtmcRowsFromFile(dataFile, { edition } = {}) {
   const atmcData = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
   const translations = loadAtmcTranslations(dataFile);
   const source = `${atmcData.organization || 'ATMC'} - ${atmcData.document_title || 'Guide'} (${atmcData.publication_date || '2023'})`;
+  const editionDate = edition || parseEdition(atmcData.publication_date) || '2023-12-01';
   const rows = [];
   for (const cat of atmcData.categories || []) {
     for (const mapping of ATMC_STATUSES) {
@@ -603,11 +553,16 @@ export function buildAtmcRows(dataDir = DATA_DIR) {
           items,
           raw_text: rawText,
           source,
+          edition: editionDate,
         });
       }
     }
   }
   return rows;
+}
+
+export function buildAtmcRows(dataDir = DATA_DIR) {
+  return buildAtmcRowsFromFile(path.join(dataDir, 'ATMC2023.json'));
 }
 
 export const spotRows = () =>
@@ -642,6 +597,6 @@ export const associationProductRows = () =>
     barcode: p.barcode || '',
     notes: p.notes,
     notes_ar: p.notesAr || '',
-    official_doc_reference: p.officialDocReference || "Guide Officiel de l'Association Tunisienne de la Cœliaque (ATC)",
+    official_doc_reference: p.officialDocReference || "Fiche Celiac Square (non validée par l'ATMC)",
     keywords: p.keywords || [],
   }));

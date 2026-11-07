@@ -93,7 +93,7 @@ export const loadCatalogue = async () => {
         ...splitAlternatives(p.productNameFr),
         extraTokens: tokenize(`${p.productNameFr} ${(p.keywords || []).join(' ')}`),
         product: {
-          source: 'Association Tunisienne de la Cœliaque',
+          source: 'Fiches Celiac Square',
           productNameFr: p.productNameFr,
           productNameAr: p.productNameAr,
           brand: p.brand,
@@ -102,6 +102,9 @@ export const loadCatalogue = async () => {
           notes: p.notes,
           notesAr: p.notesAr,
           officialDocReference: p.officialDocReference,
+          sourceDate: p.updatedAt,
+          sourceDateKind: 'updated',
+          productKey: `assoc:${p._id}`,
         },
       };
     }),
@@ -125,6 +128,9 @@ export const loadCatalogue = async () => {
           notes: `${p.statusLabelFr}. Rayon : ${p.categoryFr}.`,
           notesAr: `${p.statusLabelAr}. ${p.categoryAr}`,
           officialDocReference: p.source,
+          sourceDate: p.edition,
+          sourceDateKind: 'edition',
+          productKey: `atmc:${p._id}`,
         },
       };
     }),

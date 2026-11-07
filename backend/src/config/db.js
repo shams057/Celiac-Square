@@ -39,3 +39,16 @@ export const unwrap = ({ data, error }) => {
   if (error) throw new Error(error.message);
   return data;
 };
+
+/**
+ * True when a Supabase error means the table does not exist yet (a migration not applied):
+ * features built on newer tables answer "unavailable" instead of failing with a 500.
+ */
+export const isMissingTable = (error) =>
+  Boolean(error) && (error.code === 'PGRST205' || error.code === '42P01' || /does not exist|could not find the table/i.test(error.message || ''));
+
+export const FEATURE_UNAVAILABLE = {
+  success: false,
+  code: 'FEATURE_UNAVAILABLE',
+  message: 'Cette fonction n’est pas encore disponible. Réessayez plus tard.',
+};

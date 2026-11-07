@@ -26,8 +26,13 @@ Plateforme web et mobile pour manger sans gluten en Tunisie : le guide officiel 
 | --- | --- |
 | **Guide ATMC** | Les 241 produits du guide 2023 (autorisés, à vérifier, interdits), en français et en arabe, avec recherche tolérante aux fautes et filtres par rayon. |
 | **Scanner** | Deux modes. *Reconnaître le produit* : la photo réduite est envoyée à une IA (Gemma 4 via Ollama Cloud, Google Gemini, Groq ou tout autre service gratuit configuré, à tour de rôle) qui lit la marque et choisit la fiche des guides tunisiens ; le statut vient toujours du guide. *Analyser les ingrédients* : deux ou trois IA différentes lisent la même liste ; si elles ne sont pas d’accord, le statut le plus prudent l’emporte. L’IA lit la liste et renvoie le statut probable, un pourcentage de confiance et une courte explication, que nos propres règles ne peuvent que rendre plus strict. Sans IA, le texte est lu sur l’appareil (OCR Tesseract). |
-| **Recherche** | Nom, marque ou code-barres. Résultats locaux instantanés, Open Food Facts ensuite. Insensible aux accents. |
-| **Carte** | Médecins, boulangeries, restaurants, cafés et épiceries sans gluten, filtrables par type et par ville. |
+| **Code-barres** | Dans le scanner, le code-barres est lu en premier (sur la photo ou en direct dans le viseur), puis cherché dans les fiches de l’association et dans Open Food Facts ; l’IA ne sert que s’il est inconnu. |
+| **Recherche** | Nom, marque ou code-barres. Résultats locaux instantanés, Open Food Facts ensuite. Insensible aux accents. Chaque verdict indique sa source et sa date (édition du guide, mise à jour de la fiche). |
+| **Hors ligne** | Application installable (manifest + service worker `frontend/src/sw.js`). Le guide ATMC est téléchargé à l’installation et reste consultable et cherchable sans réseau ; la carte garde la dernière liste vue. |
+| **Carte** | Médecins, boulangeries, restaurants, cafés et épiceries sans gluten, filtrables par type et par ville. « Près de moi » (la position reste sur l’appareil), « Ouvert maintenant » d’après les horaires indiqués. |
+| **Avis des membres** | Sur chaque lieu, trois questions oui/non aux membres connectés (réaction ? cuisine dédiée ? personnel informé ?) ; seuls les totaux sont publiés. |
+| **Signalements** | « Signaler un problème » sur les produits, les lieux et les résultats du scanner ; ils arrivent dans le back-office. |
+| **Mes produits** | Produits enregistrés (compte), avec alerte si le guide change leur statut, et historique des scans (sur l’appareil seulement). |
 | **Propositions** | Les visiteurs proposent des adresses ; elles arrivent dans une boîte de réception administrateur avant publication. |
 | **Marché** | Produits sans gluten des restaurants, boulangeries, cafés et artisans : tout voir d’un coup (rangé par boutique, comme un menu) ou boutique par boutique, recherche par produit, filtres par type. Réservé aux membres connectés. |
 | **Comptes** | Inscription et connexion (Supabase Auth). Trois rôles : *client* (par défaut), *vendeur*, *administrateur*. La connexion n’est obligatoire que pour le marché. |
@@ -49,11 +54,11 @@ app/
 │       ├── app.js          # Application Express (sans écoute réseau)
 │       ├── server.js       # Serveur local (port 5000)
 │       ├── config/db.js    # Client Supabase côté serveur
-│       ├── routes/         # /api/map, /api/products, /api/atmc, /api/vision, /api/auth, /api/market, /api/admin
+│       ├── routes/         # /api/map, /api/products, /api/atmc, /api/vision, /api/auth, /api/market, /api/admin, /api/reports, /api/me
 │       ├── services/       # Open Food Facts, vision, aiBalancer (rotation des IA), photos du marché (Storage)
 │       ├── middleware/     # Comptes connectés, rôles, accès administrateur
 │       ├── seed/           # Données initiales et script de seed
-│       └── scripts/        # set-role : donner un rôle à un compte
+│       └── scripts/        # set-role : donner un rôle à un compte ; importAtmc : nouvelle édition du guide (npm run atmc:import)
 ├── frontend/               # React 18 + Vite + Tailwind CSS + Leaflet
 ├── mobile/                 # Application Expo (Android / iOS) qui affiche le site
 ├── supabase/migrations/    # Schéma Postgres (tables, RLS, recherche)

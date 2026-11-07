@@ -34,6 +34,10 @@ const toProduct = (p, fallbackBarcode = '') => {
     imageUrl: p.image_url || p.image_front_small_url || '',
     ingredientsText: p.ingredients_text_fr || p.ingredients_text || '',
     officialDocReference: 'Base internationale Open Food Facts',
+    // How fresh the verdict is: the last edit of the Open Food Facts entry
+    sourceDate: Number.isFinite(p.last_modified_t) ? new Date(p.last_modified_t * 1000).toISOString() : null,
+    sourceDateKind: 'updated',
+    productKey: stableId(p).replace(/^off_/, 'off:'),
   };
 };
 

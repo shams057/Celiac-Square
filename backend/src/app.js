@@ -14,6 +14,8 @@ import atmcRoutes from './routes/atmcRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import marketRoutes from './routes/marketRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import reportRoutes from './routes/reportRoutes.js';
+import meRoutes from './routes/meRoutes.js';
 
 dotenv.config();
 
@@ -63,6 +65,8 @@ app.use('/api/atmc', atmcRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/me', meRoutes);
 
 app.get('/', (req, res) => {
   res.send('Celiac Square Tunisia API is running smoothly.');
