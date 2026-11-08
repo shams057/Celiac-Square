@@ -24,6 +24,7 @@ const APPLICATION_FILTERS = [
 const ROLES = [
   { value: 'CLIENT', fr: 'Client', ar: 'عميل' },
   { value: 'SELLER', fr: 'Vendeur', ar: 'بائع' },
+  { value: 'STAFF', fr: 'Équipe (commandes)', ar: 'الفريق (الطلبات)' },
   { value: 'ADMIN', fr: 'Administrateur', ar: 'مدير' },
 ];
 

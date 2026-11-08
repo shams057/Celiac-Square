@@ -16,6 +16,10 @@ import marketRoutes from './routes/marketRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import meRoutes from './routes/meRoutes.js';
+import orderRoutes from './routes/orderRoutes.js';
+import orderAdminRoutes from './routes/orderAdminRoutes.js';
+import whatsappRoutes from './routes/whatsappRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
 
 dotenv.config();
 
@@ -34,6 +38,8 @@ app.use(normalizeQuery);
 // Body parsers. A body parsed by the first matching parser is not parsed again,
 // so the route-specific limits must come before the default one.
 // Marketplace photos travel as data URLs: only the routes that take images accept large bodies.
+// The WhatsApp webhook needs the raw bytes to check Meta's signature
+app.use('/api/whatsapp/webhook', express.raw({ type: '*/*', limit: '1mb' }));
 app.use(['/api/market/me/store', '/api/market/me/products'], express.json({ limit: '8mb' }));
 // Scanner photos (resized in the browser) go to /identify and /ingredients; OCR text to /match
 app.use(['/api/vision/identify', '/api/vision/ingredients'], express.json({ limit: '3mb' }));
@@ -64,9 +70,14 @@ app.use('/api/vision', visionRoutes);
 app.use('/api/atmc', atmcRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/market', marketRoutes);
+// Before /api/admin: the order pipeline and the dashboard are open to the team (STAFF), the rest of /api/admin is not
+app.use('/api/admin/orders', orderAdminRoutes);
+app.use('/api/admin/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/me', meRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/whatsapp', whatsappRoutes);
 
 app.get('/', (req, res) => {
   res.send('Celiac Square Tunisia API is running smoothly.');

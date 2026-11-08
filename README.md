@@ -35,10 +35,11 @@ Plateforme web et mobile pour manger sans gluten en Tunisie : le guide officiel 
 | **Mes produits** | Produits enregistrés (compte), avec alerte si le guide change leur statut, et historique des scans (sur l’appareil seulement). |
 | **Propositions** | Les visiteurs proposent des adresses ; elles arrivent dans une boîte de réception administrateur avant publication. |
 | **Marché** | Produits sans gluten des restaurants, boulangeries, cafés et artisans : tout voir d’un coup (rangé par boutique, comme un menu) ou boutique par boutique, recherche par produit, filtres par type. Réservé aux membres connectés. |
-| **Comptes** | Inscription et connexion (Supabase Auth). Trois rôles : *client* (par défaut), *vendeur*, *administrateur*. La connexion n’est obligatoire que pour le marché. |
+| **Commandes** | Panier sur l’appareil, commande avec nom, téléphone et adresse (une commande par boutique), paiement à la livraison. Confirmation par WhatsApp (le client répond OUI, en majuscules ou minuscules) ou, au choix du client, sans réponse sous 3 jours ou quand un prix reste à fixer, par un appel de l’équipe. Le client suit ses commandes dans *Mes commandes* et peut annuler tant que l’équipe n’a pas appelé. |
+| **Comptes** | Inscription et connexion (Supabase Auth). Quatre rôles : *client* (par défaut), *vendeur*, *équipe* (traite les commandes), *administrateur*. La connexion n’est obligatoire que pour le marché et les commandes. |
 | **Espace vendeur** | Le vendeur présente sa boutique (logo, type, ville, présentation) et publie ses produits : titre, description, prix facultatif, jusqu’à 5 photos. |
 | **Devenir vendeur** | Lien en bas de page : un client envoie une demande, examinée dans le back-office. |
-| **Back-office** | Visible uniquement par les administrateurs. *Adresses* : ajout, modification, vérification et suppression des adresses, validation des propositions. *Vendeurs et comptes* : demandes de vendeur, suspension des boutiques, rôles des comptes. |
+| **Back-office** | Ouvert depuis le menu du compte (icône de profil). *Tableau de bord* (équipe et administrateurs) : commandes en retard, encaissé, taux de confirmation et d’annulation, délais médians, commandes et encaissé par jour, commandes en cours par étape, suivi WhatsApp, chiffres par artisan, produits, villes, transporteurs, raisons d’annulation et activité de l’équipe, sur 7, 30 ou 90 jours ; les administrateurs voient aussi le marché, les demandes à traiter et les comptes. *Commandes* (équipe et administrateurs) : appeler le client pour confirmer prix et frais de livraison, transmettre à l’artisan (message WhatsApp prérempli, sans les coordonnées du client), marquer prête, confier au transporteur avec n° de suivi, marquer livrée ; historique de chaque commande. Le reste est visible uniquement par les administrateurs. *Adresses* : ajout, modification, vérification et suppression des adresses, validation des propositions. *Vendeurs et comptes* : demandes de vendeur, suspension des boutiques, rôles des comptes. |
 
 Interface bilingue français / arabe (mise en page de droite à gauche en arabe), pensée d’abord pour le téléphone.
 
@@ -54,11 +55,11 @@ app/
 │       ├── app.js          # Application Express (sans écoute réseau)
 │       ├── server.js       # Serveur local (port 5000)
 │       ├── config/db.js    # Client Supabase côté serveur
-│       ├── routes/         # /api/map, /api/products, /api/atmc, /api/vision, /api/auth, /api/market, /api/admin, /api/reports, /api/me
+│       ├── routes/         # /api/map, /api/products, /api/atmc, /api/vision, /api/auth, /api/market, /api/orders, /api/admin, /api/admin/orders, /api/reports, /api/me
 │       ├── services/       # Open Food Facts, vision, aiBalancer (rotation des IA), photos du marché (Storage)
 │       ├── middleware/     # Comptes connectés, rôles, accès administrateur
 │       ├── seed/           # Données initiales et script de seed
-│       └── scripts/        # set-role : donner un rôle à un compte ; importAtmc : nouvelle édition du guide (npm run atmc:import)
+│       └── scripts/        # set-role : donner un rôle à un compte ; importAtmc : nouvelle édition du guide (npm run atmc:import) ; importArtisans : artisans du groupe ATMC (npm run artisans:import)
 ├── frontend/               # React 18 + Vite + Tailwind CSS + Leaflet
 ├── mobile/                 # Application Expo (Android / iOS) qui affiche le site
 ├── supabase/migrations/    # Schéma Postgres (tables, RLS, recherche)
@@ -194,6 +195,22 @@ Reconnectez-vous : le lien *Back-office* apparaît en bas de page. Ensuite, les 
 
 Une variable modifiée n’est prise en compte qu’après un redéploiement (**Deployments → ⋯ → Redeploy**).
 
+### WhatsApp (confirmation des commandes)
+
+Sans ces réglages, le site fonctionne : toutes les commandes arrivent dans « À appeler ».
+
+1. Sur [business.facebook.com](https://business.facebook.com), créez (ou utilisez) le compte Business de Celiac Square, puis une app Meta de type *Business* avec le produit **WhatsApp**. Ajoutez et vérifiez le numéro qui enverra les messages (il ne doit pas déjà être utilisé dans l’application WhatsApp).
+2. Créez un **utilisateur système** avec un jeton permanent (permissions `whatsapp_business_messaging`, `whatsapp_business_management`) : c’est `WHATSAPP_TOKEN`. L’ID du numéro (*WhatsApp → API Setup*) est `WHATSAPP_PHONE_NUMBER_ID`, le secret de l’app (*App settings → Basic*) est `WHATSAPP_APP_SECRET`.
+3. Dans *WhatsApp Manager → Modèles de message*, créez un modèle **Utilitaire** nommé `confirmation_commande`, langue *Français*, avec un bouton de réponse rapide « OUI » et ce texte :
+
+   > Bonjour {{1}}, merci pour votre commande Celiac Square {{2}} : {{3}}. Total à payer à la livraison : {{4}}. Répondez OUI pour la confirmer. Sans réponse sous 3 jours, notre équipe vous appellera.
+
+   Attendez qu’il soit approuvé. Un autre nom ou une autre langue : `WHATSAPP_TEMPLATE`, `WHATSAPP_TEMPLATE_LANG`.
+4. *WhatsApp → Configuration → Webhook* : URL `https://<votre-domaine>/api/whatsapp/webhook`, jeton de vérification = `WHATSAPP_VERIFY_TOKEN` (une longue chaîne aléatoire de votre choix), puis abonnez-vous au champ **messages**.
+5. Ajoutez les variables dans Vercel (Sensitive pour le jeton et le secret), avec `ORDER_DELIVERY_FEE` si les frais de livraison sont fixes, et redéployez. `/api/admin/health` indique `whatsapp: true` quand tout est en place.
+
+Le message n’est envoyé que si tous les prix sont connus (et les frais de livraison, fixés par `ORDER_DELIVERY_FEE` ou par l’équipe, qui peut alors l’envoyer depuis le back-office). Une réponse exacte « OUI », quelle que soit la casse et la ponctuation, confirme toutes les commandes en attente pour ce numéro ; toute autre réponse est enregistrée dans l’historique et la commande passe dans « À appeler ». Sans réponse après `ORDER_WHATSAPP_WAIT_DAYS` jours (3 par défaut), elle passe aussi dans « À appeler ». Si l’équipe change un prix après l’envoi, la demande n’est plus valable : renvoyez-la ou appelez.
+
 ---
 
 ## Application mobile
@@ -263,12 +280,12 @@ L’APK local est signé avec la clé de débogage : il convient pour vos appare
 | POST | `/api/map/proposals/:id/reject` | Admin | Refuser une proposition |
 | POST / PUT / DELETE | `/api/map/spots[/:id]` | Admin | Gérer les adresses |
 | PATCH | `/api/map/spots/:id/verify` | Admin | Changer le statut vérifié |
-| POST | `/api/auth/signup` | Public | Créer un compte client (`{ email, password, fullName }`) |
+| POST | `/api/auth/signup` | Public | Créer un compte client (`{ email, password, fullName, phone }`, numéro tunisien à 8 chiffres) |
 | POST | `/api/auth/login` | Public | Se connecter : renvoie la session et le profil |
 | POST | `/api/auth/refresh` | Public | Renouveler la session (cookie `cs_refresh`, httpOnly) |
 | POST | `/api/auth/forgot` | Public | Envoyer un e-mail de réinitialisation (`{ email }`) |
 | POST | `/api/auth/reset` | Public | Nouveau mot de passe (`{ accessToken, password }`, jeton du lien de l’e-mail) |
-| GET | `/api/auth/me` | Membre | Le compte connecté et son rôle |
+| GET / PATCH | `/api/auth/me` | Membre | Le compte connecté et son rôle ; `PATCH { fullName, phone }` les modifie |
 | POST | `/api/auth/logout` | Public | Fermer la session sur cet appareil et effacer le cookie |
 | GET | `/api/market/stores` | Public | Boutiques actives (`type`) avec leur nombre de produits |
 | GET | `/api/market/stores/:id` | Public | Une boutique et ses produits |
@@ -284,6 +301,15 @@ L’APK local est signé avec la clé de débogage : il convient pour vos appare
 | GET | `/api/admin/users` | Admin | Comptes (`q`, `role`) |
 | PATCH | `/api/admin/users/:id/role` | Admin | Changer le rôle (`{ role }`), sauf le sien |
 | GET | `/api/admin/audit-log` | Admin | Les 200 dernières actions admin |
+| GET | `/api/admin/dashboard` | Équipe | Chiffres du tableau de bord (`days=7\|30\|90`) ; la partie *plateforme* pour les administrateurs seulement |
+| POST | `/api/orders` | Membre | Commander (`{ items: [{ productId, quantity }], customerName, phone, city, address, note, confirmChannel: WHATSAPP\|PHONE }`) |
+| GET | `/api/orders/mine` | Membre | Ses commandes |
+| POST | `/api/orders/:id/cancel` | Membre | Annuler tant que la commande n’est pas confirmée |
+| GET / PATCH | `/api/admin/orders[/:id]` | Équipe | Commandes (`status=NEW` à appeler, `WAITING` attente WhatsApp, `CONFIRMED`… `ACTIVE`, `ALL` ; `q`) ; modifier client, prix, frais, transporteur, notes |
+| POST | `/api/admin/orders/:id/status` | Équipe | Étape suivante ou précédente, annulation (`{ status, cancelReason, carrier, trackingNumber, note }`) |
+| POST | `/api/admin/orders/:id/whatsapp` | Équipe | (Re)envoyer la demande de confirmation WhatsApp |
+| POST | `/api/admin/orders/:id/calls` / `notes` | Équipe | Noter un appel (`REACHED`, `NO_ANSWER`, `CALL_BACK`) ou une note |
+| GET / POST | `/api/whatsapp/webhook` | Meta | Vérification du webhook ; réponses des clients (signature `X-Hub-Signature-256` vérifiée) |
 
 Les routes *Membre*, *Client*, *Vendeur* et *Admin* exigent l’en-tête `Authorization: Bearer <jeton d’accès>` d’un compte qui a le rôle voulu. Le jeton d’accès est renvoyé par `/login` et `/refresh` et gardé en mémoire par le site ; le jeton de renouvellement reste dans un cookie httpOnly. Les actions admin sont enregistrées dans `admin_audit_log` (onglet *Journal* du back-office).
 

@@ -65,6 +65,13 @@ export const limits = {
     max: 5,
     message: 'Vous avez déjà envoyé plusieurs demandes. Réessayez plus tard.',
   }),
+  // Orders land in the team's call list: a few per hour is plenty for a real customer
+  orders: rateLimit({
+    name: 'orders',
+    windowMs: 60 * MINUTE,
+    max: 10,
+    message: 'Vous avez déjà passé plusieurs commandes. Réessayez plus tard ou appelez-nous.',
+  }),
   // Proxied to Open Food Facts, which rate-limits our server's IP
   productSearch: rateLimit({ name: 'product-search', windowMs: MINUTE, max: 60 }),
 };

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BookOpen, Camera, Search, MapPin, Plus, Languages, ShoppingBag, UserRound, Store, LogOut, BadgePlus, Bookmark } from 'lucide-react';
+import { BookOpen, Camera, Search, MapPin, Plus, Languages, ShoppingBag, UserRound, Store, LogOut, BadgePlus, Bookmark, Package, LayoutDashboard } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { BrandMark, t } from './ui';
 import { pathFor } from '../services/router';
@@ -21,6 +21,7 @@ const TABS = [
 
 const ROLE_LABELS = {
   ADMIN: ['Administrateur', 'مدير'],
+  STAFF: ['Équipe', 'الفريق'],
   SELLER: ['Vendeur', 'بائع'],
   CLIENT: ['Client', 'عميل'],
 };
@@ -165,9 +166,26 @@ function AccountMenu({ lang, go }) {
             <p className="mt-1.5 inline-block rounded-md bg-canvas-sunk/80 px-1.5 py-0.5 text-xs text-ink-soft">{tr(roleFr, roleAr)}</p>
           </div>
           <div className="my-1 border-t border-canvas-line/70" />
+          {(user.role === 'ADMIN' || user.role === 'STAFF') && (
+            <>
+              <button type="button" role="menuitem" className={`${item} font-medium`} onClick={() => choose('backoffice')}>
+                <LayoutDashboard className="h-4 w-4 text-ink-soft" />
+                {tr('Back-office et tableau de bord', 'الإدارة ولوحة القيادة')}
+              </button>
+              <div className="my-1 border-t border-canvas-line/70" />
+            </>
+          )}
           <button type="button" role="menuitem" className={item} onClick={() => choose('saved')}>
             <Bookmark className="h-4 w-4 text-ink-soft" />
             {tr('Mes produits et scans', 'منتجاتي وعمليات المسح')}
+          </button>
+          <button type="button" role="menuitem" className={item} onClick={() => choose('account')}>
+            <UserRound className="h-4 w-4 text-ink-soft" />
+            {tr('Mon profil', 'ملفي الشخصي')}
+          </button>
+          <button type="button" role="menuitem" className={item} onClick={() => choose('orders')}>
+            <Package className="h-4 w-4 text-ink-soft" />
+            {tr('Mes commandes', 'طلباتي')}
           </button>
           {(user.role === 'SELLER' || user.role === 'ADMIN') && (
             <button type="button" role="menuitem" className={item} onClick={() => choose('seller')}>

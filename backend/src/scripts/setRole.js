@@ -6,15 +6,15 @@ import { db } from '../config/db.js';
  *
  *   npm run set-role -- someone@example.com ADMIN
  *
- * The account must exist (sign up on the site first). Roles: ADMIN, SELLER, CLIENT.
+ * The account must exist (sign up on the site first). Roles: ADMIN, STAFF, SELLER, CLIENT.
  */
 dotenv.config();
 
 const [email, role] = process.argv.slice(2);
-const ROLES = ['ADMIN', 'SELLER', 'CLIENT'];
+const ROLES = ['ADMIN', 'STAFF', 'SELLER', 'CLIENT'];
 
 if (!email || !ROLES.includes(String(role).toUpperCase())) {
-  console.error('Usage: npm run set-role -- <email> <ADMIN|SELLER|CLIENT>');
+  console.error('Usage: npm run set-role -- <email> <ADMIN|STAFF|SELLER|CLIENT>');
   process.exit(1);
 }
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrandMark, t } from './ui';
 
-export default function Footer({ lang, isAdmin, onOpenBackoffice, onBecomeSeller, onOpenPrivacy }) {
+export default function Footer({ lang, onBecomeSeller, onOpenPrivacy }) {
   const tr = t(lang);
 
   return (
@@ -29,13 +29,6 @@ export default function Footer({ lang, isAdmin, onOpenBackoffice, onBecomeSeller
                 {tr('Confidentialité et conditions', 'الخصوصية والشروط')}
               </button>
             </li>
-            {isAdmin && (
-              <li>
-                <button type="button" onClick={onOpenBackoffice} className="text-ink-soft underline decoration-canvas-line underline-offset-4 hover:text-ink">
-                  {tr('Back-office', 'فضاء الإدارة')}
-                </button>
-              </li>
-            )}
           </ul>
         </div>
 

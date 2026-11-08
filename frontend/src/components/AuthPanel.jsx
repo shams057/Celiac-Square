@@ -19,7 +19,7 @@ export default function AuthPanel({ lang, title, lede, onDone }) {
   const tr = t(lang);
   const { signIn } = useAuth();
   const [mode, setMode] = useState('login'); // 'login' | 'signup' | 'forgot'
-  const [form, setForm] = useState({ fullName: '', email: '', password: '' });
+  const [form, setForm] = useState({ fullName: '', phone: '', email: '', password: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
@@ -100,6 +100,28 @@ export default function AuthPanel({ lang, title, lede, onDone }) {
             <div>
               <label htmlFor="auth-name" className="field-label">{tr('Nom complet', 'الاسم الكامل')}</label>
               <input id="auth-name" value={form.fullName} onChange={set('fullName')} autoComplete="name" required maxLength={100} className="field" />
+            </div>
+          )}
+          {mode === 'signup' && (
+            <div>
+              <label htmlFor="auth-phone" className="field-label">{tr('Téléphone (WhatsApp de préférence)', 'الهاتف (واتساب إن أمكن)')}</label>
+              <input
+                id="auth-phone"
+                type="tel"
+                inputMode="tel"
+                value={form.phone}
+                onChange={set('phone')}
+                autoComplete="tel-national"
+                required
+                maxLength={20}
+                placeholder="22 123 456"
+                aria-describedby="auth-phone-hint"
+                className="field"
+                dir="ltr"
+              />
+              <p id="auth-phone-hint" className="mt-1.5 text-xs text-ink-faint">
+                {tr('Pour confirmer vos commandes par WhatsApp ou par téléphone.', 'لتأكيد طلباتك عبر واتساب أو الهاتف.')}
+              </p>
             </div>
           )}
           <div>

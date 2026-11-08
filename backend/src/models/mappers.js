@@ -1,3 +1,4 @@
+import { whatsappDeadline, isAwaitingWhatsApp } from '../services/orderFlow.js';
 /**
  * Convert database rows (snake_case) to the JSON the frontend expects
  * (camelCase, `_id`, GeoJSON-like `location`), which predates the move to Postgres.
@@ -52,6 +53,7 @@ export const toProfile = (r) => ({
   _id: r.id,
   email: r.email,
   fullName: r.full_name,
+  phone: r.phone ?? '',
   role: r.role,
   createdAt: r.created_at,
 });
@@ -156,3 +158,75 @@ export const toReport = (r) => ({
   resolvedAt: r.resolved_at,
   createdAt: r.created_at,
 });
+
+const num = (v) => (v == null ? null : Number(v));
+
+export const toOrderItem = (r) => ({
+  _id: r.id,
+  productId: r.product_id,
+  title: r.title,
+  image: r.image,
+  unitPrice: num(r.unit_price),
+  quantity: r.quantity,
+});
+
+export const toOrderEvent = (r) => ({
+  _id: r.id,
+  kind: r.kind,
+  fromStatus: r.from_status,
+  toStatus: r.to_status,
+  message: r.message,
+  actorEmail: r.actor_email,
+  createdAt: r.created_at,
+});
+
+/**
+ * An order for its customer. `staff` adds what only the team sees: internal notes,
+ * call attempts, the artisan's contact details and the history.
+ */
+export const toOrder = (r, { staff = false } = {}) => {
+  const order = {
+    _id: r.id,
+    number: Number(r.number),
+    reference: `CS-${r.number}`,
+    status: r.status,
+    storeId: r.store_id,
+    storeName: r.store_name,
+    customerName: r.customer_name,
+    phone: r.phone,
+    city: r.city,
+    address: r.address,
+    customerNote: r.customer_note,
+    deliveryFee: num(r.delivery_fee),
+    carrier: r.carrier,
+    trackingNumber: r.tracking_number,
+    cancelReason: r.cancel_reason,
+    confirmChannel: r.confirm_channel,
+    whatsappStatus: r.whatsapp_status,
+    whatsappSentAt: r.whatsapp_sent_at,
+    // Until then the team waits for the WhatsApp reply; after it, they call
+    whatsappDeadline: r.whatsapp_status === 'SENT' ? whatsappDeadline(r.whatsapp_sent_at) : null,
+    awaitingWhatsApp: isAwaitingWhatsApp(r),
+    items: Array.isArray(r.order_items) ? r.order_items.map(toOrderItem) : [],
+    confirmedAt: r.confirmed_at,
+    preparingAt: r.preparing_at,
+    readyAt: r.ready_at,
+    shippedAt: r.shipped_at,
+    deliveredAt: r.delivered_at,
+    cancelledAt: r.cancelled_at,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+  if (!staff) return order;
+  return {
+    ...order,
+    staffNotes: r.staff_notes,
+    callAttempts: r.call_attempts,
+    lastCallAt: r.last_call_at,
+    customerEmail: r.customer?.email ?? null,
+    store: r.stores ? { name: r.stores.name, phone: r.stores.phone, city: r.stores.city, address: r.stores.address } : null,
+    events: Array.isArray(r.order_events)
+      ? r.order_events.map(toOrderEvent).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      : undefined,
+  };
+};

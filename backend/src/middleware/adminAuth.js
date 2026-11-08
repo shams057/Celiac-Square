@@ -18,3 +18,17 @@ export const requireAdmin = async (req, res, next) => {
     return next(error);
   }
 };
+
+/** Back-office workers (STAFF) and admins: the order pipeline */
+export const requireStaff = async (req, res, next) => {
+  try {
+    const user = await getRequestUser(req);
+    if (user?.role === 'ADMIN' || user?.role === 'STAFF') {
+      req.user = user;
+      return next();
+    }
+    return res.status(user ? 403 : 401).json({ success: false, message: 'Accès réservé à l’équipe.' });
+  } catch (error) {
+    return next(error);
+  }
+};

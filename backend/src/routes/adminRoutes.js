@@ -5,10 +5,11 @@ import { containsPattern } from '../utils/regex.js';
 import { asyncRouter, clean, UUID_RE, badRequest } from '../utils/http.js';
 import { audit } from '../services/audit.js';
 import { providerStatus } from '../services/aiBalancer.js';
+import { isWhatsAppConfigured } from '../services/whatsapp.js';
 
 const router = asyncRouter();
 
-const ROLES = ['ADMIN', 'SELLER', 'CLIENT'];
+const ROLES = ['ADMIN', 'STAFF', 'SELLER', 'CLIENT'];
 const STATUSES = ['PENDING', 'APPROVED', 'REJECTED'];
 
 router.use(requireAdmin);
@@ -41,6 +42,8 @@ router.get('/health', async (req, res) => {
       ollamaApiKey: Boolean(process.env.OLLAMA_API_KEY),
       geminiApiKey: Boolean(process.env.GEMINI_API_KEY),
       siteUrl: Boolean(process.env.SITE_URL),
+      whatsapp: isWhatsAppConfigured(),
+      whatsappVerifyToken: Boolean(process.env.WHATSAPP_VERIFY_TOKEN),
     },
     // AI providers in rotation: answers, failures and cooldown since the server started
     aiProviders: providerStatus(),
@@ -169,7 +172,8 @@ router.patch('/users/:id/role', async (req, res) => {
 
   const [updated] = unwrap(await db().from('profiles').update({ role }).eq('id', req.params.id).select());
   let storeSuspended = false;
-  if (role === 'CLIENT' && before.role !== 'CLIENT') {
+  // Only sellers and admins run a shop: any other role takes the shop off the marketplace
+  if ((role === 'CLIENT' || role === 'STAFF') && (before.role === 'SELLER' || before.role === 'ADMIN')) {
     const suspended = unwrap(await db().from('stores').update({ is_active: false }).eq('owner_id', req.params.id).eq('is_active', true).select('id'));
     storeSuspended = suspended.length > 0;
   }

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Search, ChevronLeft, ChevronRight, MapPin, Phone, Store, ShoppingBag } from 'lucide-react';
 import { fetchStores, fetchMarketProducts, fetchStore } from '../services/api';
+import { CartButton, AddToCart } from './orders';
 import { t, PageHead, Spinner, Notice, EmptyState, Modal, STORE_TYPES, storeType, formatPrice, StoreLogo } from './ui';
 
 /**
@@ -79,6 +80,7 @@ function MarketBrowser({ lang, storeId, onOpenStore, onCloseStore }) {
           'Plats, pains, douceurs et créations préparés sans gluten par des restaurants, boulangeries, cafés et artisans tunisiens.',
           'أطباق وخبز وحلويات ومنتجات حرفية بدون غلوتين من مطاعم ومخابز ومقاهٍ وحرفيين تونسيين.'
         )}
+        action={<CartButton lang={lang} />}
       />
 
       <div className="relative">
@@ -223,10 +225,13 @@ function StoreMenu({ lang, storeId, onBack, onOpenProduct }) {
   }, [store, query]);
 
   const back = (
-    <button type="button" onClick={onBack} className="btn-ghost -ms-3 px-3">
-      <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
-      {tr('Toutes les boutiques', 'كل المحلات')}
-    </button>
+    <div className="flex items-center justify-between gap-2">
+      <button type="button" onClick={onBack} className="btn-ghost -ms-3 px-3">
+        <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
+        {tr('Toutes les boutiques', 'كل المحلات')}
+      </button>
+      <CartButton lang={lang} />
+    </div>
   );
 
   if (error) return <div className="space-y-4">{back}<Notice tone="error" title={tr('Cette boutique n’est pas disponible.', 'هذا المحل غير متاح.')} /></div>;
@@ -362,6 +367,7 @@ function ProductSheet({ lang, product, onClose, onOpenStore }) {
         )}
 
         {product.price != null && <p className="text-2xl font-semibold tabular-nums">{formatPrice(product.price, lang)}</p>}
+        <AddToCart lang={lang} product={product} />
         {product.description ? (
           <p className="whitespace-pre-line text-[15px] text-ink-soft">{product.description}</p>
         ) : (

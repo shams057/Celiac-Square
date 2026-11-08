@@ -4,6 +4,7 @@ import { limits } from '../middleware/rateLimit.js';
 import { allowedOrigins } from '../middleware/security.js';
 import { toProfile } from '../models/mappers.js';
 import { asyncRouter, clean, MAX_LEN, badRequest } from '../utils/http.js';
+import { normalizePhone } from '../services/orderFlow.js';
 
 const router = asyncRouter();
 
@@ -69,11 +70,13 @@ const loadProfile = async (id) => {
   return data ? toProfile(data) : null;
 };
 
+export const PHONE_INVALID = 'Numéro de téléphone invalide : 8 chiffres, par exemple 22 123 456.';
+
 const CHECK_EMAIL = 'Si cette adresse peut être utilisée, un e-mail de confirmation vient d’être envoyé. Ouvrez-le, puis connectez-vous.';
 
 /**
  * POST /api/auth/signup
- * Body: { email, password, fullName }. New accounts are clients.
+ * Body: { email, password, fullName, phone }. New accounts are clients.
  * An address that already has an account gets the same answer as a new one waiting for
  * confirmation, so the form cannot be used to find out who is registered.
  */
@@ -81,14 +84,17 @@ router.post('/signup', limits.auth, async (req, res) => {
   const email = clean(req.body.email).toLowerCase();
   const password = typeof req.body.password === 'string' ? req.body.password : '';
   const fullName = clean(req.body.fullName);
+  const phone = normalizePhone(req.body.phone);
 
   if (!EMAIL_RE.test(email) || email.length > MAX_LEN.email) return badRequest(res, 'Adresse e-mail invalide.');
   const weak = passwordProblem(password);
   if (weak) return badRequest(res, weak);
   if (!fullName) return badRequest(res, 'Indiquez votre nom.');
   if (fullName.length > MAX_LEN.fullName) return badRequest(res, `Le nom ne doit pas dépasser ${MAX_LEN.fullName} caractères.`);
+  if (!phone) return badRequest(res, PHONE_INVALID);
 
-  const { data, error } = await authClient().auth.signUp({ email, password, options: { data: { full_name: fullName } } });
+  // The profile row is created by the handle_new_user trigger from this metadata
+  const { data, error } = await authClient().auth.signUp({ email, password, options: { data: { full_name: fullName, phone } } });
   const taken =
     (error && /already|registered|exists/i.test(error.message)) ||
     (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0);
@@ -144,6 +150,29 @@ router.post('/refresh', limits.refresh, async (req, res) => {
  * The signed-in account, with its role
  */
 router.get('/me', requireUser, async (req, res) => res.json({ success: true, user: await loadProfile(req.user.id) }));
+
+/**
+ * PATCH /api/auth/me
+ * Body: { fullName?, phone? } — the account's own name and phone number
+ */
+router.patch('/me', requireUser, async (req, res) => {
+  const row = {};
+  if (req.body?.fullName !== undefined) {
+    const fullName = clean(req.body.fullName);
+    if (!fullName) return badRequest(res, 'Indiquez votre nom.');
+    if (fullName.length > MAX_LEN.fullName) return badRequest(res, `Le nom ne doit pas dépasser ${MAX_LEN.fullName} caractères.`);
+    row.full_name = fullName;
+  }
+  if (req.body?.phone !== undefined) {
+    const phone = normalizePhone(req.body.phone);
+    if (!phone) return badRequest(res, PHONE_INVALID);
+    row.phone = phone;
+  }
+  if (!Object.keys(row).length) return badRequest(res, 'Rien à enregistrer.');
+  const { error } = await db().from('profiles').update(row).eq('id', req.user.id);
+  if (error) throw new Error(error.message);
+  return res.json({ success: true, message: 'Profil enregistré.', user: await loadProfile(req.user.id) });
+});
 
 /**
  * POST /api/auth/logout

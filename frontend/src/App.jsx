@@ -15,13 +15,16 @@ import Privacy from './components/Privacy';
 import SpotModal from './components/SpotModal';
 import Footer from './components/Footer';
 import SavedProducts from './components/SavedProducts';
+import MyOrders from './components/MyOrders';
+import AccountProfile from './components/AccountProfile';
+import { CartProvider, CartSheet } from './components/orders';
 import { SavedProvider } from './components/community';
 import { WifiOff } from 'lucide-react';
 import { AuthProvider, useAuth } from './components/AuthContext';
 import { navigate, pathFor, useRoute } from './services/router';
 
 // Dock tabs first, then pages reached from the account menu and the footer
-const TAB_ORDER = ['atmc', 'vision', 'search', 'map', 'market', 'account', 'reset-password', 'seller', 'become-seller', 'backoffice', 'privacy', 'saved'];
+const TAB_ORDER = ['atmc', 'vision', 'search', 'map', 'market', 'account', 'reset-password', 'seller', 'become-seller', 'backoffice', 'privacy', 'saved', 'orders'];
 
 const PAGE_TITLES = {
   atmc: ['Guide ATMC', 'دليل الجمعية'],
@@ -36,6 +39,7 @@ const PAGE_TITLES = {
   backoffice: ['Back-office', 'فضاء الإدارة'],
   privacy: ['Confidentialité', 'الخصوصية'],
   saved: ['Mes produits', 'منتجاتي'],
+  orders: ['Mes commandes', 'طلباتي'],
 };
 
 const SITE = {
@@ -65,7 +69,9 @@ export default function App() {
   return (
     <AuthProvider>
       <SavedProvider>
-        <AppShell />
+        <CartProvider>
+          <AppShell />
+        </CartProvider>
       </SavedProvider>
     </AuthProvider>
   );
@@ -163,7 +169,7 @@ function AppShell() {
           />
         );
       case 'account':
-        return <AuthPanel lang={lang} onDone={() => goTo('market')} />;
+        return user ? <AccountProfile lang={lang} /> : <AuthPanel lang={lang} onDone={() => goTo('market')} />;
       case 'reset-password':
         return <ResetPassword lang={lang} onDone={() => goTo('account')} />;
       case 'seller':
@@ -176,6 +182,8 @@ function AppShell() {
         return <Privacy lang={lang} />;
       case 'saved':
         return <SavedProducts lang={lang} />;
+      case 'orders':
+        return <MyOrders lang={lang} />;
       default:
         return <AtmcCatalog lang={lang} />;
     }
@@ -206,12 +214,12 @@ function AppShell() {
         </div>
       </main>
 
+      <CartSheet lang={lang} />
+
       <SpotModal isOpen={isSubmitModalOpen} onClose={() => setIsSubmitModalOpen(false)} lang={lang} />
 
       <Footer
         lang={lang}
-        isAdmin={user?.role === 'ADMIN'}
-        onOpenBackoffice={() => goTo('backoffice')}
         onBecomeSeller={() => goTo('become-seller')}
         onOpenPrivacy={() => goTo('privacy')}
       />

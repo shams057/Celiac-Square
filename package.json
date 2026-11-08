@@ -16,7 +16,8 @@
     "dev": "node scripts/dev.mjs",
     "build": "npm run build --workspace frontend",
     "test": "npm test --workspace backend",
-    "atmc:import": "npm run atmc:import --workspace backend --"
+    "atmc:import": "npm run atmc:import --workspace backend --",
+    "artisans:import": "npm run artisans:import --workspace backend --"
   },
   "keywords": [
     "celiac",

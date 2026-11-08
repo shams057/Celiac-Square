@@ -124,8 +124,8 @@ export const fetchAtmcStats = async () => {
 
 // Accounts ------------------------------------------------------------------
 
-export const signUp = async ({ email, password, fullName }) =>
-  (await axios.post(`${API_BASE}/auth/signup`, { email, password, fullName }, { skipAuth: true })).data;
+export const signUp = async ({ email, password, fullName, phone }) =>
+  (await axios.post(`${API_BASE}/auth/signup`, { email, password, fullName, phone }, { skipAuth: true })).data;
 
 export const logIn = async ({ email, password }) =>
   (await axios.post(`${API_BASE}/auth/login`, { email, password }, { skipAuth: true })).data;
@@ -133,6 +133,9 @@ export const logIn = async ({ email, password }) =>
 export const logOut = async () => (await axios.post(`${API_BASE}/auth/logout`)).data;
 
 export const fetchMe = async () => (await axios.get(`${API_BASE}/auth/me`)).data;
+
+/** changes: { fullName?, phone? } */
+export const updateProfile = async (changes) => (await axios.patch(`${API_BASE}/auth/me`, changes)).data;
 
 export const requestPasswordReset = async (email) =>
   (await axios.post(`${API_BASE}/auth/forgot`, { email }, { skipAuth: true })).data;
@@ -190,6 +193,40 @@ export const fetchReports = (status = 'OPEN') => adminRequest({ method: 'get', u
 export const setReportStatus = (id, status) => adminRequest({ method: 'patch', url: `${API_BASE}/admin/reports/${id}`, data: { status } });
 
 export const fetchAuditLog = () => adminRequest({ method: 'get', url: `${API_BASE}/admin/audit-log` });
+
+// Orders --------------------------------------------------------------------
+
+/** order: { items: [{ productId, quantity }], customerName, phone, city, address, note, confirmChannel: 'WHATSAPP' | 'PHONE' } */
+export const placeOrder = async (order) => (await axios.post(`${API_BASE}/orders`, order)).data;
+
+export const fetchMyOrders = async () => (await axios.get(`${API_BASE}/orders/mine`)).data;
+
+export const cancelMyOrder = async (id) => (await axios.post(`${API_BASE}/orders/${id}/cancel`)).data;
+
+// Back-office: dashboard (team and admins; admins also get the platform figures)
+
+export const fetchDashboard = (days = 30) => adminRequest({ method: 'get', url: `${API_BASE}/admin/dashboard`, params: { days } });
+
+// Back-office: orders (team and admins)
+
+export const fetchOrders = ({ status = 'ACTIVE', q = '' } = {}) =>
+  adminRequest({ method: 'get', url: `${API_BASE}/admin/orders`, params: { status, q: q || undefined } });
+
+export const fetchOrder = (id) => adminRequest({ method: 'get', url: `${API_BASE}/admin/orders/${id}` });
+
+export const updateOrder = (id, changes) => adminRequest({ method: 'patch', url: `${API_BASE}/admin/orders/${id}`, data: changes });
+
+/** outcome: REACHED | NO_ANSWER | CALL_BACK */
+export const logOrderCall = (id, outcome, note = '') =>
+  adminRequest({ method: 'post', url: `${API_BASE}/admin/orders/${id}/calls`, data: { outcome, note } });
+
+export const sendOrderWhatsApp = (id) => adminRequest({ method: 'post', url: `${API_BASE}/admin/orders/${id}/whatsapp` });
+
+export const addOrderNote = (id, note) => adminRequest({ method: 'post', url: `${API_BASE}/admin/orders/${id}/notes`, data: { note } });
+
+/** extra: { note, cancelReason, carrier, trackingNumber } */
+export const setOrderStatus = (id, status, extra = {}) =>
+  adminRequest({ method: 'post', url: `${API_BASE}/admin/orders/${id}/status`, data: { status, ...extra } });
 
 // Community ---------------------------------------------------------------
 

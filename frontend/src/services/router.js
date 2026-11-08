@@ -18,6 +18,7 @@ export const ROUTES = {
   backoffice: '/admin',
   privacy: '/confidentialite',
   saved: '/mes-produits',
+  orders: '/mes-commandes',
 };
 
 const STORE_RE = /^\/marche\/boutique\/([0-9a-f-]{36})\/?$/i;
