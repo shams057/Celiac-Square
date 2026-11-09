@@ -72,7 +72,15 @@ const loadProfile = async (id) => {
 
 export const PHONE_INVALID = 'Numéro de téléphone invalide : 8 chiffres, par exemple 22 123 456.';
 
-const CHECK_EMAIL = 'Si cette adresse peut être utilisée, un e-mail de confirmation vient d’être envoyé. Ouvrez-le, puis connectez-vous.';
+// Public address of this site, for links in Supabase e-mails. Without it Supabase falls back
+// to the dashboard's Site URL, which may still be localhost.
+const siteBase = (req) => {
+  const origin = req.headers.origin;
+  const base = process.env.SITE_URL || (origin && allowedOrigins().includes(origin) ? origin : allowedOrigins()[0]);
+  return base.replace(/\/$/, '');
+};
+
+const CHECK_EMAIL ='Si cette adresse peut être utilisée, un e-mail de confirmation vient d’être envoyé. Ouvrez-le, puis connectez-vous.';
 
 /**
  * POST /api/auth/signup
@@ -94,7 +102,11 @@ router.post('/signup', limits.auth, async (req, res) => {
   if (!phone) return badRequest(res, PHONE_INVALID);
 
   // The profile row is created by the handle_new_user trigger from this metadata
-  const { data, error } = await authClient().auth.signUp({ email, password, options: { data: { full_name: fullName, phone } } });
+  const { data, error } = await authClient().auth.signUp({
+    email,
+    password,
+    options: { data: { full_name: fullName, phone }, emailRedirectTo: `${siteBase(req)}/` },
+  });
   const taken =
     (error && /already|registered|exists/i.test(error.message)) ||
     (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0);
@@ -196,11 +208,7 @@ router.post('/logout', async (req, res) => {
 // ---------------------------------------------------------------------------
 
 // Where the e-mail link sends people back: this site's reset page
-const resetRedirect = (req) => {
-  const origin = req.headers.origin;
-  const base = process.env.SITE_URL || (origin && allowedOrigins().includes(origin) ? origin : allowedOrigins()[0]);
-  return `${base.replace(/\/$/, '')}/compte/nouveau-mot-de-passe`;
-};
+const resetRedirect = (req) => `${siteBase(req)}/compte/nouveau-mot-de-passe`;
 
 /**
  * POST /api/auth/forgot
