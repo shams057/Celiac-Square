@@ -8,7 +8,7 @@ const router = asyncRouter();
 
 const STATUSES = ['ALLOWED', 'TO_CHECK', 'NOT_ALLOWED'];
 
-// The guide is fixed (a seed of ~240 rows): kept in memory for a few minutes per instance
+// The guide is fixed (a seed of ~620 rows): kept in memory for a few minutes per instance
 const loadGuide = () =>
   cached('atmc:all', 10 * 60 * 1000, async () =>
     unwrap(await db().from('atmc_products').select('*').order('category_fr').order('status')).map(toAtmcProduct)

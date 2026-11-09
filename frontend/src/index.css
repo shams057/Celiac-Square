@@ -32,6 +32,11 @@
     outline-offset: 2px;
   }
 
+  /* Page headings get focus from code on navigation (for screen readers): not an interactive element, so no ring */
+  [tabindex='-1']:focus {
+    outline: none;
+  }
+
   ::selection {
     background: #ff8a41;
     color: #2f261d;

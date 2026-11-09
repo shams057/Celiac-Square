@@ -9,8 +9,8 @@ import { buildAtmcRowsFromFile } from '../seed/data.js';
  *   npm run atmc:import -- ../Data/ATMC2025.json                 dry run: prints what would change
  *   npm run atmc:import -- ../Data/ATMC2025.json --edition 2025-06 --apply
  *
- * The file has the same format as Data/ATMC2023.json; French translations are read from the
- * sibling <name>.fr.json when it exists. --edition (YYYY-MM) overrides the file's publication_date.
+ * The file has the same format as Data/ATMC2023.products.json (one entry per product, French and
+ * Arabic names). The older grouped format (Data/ATMC2023.json + its sibling <name>.fr.json) still loads. --edition (YYYY-MM) overrides the file's publication_date.
  *
  * Entries are matched on (category, text): unchanged and re-classified entries keep their row id, so
  * products that users saved stay linked and show "status changed" when the guide re-classifies them.
@@ -21,7 +21,8 @@ dotenv.config();
 const args = process.argv.slice(2);
 const file = args.find((a) => !a.startsWith('--'));
 const apply = args.includes('--apply');
-const editionArg = args[args.indexOf('--edition') + 1];
+// Only when the flag is there: indexOf(-1) + 1 would otherwise read the file path as the edition
+const editionArg = args.includes('--edition') ? args[args.indexOf('--edition') + 1] : undefined;
 
 if (!file) {
   console.error('Usage: npm run atmc:import -- <guide.json> [--edition YYYY-MM] [--apply]');

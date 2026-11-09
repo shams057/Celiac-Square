@@ -527,14 +527,16 @@ export function parseEdition(text) {
 }
 
 /**
- * Rows of atmc_products from a guide file (same format as Data/ATMC2023.json).
+ * Rows of atmc_products from a guide file: per-product (Data/ATMC2023.products.json) or the older
+ * grouped format (Data/ATMC2023.json).
  * `edition` overrides the file's publication_date (YYYY-MM-DD).
  */
 export function buildAtmcRowsFromFile(dataFile, { edition } = {}) {
   const atmcData = JSON.parse(fs.readFileSync(dataFile, 'utf8'));
-  const translations = loadAtmcTranslations(dataFile);
   const source = `${atmcData.organization || 'ATMC'} - ${atmcData.document_title || 'Guide'} (${atmcData.publication_date || '2023'})`;
   const editionDate = edition || parseEdition(atmcData.publication_date) || '2023-12-01';
+  if (Array.isArray(atmcData.products)) return buildAtmcRowsFromProducts(atmcData.products, { source, editionDate });
+  const translations = loadAtmcTranslations(dataFile);
   const rows = [];
   for (const cat of atmcData.categories || []) {
     for (const mapping of ATMC_STATUSES) {
@@ -561,8 +563,48 @@ export function buildAtmcRowsFromFile(dataFile, { edition } = {}) {
   return rows;
 }
 
+// "Brand : product", the shape the catalog and the scanner split on (brand in bold, product after)
+const withBrand = (brand, name) =>
+  !brand || name.toLowerCase().includes(brand.toLowerCase()) ? name : `${brand} : ${name}`;
+
+/**
+ * Rows from a per-product guide file (Data/ATMC2023.products.json): one row per product, already
+ * split and translated. `name` holds the Arabic name and `name_fr` the French one, as the catalog expects.
+ * `raw_text` is the name as printed in the guide's language; it is the key the importer matches on, so
+ * a product the guide lists under two statuses of one category gets the status appended to stay unique.
+ */
+export function buildAtmcRowsFromProducts(products, { source, editionDate }) {
+  const labelOf = (p) => withBrand(p.brand, p.source_lang === 'ar' ? p.name_ar : p.name_fr);
+  const seen = new Map();
+  for (const p of products) {
+    const key = `${p.category_slug}\u0000${labelOf(p)}`;
+    seen.set(key, (seen.get(key) || 0) + 1);
+  }
+  return products.map((p) => {
+    const status = ATMC_STATUSES.find((s) => s.status === p.status);
+    if (!status) throw new Error(`Unknown status "${p.status}" for ${p.id}`);
+    const label = labelOf(p);
+    const duplicated = seen.get(`${p.category_slug}\u0000${label}`) > 1;
+    return {
+      category_fr: p.category_fr,
+      category_ar: p.category_ar,
+      category_slug: p.category_slug,
+      status: status.status,
+      status_label_fr: status.labelFr,
+      status_label_ar: status.labelAr,
+      name: withBrand(p.brand, p.name_ar),
+      name_fr: withBrand(p.brand, p.name_fr),
+      brand: p.brand || '',
+      items: [p.name_fr],
+      raw_text: duplicated ? `${label} (${p.status_fr})` : label,
+      source,
+      edition: editionDate,
+    };
+  });
+}
+
 export function buildAtmcRows(dataDir = DATA_DIR) {
-  return buildAtmcRowsFromFile(path.join(dataDir, 'ATMC2023.json'));
+  return buildAtmcRowsFromFile(path.join(dataDir, 'ATMC2023.products.json'));
 }
 
 export const spotRows = () =>

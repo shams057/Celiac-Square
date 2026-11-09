@@ -317,8 +317,9 @@ Limites de débit (par IP) : 300 requêtes/min sur l’API, 10 connexions ou ins
 
 ### Données
 
-- `Data/ATMC2023.json` : guide ATMC 2023, source du seed.
-- `Data/ATMC2023.fr.json` : traductions françaises des entrées rédigées en arabe. Corrigez une traduction ici puis relancez le seed (sur une base de développement).
+- `Data/ATMC2023.products.json` : guide ATMC 2023, source du seed. Une entrée par produit, avec sa catégorie, son statut, son nom en français et en arabe. Corrigez un produit ici puis relancez le seed (sur une base de développement) ou `npm run atmc:import`.
+- `Data/ATMC2023.products.csv` : la même liste en tableur, pour relecture.
+- `Data/ATMC2023.json` et `Data/ATMC2023.fr.json` : ancienne version (entrées groupées), plus utilisée par le seed.
 - `atmc-guide-2023.json` : transcription brute du PDF de l’ATMC, conservée comme référence.
 
 ### Charte graphique
