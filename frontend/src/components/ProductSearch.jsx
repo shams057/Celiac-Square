@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, LoaderCircle, X } from 'lucide-react';
 import { searchProducts, fetchAtmcProducts } from '../services/api';
 import { t, statusKind, STATUS, StatusTile, PageHead, Notice, EmptyState } from './ui';
@@ -28,8 +28,9 @@ const searchSavedGuide = async (query) => {
 export default function ProductSearch({ initialQuery = '', lang }) {
   const tr = t(lang);
   const [query, setQuery] = useState(initialQuery);
-  const [localQuery, setLocalQuery] = useState(initialQuery.trim());
-  const [offQuery, setOffQuery] = useState(initialQuery.trim());
+  // The text actually searched: set only by the search button (or Enter), never while typing,
+  // so each search costs one request to Open Food Facts, which limits how many it accepts
+  const [submitted, setSubmitted] = useState({ q: initialQuery.trim(), n: 0 });
   const [loading, setLoading] = useState(false);
   const [localItems, setLocalItems] = useState([]);
   const [offItems, setOffItems] = useState([]);
@@ -37,24 +38,27 @@ export default function ProductSearch({ initialQuery = '', lang }) {
   const [offRetry, setOffRetry] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
   const [offline, setOffline] = useState(false);
+  const localQuery = submitted.q;
+  const offQuery = submitted.q;
 
+  // A query handed over by the scanner (or the URL) is searched at once: the user already asked for it.
+  // Skipped on the first render, where the initial state already holds it.
+  const firstInitial = useRef(true);
   useEffect(() => {
+    if (firstInitial.current) {
+      firstInitial.current = false;
+      return;
+    }
     if (initialQuery) {
       setQuery(initialQuery);
-      setLocalQuery(initialQuery.trim());
-      setOffQuery(initialQuery.trim());
+      setSubmitted((s) => ({ q: initialQuery.trim(), n: s.n + 1 }));
     }
   }, [initialQuery]);
 
-  // Local guides answer instantly; Open Food Facts is rate limited, so it waits for a real pause
-  useEffect(() => {
-    const local = setTimeout(() => setLocalQuery(query.trim()), 250);
-    const off = setTimeout(() => setOffQuery(query.trim()), 900);
-    return () => {
-      clearTimeout(local);
-      clearTimeout(off);
-    };
-  }, [query]);
+  const runSearch = (e) => {
+    e?.preventDefault();
+    setSubmitted((s) => ({ q: query.trim(), n: s.n + 1 }));
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -80,7 +84,7 @@ export default function ProductSearch({ initialQuery = '', lang }) {
     return () => {
       cancelled = true;
     };
-  }, [localQuery]);
+  }, [submitted]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setOffItems([]);
@@ -100,10 +104,9 @@ export default function ProductSearch({ initialQuery = '', lang }) {
     return () => {
       cancelled = true;
     };
-  }, [offQuery, offRetry]);
+  }, [submitted, offRetry]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Results for the previous text stay on screen until the new ones arrive
-  const stale = query.trim() !== localQuery;
+  const busy = loading || offState === 'loading';
   const items = [...localItems, ...offItems];
 
   return (
@@ -116,28 +119,32 @@ export default function ProductSearch({ initialQuery = '', lang }) {
         )}
       />
 
-      <div className="relative">
-        <Search className="pointer-events-none absolute start-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-faint" />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={tr('couscous, harissa, Barilla, 8076809545440…', 'كسكسي، هريسة، باريلا، 8076809545440…')}
-          aria-label={tr('Nom, marque ou code-barres', 'اسم، علامة أو رمز شريطي')}
-          className="field h-14 pe-12 ps-12 text-base"
-        />
-        <span className="absolute end-3 top-1/2 -translate-y-1/2">
-          {loading || stale || offState === 'loading' ? (
-            <LoaderCircle className="h-5 w-5 animate-spin text-ink-soft" aria-label={tr('Recherche en cours', 'جاري البحث')} />
-          ) : (
-            query && (
+      <form role="search" onSubmit={runSearch} className="flex gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute start-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-faint" />
+          <input
+            type="search"
+            enterKeyHint="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={tr('couscous, harissa, Barilla, 8076809545440…', 'كسكسي، هريسة، باريلا، 8076809545440…')}
+            aria-label={tr('Nom, marque ou code-barres', 'اسم، علامة أو رمز شريطي')}
+            className="field h-14 pe-12 ps-12 text-base"
+          />
+          {query && (
+            <span className="absolute end-3 top-1/2 -translate-y-1/2">
               <button type="button" onClick={() => setQuery('')} className="rounded-md p-1.5 text-ink-soft hover:text-ink" aria-label={tr('Effacer', 'مسح')}>
                 <X className="h-4 w-4" />
               </button>
-            )
+            </span>
           )}
-        </span>
-      </div>
+        </div>
+        <button type="submit" className="btn-primary h-14 shrink-0 px-5" disabled={busy && query.trim() === submitted.q}>
+          {busy ? <LoaderCircle className="h-5 w-5 animate-spin" aria-hidden="true" /> : <Search className="h-5 w-5" aria-hidden="true" />}
+          <span className="hidden sm:inline">{busy ? tr('Recherche…', 'جاري البحث…') : tr('Rechercher', 'ابحث')}</span>
+          <span className="sr-only sm:hidden">{tr('Rechercher', 'ابحث')}</span>
+        </button>
+      </form>
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-ink-soft" aria-live="polite">
         <p>
@@ -185,7 +192,7 @@ export default function ProductSearch({ initialQuery = '', lang }) {
       )}
 
       {items.length > 0 ? (
-        <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-white/70 bg-canvas-paper/80 backdrop-blur-sm">
+        <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-canvas-line bg-canvas-paper/80">
           {items.map((item, idx) => {
             const k = statusKind(item.status);
             const label = lang === 'ar' ? item.badgeTextAr || STATUS[k].ar : item.badgeText || STATUS[k].fr;
@@ -224,9 +231,8 @@ export default function ProductSearch({ initialQuery = '', lang }) {
           })}
         </ul>
       ) : (
-        !loading &&
-        !stale &&
-        offState !== 'loading' &&
+        !busy &&
+        submitted.q &&
         !errorMsg && (
           <EmptyState title={tr('Aucun résultat', 'لا توجد نتائج')}>
             {tr(

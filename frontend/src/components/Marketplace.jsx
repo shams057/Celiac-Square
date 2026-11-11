@@ -317,7 +317,7 @@ function ProductCard({ lang, product, showStore = false, onOpen }) {
     <button
       type="button"
       onClick={() => onOpen(product)}
-      className="group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-white/60 bg-canvas-paper/80 text-start shadow-[0_1px_2px_rgba(47,38,29,0.05)] transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_10px_24px_-14px_rgba(47,38,29,0.4)]"
+      className="group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-canvas-line bg-canvas-paper/80 text-start shadow-[0_1px_2px_rgba(47,38,29,0.05)] transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-[0_10px_24px_-14px_rgba(47,38,29,0.4)]"
     >
       <div className="aspect-[4/3] w-full overflow-hidden">
         <ProductImage product={product} className="transition-transform duration-500 group-hover:scale-[1.03]" />

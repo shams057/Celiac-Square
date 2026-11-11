@@ -51,7 +51,7 @@ export default function Backoffice({ lang }) {
               aria-selected={section === id}
               onClick={() => setSection(id)}
               className={`flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-sm transition-colors ${
-                section === id ? 'bg-canvas-paper font-medium text-ink shadow-sm' : 'text-ink-soft hover:text-ink'
+                section === id ? 'bg-canvas-paper font-medium text-ink shadow-sm dark:bg-canvas-edge' : 'text-ink-soft hover:text-ink'
               }`}
             >
               <Icon className="h-4 w-4" />

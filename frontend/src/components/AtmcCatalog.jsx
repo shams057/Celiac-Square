@@ -155,16 +155,16 @@ export default function AtmcCatalog({ lang = 'fr' }) {
               type="button"
               aria-pressed={active}
               onClick={() => setSelectedStatus(active ? 'ALL' : f.id)}
-              className={`flex flex-col items-start gap-3 rounded-2xl border p-3 text-start transition-colors sm:flex-row sm:items-center sm:p-4 ${
-                active ? 'border-ink bg-canvas-paper' : 'border-white/50 bg-canvas-raised/60 hover:bg-canvas-paper/80'
+              className={`panel flex flex-col items-start gap-3 p-3.5 text-start transition-shadow sm:flex-row sm:items-center sm:gap-4 sm:p-5 ${
+                active ? 'ring-2 ring-ink' : 'hover:ring-1 hover:ring-ink/15'
               }`}
             >
               <StatusTile kind={f.kind} />
               <span className="min-w-0">
-                <span className="block text-2xl font-semibold leading-none tabular-nums">
+                <span className="block text-[1.75rem] font-bold leading-none tracking-[-0.025em] tabular-nums sm:text-[2rem]">
                   {stats ? stats[f.countKey] : '–'}
                 </span>
-                <span className={`mt-1 block text-sm ${meta.text}`}>{tr(f.fr, f.ar)}</span>
+                <span className={`mt-1.5 block text-sm font-medium ${meta.text}`}>{tr(f.fr, f.ar)}</span>
               </span>
             </button>
           );
@@ -174,8 +174,8 @@ export default function AtmcCatalog({ lang = 'fr' }) {
       <div className="grid gap-6 lg:grid-cols-[15rem_1fr] lg:gap-8">
         {/* Rayons: white card on desktop, in the filters sheet on mobile */}
         <aside className="hidden lg:block">
-          <div className="rounded-2xl border border-white/70 bg-canvas-paper/80 backdrop-blur-sm p-2">
-            <p className="px-3 pb-1 pt-2 text-sm font-medium">{tr('Rayons', 'الأصناف')}</p>
+          <div className="panel p-2">
+            <p className="px-3 pb-1 pt-2 text-sm font-semibold text-ink-soft">{tr('Rayons', 'الأصناف')}</p>
             {categoryList}
           </div>
         </aside>
@@ -268,7 +268,7 @@ export default function AtmcCatalog({ lang = 'fr' }) {
               )}
             </EmptyState>
           ) : (
-            <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-white/70 bg-canvas-paper/80 backdrop-blur-sm">
+            <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-canvas-line bg-canvas-paper/80">
               {filteredProducts.map((item) => {
                 const kind = statusKind(item.status);
                 const { head, rest } = splitName(lang === 'ar' ? item.name : item.nameFr || item.name);
@@ -304,7 +304,7 @@ export default function AtmcCatalog({ lang = 'fr' }) {
 /** Grey rows in the shape of the list while it loads, instead of "0 produit" */
 function ListSkeleton({ label }) {
   return (
-    <div role="status" aria-label={label} className="overflow-hidden rounded-2xl border border-white/70 bg-canvas-paper/80">
+    <div role="status" aria-label={label} className="overflow-hidden rounded-2xl border border-canvas-line bg-canvas-paper/80">
       {Array.from({ length: 8 }, (_, i) => (
         <div key={i} className="flex items-start gap-3.5 border-b border-canvas-line/40 px-4 py-4 last:border-0" aria-hidden="true">
           <span className="h-6 w-6 shrink-0 animate-pulse rounded-tile bg-canvas-sunk" />

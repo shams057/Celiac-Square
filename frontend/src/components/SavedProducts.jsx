@@ -83,7 +83,7 @@ export default function SavedProducts({ lang }) {
                 {tr('Le nouveau statut est affiché. Relisez l’emballage avant de les racheter.', 'الحالة الجديدة معروضة. اقرأ العلبة قبل إعادة الشراء.')}
               </Notice>
             )}
-            <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-white/70 bg-canvas-paper/80">
+            <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-canvas-line bg-canvas-paper/80">
               {saved.items.map((item) => {
                 const status = item.currentStatus || item.status;
                 const kind = statusKind(status);
@@ -140,7 +140,7 @@ export default function SavedProducts({ lang }) {
             }
           />
         ) : (
-          <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-white/70 bg-canvas-paper/80">
+          <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-canvas-line bg-canvas-paper/80">
             {history.map((h) => {
               const kind = statusKind(h.status);
               const Icon = SCAN_ICONS[h.mode] || ScanText;

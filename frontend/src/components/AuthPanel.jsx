@@ -87,7 +87,7 @@ export default function AuthPanel({ lang, title, lede, onDone }) {
               role="tab"
               aria-selected={mode === id}
               onClick={() => switchTo(id)}
-              className={`rounded-full py-2 text-sm transition-colors ${mode === id ? 'bg-canvas-paper font-medium text-ink shadow-sm' : 'text-ink-soft hover:text-ink'}`}
+              className={`rounded-full py-2 text-sm transition-colors ${mode === id ? 'bg-canvas-paper font-medium text-ink shadow-sm dark:bg-canvas-edge' : 'text-ink-soft hover:text-ink'}`}
             >
               {label}
             </button>

@@ -24,7 +24,7 @@ import { AuthProvider, useAuth } from './components/AuthContext';
 import { navigate, pathFor, useRoute } from './services/router';
 
 // Dock tabs first, then pages reached from the account menu and the footer
-const TAB_ORDER = ['atmc', 'vision', 'search', 'map', 'market', 'account', 'reset-password', 'seller', 'become-seller', 'backoffice', 'privacy', 'saved', 'orders'];
+const TAB_ORDER = ['atmc', 'search', 'vision', 'map', 'market', 'account', 'reset-password', 'seller', 'become-seller', 'backoffice', 'privacy', 'saved', 'orders'];
 
 const PAGE_TITLES = {
   atmc: ['Guide ATMC', 'دليل الجمعية'],
@@ -191,14 +191,14 @@ function AppShell() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-[2000] focus:rounded-lg focus:bg-ink focus:px-4 focus:py-2 focus:text-canvas-paper">
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-[2000] focus:rounded-full focus:bg-ink focus:px-4 focus:py-2 focus:text-canvas-paper">
         {lang === 'ar' ? 'انتقل إلى المحتوى' : 'Aller au contenu'}
       </a>
 
       <Navbar activeTab={activeTab} setActiveTab={goTo} onOpenSubmitModal={() => setIsSubmitModalOpen(true)} lang={lang} setLang={setLang} />
 
       {!online && (
-        <div role="status" className="mx-auto mt-2 flex w-[calc(100%-2rem)] max-w-6xl items-start gap-2.5 rounded-xl border border-status-warning/60 bg-status-warning/15 px-4 py-2.5 text-sm">
+        <div role="status" className="mx-auto mt-1 flex w-[calc(100%-2rem)] max-w-6xl items-start gap-2.5 rounded-2xl bg-status-warning/20 px-4 py-3 text-sm">
           <WifiOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <span>
             {lang === 'ar'
@@ -208,7 +208,7 @@ function AppShell() {
         </div>
       )}
 
-      <main id="main" ref={mainRef} className="mx-auto w-full max-w-6xl flex-1 overflow-x-clip px-4 pb-32 pt-6 sm:px-6 sm:pt-10">
+      <main id="main" ref={mainRef} className="mx-auto w-full max-w-6xl flex-1 overflow-x-clip px-4 pb-32 pt-3 sm:px-6 sm:pt-6 lg:pb-20">
         <div key={activeTab} className={slide}>
           {page}
         </div>

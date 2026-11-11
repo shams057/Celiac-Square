@@ -31,8 +31,8 @@ const shrinkImage = async (file) => {
 const MIN_OCR_CONFIDENCE = 45;
 
 const VERDICT_BLOCK = {
-  safe: 'bg-status-safe text-ink',
-  warning: 'bg-status-warning text-ink',
+  safe: 'bg-status-safe text-onbright',
+  warning: 'bg-status-warning text-onbright',
   unsafe: 'bg-status-unsafe text-white',
   unknown: 'bg-canvas-sunk text-ink',
 };
@@ -229,6 +229,15 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
     try {
       const res = await identifyProductPhoto(await toUpload(image));
       if (!res?.success) throw new Error(res?.message || 'failed');
+      // 3. No product name on the photo: the AI may still have read the digits under a barcode the
+      //    device reader missed (blurred, curved, partly hidden). Search with them.
+      const aiCode = res.data.barcode;
+      const named = res.data.matchedProduct || res.data.aiProduct?.productName;
+      if (!named && aiCode && aiCode !== code) {
+        const found = await lookUpBarcode(aiCode);
+        if (found) return found;
+        return { mode: 'product', data: { ...res.data, unknownBarcode: aiCode, searchQuery: res.data.searchQuery || aiCode } };
+      }
       return { mode: 'product', data: { ...res.data, ...unknownBarcode } };
     } catch (err) {
       if (!isAiUnavailable(err) && err.response?.data?.code !== 'AI_NOT_CONFIGURED') throw err;
@@ -372,7 +381,7 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
       />
 
       {/* Mode switch */}
-      <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/50 bg-canvas-raised/60 p-1" role="tablist" aria-label={tr('Type de scan', 'نوع المسح')}>
+      <div className="grid grid-cols-2 gap-2 rounded-2xl border border-canvas-line bg-canvas-raised/60 p-1" role="tablist" aria-label={tr('Type de scan', 'نوع المسح')}>
         {Object.entries(MODES).map(([id, m]) => {
           const Icon = m.icon;
           const active = mode === id;
@@ -413,9 +422,9 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
               <>
                 <img src={previewUrl} alt={tr('Photo analysée', 'الصورة المحللة')} className="h-full w-full object-contain" />
                 {busy && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-ink/75 px-8 text-canvas-paper" role="status">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/75 px-8 text-white" role="status">
                     <p className="font-medium">{busy.label}</p>
-                    <div className="h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-canvas-paper/25">
+                    <div className="h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-white/25">
                       {typeof busy.progress === 'number' ? (
                         <div className="h-full rounded-full bg-accent transition-[width] duration-200" style={{ width: `${Math.round(busy.progress * 100)}%` }} />
                       ) : (
@@ -429,9 +438,9 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
               <>
                 <video ref={videoRef} playsInline autoPlay muted className="h-full w-full object-cover" />
                 <canvas ref={canvasRef} className="hidden" />
-                <div className="pointer-events-none absolute inset-[12%] rounded-lg border-2 border-canvas-paper/70" />
+                <div className="pointer-events-none absolute inset-[12%] rounded-lg border-2 border-white/70" />
                 {mode === 'product' && streamActive && (
-                  <p className="absolute inset-x-0 top-3 mx-auto w-fit rounded-full bg-ink/70 px-3 py-1 text-xs text-canvas-paper">
+                  <p className="absolute inset-x-0 top-3 mx-auto w-fit rounded-full bg-black/70 px-3 py-1 text-xs text-white">
                     <ScanBarcode className="me-1.5 inline h-3.5 w-3.5" aria-hidden="true" />
                     {tr('Code-barres lu automatiquement', 'يُقرأ الرمز الشريطي تلقائيا')}
                   </p>
@@ -441,7 +450,7 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
                     type="button"
                     onClick={() => captureSnapshot()}
                     disabled={!streamActive}
-                    className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-canvas-paper bg-accent text-ink disabled:opacity-50"
+                    className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-white bg-accent text-onbright disabled:opacity-50"
                     aria-label={tr('Prendre la photo', 'التقط الصورة')}
                   >
                     <Camera className="h-6 w-6" />
@@ -725,7 +734,7 @@ function ProductVerdict({ result, lang, onSearch, onAnalyzeIngredients }) {
                 <button
                   type="button"
                   onClick={() => onSearch?.(cand.candidateName)}
-                  className="flex w-full items-center gap-3 rounded-lg border border-canvas-line bg-white px-3 py-2.5 text-start text-sm hover:border-ink"
+                  className="flex w-full items-center gap-3 rounded-lg border border-canvas-line bg-canvas-paper px-3 py-2.5 text-start text-sm hover:border-ink"
                 >
                   <StatusTile kind={cand.matchedProduct ? statusKind(cand.matchedProduct.status) : 'unknown'} size="xs" />
                   <span dir="auto">{cand.candidateName}</span>

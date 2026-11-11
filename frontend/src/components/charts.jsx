@@ -2,15 +2,13 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { t } from './ui';
 
 /**
- * Small SVG charts for the back-office dashboard, drawn on the panel surface (~#E2DCC8).
+ * Small SVG charts for the back-office dashboard, drawn on the panel surface (~#FFFFFF).
  * Series colours were checked with the dataviz palette validator against that surface
  * (lightness, chroma, colour-blind separation, normal vision, 3:1 contrast): all pass.
  * Slot 1 olive, slot 2 violet, always in this order. Text never takes a series colour.
  */
 export const SERIES = ['#5e7d2a', '#7a5aa6'];
-const GRID = 'rgba(47, 38, 29, 0.12)';
-const AXIS = 'rgba(47, 38, 29, 0.28)';
-const MUTED = '#63543F'; // ink-faint
+// Grid, axis and labels take the theme's ink (text-ink/… with currentColor), so they hold in dark
 
 /** Width of an element, kept up to date */
 function useWidth() {
@@ -103,8 +101,8 @@ export function DailyChart({ lang, data, bar, line, height = 220, ariaLabel }) {
         <svg width={width} height={height} role="img" aria-label={ariaLabel} onMouseMove={onMove} onMouseLeave={() => setHover(null)} className="block">
           {ticks.map((tv) => (
             <g key={tv}>
-              <line x1={pad.left} x2={width - pad.right} y1={y(tv)} y2={y(tv)} stroke={tv === 0 ? AXIS : GRID} strokeWidth="1" />
-              <text x={pad.left - 6} y={y(tv)} dy="0.32em" textAnchor="end" fontSize="11" fill={MUTED} style={{ fontVariantNumeric: 'tabular-nums' }}>
+              <line x1={pad.left} x2={width - pad.right} y1={y(tv)} y2={y(tv)} stroke="currentColor" className={tv === 0 ? 'text-ink/30' : 'text-ink/10'} strokeWidth="1" />
+              <text x={pad.left - 6} y={y(tv)} dy="0.32em" textAnchor="end" fontSize="11" fill="currentColor" className="text-ink-faint" style={{ fontVariantNumeric: 'tabular-nums' }}>
                 {compact(tv, lang)}
               </text>
             </g>
@@ -125,12 +123,12 @@ export function DailyChart({ lang, data, bar, line, height = 220, ariaLabel }) {
           {line &&
             data.map((d, i) =>
               (d[line.key] || 0) > 0 || hover === i ? (
-                <circle key={d.day} cx={x(i)} cy={y(d[line.key] || 0)} r="4" fill={SERIES[1]} stroke="#E2DCC8" strokeWidth="2" />
+                <circle key={d.day} cx={x(i)} cy={y(d[line.key] || 0)} r="4" fill={SERIES[1]} stroke="currentColor" className="text-canvas-paper" strokeWidth="2" />
               ) : null
             )}
           {data.map((d, i) =>
             i % every === (data.length - 1) % every ? (
-              <text key={d.day} x={x(i)} y={height - 8} textAnchor="middle" fontSize="11" fill={MUTED}>
+              <text key={d.day} x={x(i)} y={height - 8} textAnchor="middle" fontSize="11" fill="currentColor" className="text-ink-faint">
                 {dayLabel(d.day, lang)}
               </text>
             ) : null

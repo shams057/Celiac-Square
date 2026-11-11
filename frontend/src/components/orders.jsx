@@ -14,7 +14,7 @@ export const ORDER_STATUS = {
   CONFIRMED: { fr: 'Confirmée', ar: 'مؤكدة', staffFr: 'À transmettre', staffAr: 'للإرسال', tone: 'bg-status-safe/25 text-ink' },
   PREPARING: { fr: 'En préparation', ar: 'قيد التحضير', staffFr: 'Chez l’artisan', staffAr: 'عند الحرفي', tone: 'bg-status-warning/25 text-ink' },
   READY: { fr: 'Prête', ar: 'جاهزة', staffFr: 'Prête à expédier', staffAr: 'جاهزة للشحن', tone: 'bg-status-warning/40 text-ink' },
-  SHIPPED: { fr: 'En livraison', ar: 'قيد التوصيل', staffFr: 'En livraison', staffAr: 'قيد التوصيل', tone: 'bg-sky-200/60 text-ink' },
+  SHIPPED: { fr: 'En livraison', ar: 'قيد التوصيل', staffFr: 'En livraison', staffAr: 'قيد التوصيل', tone: 'bg-sky-400/25 text-ink' },
   DELIVERED: { fr: 'Livrée', ar: 'تم التسليم', staffFr: 'Livrée', staffAr: 'تم التسليم', tone: 'bg-status-safe/50 text-ink' },
   CANCELLED: { fr: 'Annulée', ar: 'ملغاة', staffFr: 'Annulée', staffAr: 'ملغاة', tone: 'bg-canvas-sunk text-ink-soft' },
 };
@@ -119,7 +119,7 @@ export function CartButton({ lang, className = '' }) {
     <button type="button" onClick={() => setOpen(true)} className={`btn-quiet relative ${className}`} aria-label={tr(`Panier, ${count} article(s)`, `السلة، ${count}`)}>
       <ShoppingCart className="h-4 w-4" />
       {tr('Panier', 'السلة')}
-      {count > 0 && <span className="rounded-md bg-accent px-1.5 text-sm font-medium tabular-nums text-ink">{count}</span>}
+      {count > 0 && <span className="rounded-md bg-accent px-1.5 text-sm font-medium tabular-nums text-onbright">{count}</span>}
     </button>
   );
 }

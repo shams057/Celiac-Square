@@ -80,7 +80,7 @@ export default function BackofficeSellers({ lang }) {
             className={`-mb-px flex shrink-0 items-center gap-2 border-b-[3px] pb-3 text-[15px] ${view === id ? 'border-accent font-medium text-ink' : 'border-transparent text-ink-soft hover:text-ink'}`}
           >
             {label}
-            {count > 0 && <span className="rounded-md bg-accent px-1.5 text-sm tabular-nums text-ink">{count}</span>}
+            {count > 0 && <span className="rounded-md bg-accent px-1.5 text-sm tabular-nums text-onbright">{count}</span>}
           </button>
         ))}
       </div>
@@ -166,7 +166,7 @@ function RequestsView({ lang, onPendingCount, showToast }) {
           {items.map((a) => {
             const type = storeType(a.type);
             return (
-              <li key={a._id} className="rounded-2xl border border-white/70 bg-canvas-paper/80 p-4 backdrop-blur-sm sm:p-5">
+              <li key={a._id} className="rounded-2xl border border-canvas-line bg-canvas-paper/80 p-4 sm:p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
@@ -266,7 +266,7 @@ function StoresView({ lang, showToast }) {
   if (stores.length === 0) return <EmptyState title={tr('Aucune boutique', 'لا توجد محلات')}>{tr('Acceptez une demande de vendeur pour ouvrir la première.', 'اقبل طلب بائع لفتح أول محل.')}</EmptyState>;
 
   return (
-    <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-white/70 bg-canvas-paper/80">
+    <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-canvas-line bg-canvas-paper/80">
       {stores.map((s) => (
         <li key={s._id} className="flex items-center gap-3 p-3 sm:gap-4 sm:p-4">
           <StoreLogo store={s} className="h-12 w-12" />
@@ -369,7 +369,7 @@ function UsersView({ lang, showToast }) {
       ) : users.length === 0 ? (
         <EmptyState title={tr('Aucun compte ne correspond', 'لا يوجد حساب مطابق')} />
       ) : (
-        <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-white/70 bg-canvas-paper/80">
+        <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-canvas-line bg-canvas-paper/80">
           {users.map((u) => (
             <li key={u._id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-4 sm:p-4">
               <div className="min-w-0 flex-1">
@@ -461,7 +461,7 @@ function AuditLogView({ lang }) {
   if (rows.length === 0) return <EmptyState title={tr('Aucune action enregistrée', 'لا توجد عمليات مسجلة')} />;
 
   return (
-    <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-white/70 bg-canvas-paper/80 text-sm">
+    <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-canvas-line bg-canvas-paper/80 text-sm">
       {rows.map((r) => {
         const [fr, ar] = ACTION_LABELS[r.action] || [r.action, r.action];
         const detail = r.details?.name || r.details?.email || '';

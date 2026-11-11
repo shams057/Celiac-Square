@@ -127,7 +127,7 @@ export default function SellerDashboard({ lang }) {
           {tr('Ajoutez un titre, une description et des photos.', 'أضف عنوانا ووصفا وصورا.')}
         </EmptyState>
       ) : (
-        <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-white/70 bg-canvas-paper/80">
+        <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-canvas-line bg-canvas-paper/80">
           {store.products.map((p) => (
             <li key={p._id} className="flex items-center gap-3 p-3 sm:gap-4 sm:p-4">
               <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-canvas-sunk sm:h-20 sm:w-20">
@@ -363,13 +363,13 @@ function ProductForm({ lang, product, onSaved }) {
             <div key={src.slice(-40) + i} className="group relative aspect-square overflow-hidden rounded-xl bg-canvas-sunk">
               <img src={src} alt="" className="h-full w-full object-cover" />
               {i === 0 ? (
-                <span className="absolute bottom-1 start-1 rounded-md bg-ink/80 px-1.5 py-0.5 text-[11px] text-canvas-paper">{tr('Principale', 'رئيسية')}</span>
+                <span className="absolute bottom-1 start-1 rounded-md bg-black/80 px-1.5 py-0.5 text-[11px] text-white">{tr('Principale', 'رئيسية')}</span>
               ) : (
-                <button type="button" onClick={() => makeCover(i)} className="absolute bottom-1 start-1 rounded-md bg-canvas-paper/90 px-1.5 py-0.5 text-[11px] text-ink">
+                <button type="button" onClick={() => makeCover(i)} className="absolute bottom-1 start-1 rounded-md bg-white/90 px-1.5 py-0.5 text-[11px] text-onbright">
                   {tr('Principale', 'رئيسية')}
                 </button>
               )}
-              <button type="button" onClick={() => removeImage(i)} className="absolute end-1 top-1 rounded-full bg-ink/80 p-1 text-canvas-paper" aria-label={tr('Retirer la photo', 'إزالة الصورة')}>
+              <button type="button" onClick={() => removeImage(i)} className="absolute end-1 top-1 rounded-full bg-black/80 p-1 text-white" aria-label={tr('Retirer la photo', 'إزالة الصورة')}>
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>

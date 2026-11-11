@@ -353,7 +353,7 @@ export default function BackofficeSpots({ lang = 'fr' }) {
           >
             {label}
             {count > 0 && (
-              <span className={`rounded-md px-1.5 text-sm tabular-nums ${id === 'inbox' ? 'bg-accent text-ink' : 'bg-canvas-sunk text-ink-soft'}`}>{count}</span>
+              <span className={`rounded-md px-1.5 text-sm tabular-nums ${id === 'inbox' ? 'bg-accent text-onbright' : 'bg-canvas-sunk text-ink-soft'}`}>{count}</span>
             )}
           </button>
         ))}
@@ -452,7 +452,7 @@ export default function BackofficeSpots({ lang = 'fr' }) {
           }
         />
       ) : (
-        <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-white/70 bg-canvas-paper/80 backdrop-blur-sm">
+        <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-canvas-line bg-canvas-paper/80">
           {filteredSpots.map((spot) => {
             const cats = (spot.categories?.length ? spot.categories : [spot.category]).map(spotCategory);
             const coords = spot.location?.coordinates || [0, 0];
@@ -666,7 +666,7 @@ export default function BackofficeSpots({ lang = 'fr' }) {
                 type="checkbox"
                 checked={formData.isVerified}
                 onChange={(e) => setFormData({ ...formData, isVerified: e.target.checked })}
-                className="h-4 w-4 accent-[#4E6127]"
+                className="h-4 w-4 accent-[#4F6B1C]"
               />
               <span className="text-[15px]">{tr('Adresse vérifiée', 'عنوان موثق')}</span>
             </label>
@@ -777,7 +777,7 @@ function InboxView({ lang, proposals, loading, filter, setFilter, onApprove, onR
           {proposals.map((p) => {
             const cat = spotCategory(p.category);
             return (
-              <li key={p._id} className="rounded-2xl border border-white/70 bg-canvas-paper/80 backdrop-blur-sm p-4 sm:p-5">
+              <li key={p._id} className="rounded-2xl border border-canvas-line bg-canvas-paper/80 p-4 sm:p-5">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">

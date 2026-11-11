@@ -176,8 +176,8 @@ function Thumb({ item, onOpen, lang }) {
     >
       <img src={isVideo ? item.poster : item.src} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
       {isVideo && (
-        <span className="absolute inset-0 flex items-center justify-center bg-ink/25">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-canvas-paper/90 text-ink">
+        <span className="absolute inset-0 flex items-center justify-center bg-black/25">
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-onbright">
             <Play className="ms-0.5 h-4 w-4" fill="currentColor" aria-hidden="true" />
           </span>
         </span>
@@ -198,7 +198,7 @@ function Viewer({ items, index, setIndex, onClose, title, lang }) {
   return (
     <Modal open onClose={onClose} lang={lang} title={title} subtitle={`${index + 1} / ${items.length} · ${item.alt}`} width="max-w-3xl">
       <div className="space-y-3" onKeyDown={onKey}>
-        <div className="flex items-center justify-center overflow-hidden rounded-xl bg-ink/90">
+        <div className="flex items-center justify-center overflow-hidden rounded-xl bg-black/90">
           {item.type === 'video' ? (
             <video key={item.src} src={item.src} poster={item.poster} controls autoPlay playsInline className="max-h-[70vh] w-full">
               {item.alt}

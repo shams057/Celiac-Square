@@ -20,14 +20,14 @@ export const STATUS = {
     icon: Check,
     fr: 'Sans gluten',
     ar: 'خالٍ من الغلوتين',
-    tile: 'bg-status-safe text-ink',
+    tile: 'bg-status-safe text-onbright',
     text: 'text-status-safe-ink',
   },
   warning: {
     icon: TriangleAlert,
     fr: 'À vérifier',
     ar: 'للتثبت',
-    tile: 'bg-status-warning text-ink',
+    tile: 'bg-status-warning text-onbright',
     text: 'text-status-warning-ink',
   },
   unsafe: {
@@ -132,7 +132,7 @@ export function Notice({ tone = 'info', title, children, action }) {
 export function EmptyState({ title, children, action }) {
   return (
     <div className="panel px-6 py-12 text-center">
-      <p className="text-lg font-medium">{title}</p>
+      <p className="text-lg font-semibold tracking-[-0.01em]">{title}</p>
       {children && <p className="mx-auto mt-1 max-w-[46ch] text-sm text-ink-soft">{children}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
@@ -155,19 +155,21 @@ export function Modal({ open, onClose, title, subtitle, children, width = 'max-w
 
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[1000] flex animate-fade-in items-end justify-center bg-ink/40 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 z-[1000] flex animate-fade-in items-end justify-center bg-black/30 dark:bg-black/60 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
-        className={`flex max-h-[92vh] w-full ${width} animate-sheet-up flex-col rounded-t-3xl sm:animate-pop-in border border-white/60 bg-canvas-raised/90 backdrop-blur-xl shadow-[0_20px_60px_rgba(47,38,29,0.35)] sm:rounded-3xl`}
+        className={`flex max-h-[92vh] w-full ${width} animate-sheet-up flex-col rounded-t-[2rem] sm:animate-pop-in glass glass-thick sm:rounded-[2rem]`}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-canvas-line px-5 py-4 sm:px-6">
+        {/* Sheets are the thick glass: the page shows through faintly, the form on it stays plain */}
+        <span aria-hidden="true" className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-ink/20 sm:hidden" />
+        <div className="flex items-start justify-between gap-4 border-b border-ink/10 px-5 pb-4 pt-3 sm:px-6 sm:pt-5">
           <div>
-            <h2 id="modal-title" className="text-xl font-semibold">{title}</h2>
+            <h2 id="modal-title" className="text-xl font-semibold tracking-[-0.02em]">{title}</h2>
             {subtitle && <p className="mt-0.5 text-sm text-ink-soft">{subtitle}</p>}
           </div>
-          <button type="button" onClick={onClose} className="btn-ghost -me-2 p-2" aria-label={lang === 'ar' ? 'إغلاق' : 'Fermer'}>
+          <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink/[0.07] text-ink-soft transition-colors hover:bg-ink/[0.12] hover:text-ink" aria-label={lang === 'ar' ? 'إغلاق' : 'Fermer'}>
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -205,10 +207,10 @@ export function StoreLogo({ store, className = 'h-12 w-12' }) {
   const type = storeType(store?.type);
   const Icon = type.icon;
   if (store?.logoUrl) {
-    return <img src={store.logoUrl} alt="" className={`${className} shrink-0 rounded-2xl object-cover ring-1 ring-white/70`} />;
+    return <img src={store.logoUrl} alt="" className={`${className} shrink-0 rounded-xl object-cover ring-1 ring-black/5`} />;
   }
   return (
-    <span className={`${className} inline-flex shrink-0 items-center justify-center rounded-2xl text-white ring-1 ring-white/70`} style={{ background: type.color }} aria-hidden="true">
+    <span className={`${className} inline-flex shrink-0 items-center justify-center rounded-xl text-white`} style={{ background: type.color }} aria-hidden="true">
       <Icon className="h-1/2 w-1/2" strokeWidth={1.75} />
     </span>
   );
@@ -229,11 +231,11 @@ export function FilterSheet({ lang, activeCount = 0, children, className = '' })
       <button type="button" onClick={() => setOpen(true)} className="btn-quiet h-full w-full" aria-haspopup="dialog">
         <SlidersHorizontal className="h-4 w-4" />
         {tr('Filtres', 'المرشحات')}
-        {activeCount > 0 && <span className="rounded-md bg-accent px-1.5 text-sm tabular-nums text-ink">{activeCount}</span>}
+        {activeCount > 0 && <span className="rounded-md bg-accent px-1.5 text-sm tabular-nums text-onbright">{activeCount}</span>}
       </button>
       <Modal open={open} onClose={() => setOpen(false)} title={tr('Filtres', 'المرشحات')} lang={lang} width="max-w-lg">
         <div onClick={(e) => e.target.closest('[data-closes-sheet]') && setOpen(false)}>{children}</div>
-        <div className="mt-6 border-t border-canvas-line pt-4">
+        <div className="mt-6 border-t border-ink/10 pt-4">
           <button type="button" onClick={() => setOpen(false)} className="btn-primary w-full">
             {tr('Voir les résultats', 'عرض النتائج')}
           </button>

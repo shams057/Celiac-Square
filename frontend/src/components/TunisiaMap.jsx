@@ -219,14 +219,14 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
 
   const verifiedToggle = (
     <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-canvas-line bg-canvas-paper px-3.5 py-2.5 text-[15px]">
-      <input type="checkbox" checked={verifiedOnly} onChange={(e) => setVerifiedOnly(e.target.checked)} className="h-4 w-4 accent-[#4E6127]" />
+      <input type="checkbox" checked={verifiedOnly} onChange={(e) => setVerifiedOnly(e.target.checked)} className="h-4 w-4 accent-[#4F6B1C]" />
       {tr('Vérifiées seulement', 'الموثقة فقط')}
     </label>
   );
 
   const openNowToggle = (
     <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-canvas-line bg-canvas-paper px-3.5 py-2.5 text-[15px]" title={tr('D’après les horaires indiqués, heure de Tunisie', 'حسب الأوقات المذكورة، بتوقيت تونس')}>
-      <input type="checkbox" checked={openNow} onChange={(e) => setOpenNow(e.target.checked)} className="h-4 w-4 accent-[#4E6127]" />
+      <input type="checkbox" checked={openNow} onChange={(e) => setOpenNow(e.target.checked)} className="h-4 w-4 accent-[#4F6B1C]" />
       {tr('Ouvert maintenant', 'مفتوح الآن')}
     </label>
   );
@@ -318,7 +318,7 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
       )}
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
-        <div role="region" aria-label={tr('Carte des adresses. La liste qui suit présente les mêmes lieux.', 'خريطة العناوين. القائمة التالية تعرض نفس الأماكن.')} className="relative z-0 h-[55vh] min-h-[340px] overflow-hidden rounded-2xl border border-white/60 shadow-[0_8px_24px_-16px_rgba(47,38,29,0.3)] lg:sticky lg:top-24 lg:h-[620px]">
+        <div role="region" aria-label={tr('Carte des adresses. La liste qui suit présente les mêmes lieux.', 'خريطة العناوين. القائمة التالية تعرض نفس الأماكن.')} className="relative z-0 h-[55vh] min-h-[340px] overflow-hidden rounded-2xl border border-canvas-line shadow-[0_8px_24px_-16px_rgba(47,38,29,0.3)] lg:sticky lg:top-24 lg:h-[620px]">
           <MapContainer center={TUNISIA_CENTER} zoom={TUNISIA_ZOOM} scrollWheelZoom className="h-full w-full">
             <FlyTo target={flyTarget} />
             <TileLayer
@@ -373,7 +373,7 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
           <button
             type="button"
             onClick={resetView}
-            className="absolute end-3 top-3 z-[500] flex h-11 w-11 items-center justify-center rounded-lg border border-canvas-line bg-canvas-paper text-ink shadow-sm hover:bg-white"
+            className="glass glass-control absolute end-3 top-3 z-[500] w-11 px-0"
             aria-label={tr('Revoir toute la Tunisie', 'عرض كامل تونس')}
             title={tr('Revoir toute la Tunisie', 'عرض كامل تونس')}
           >
@@ -423,7 +423,7 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
                 return (
                   <li
                     key={spot._id}
-                    className={`overflow-hidden rounded-xl border bg-white transition-colors ${
+                    className={`overflow-hidden rounded-xl border bg-canvas-paper transition-colors ${
                       active ? 'border-ink ring-1 ring-ink' : 'border-canvas-line hover:border-ink-faint'
                     }`}
                   >

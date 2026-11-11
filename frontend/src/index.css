@@ -2,22 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Liquid Glass, after iOS 26. Two layers:
+ *  - Functional layer (floats above the page): the tab bar, the top-bar buttons, menus, sheets and
+ *    map controls are glass.
+ *  - Content layer (scrolls underneath): pages, cards, lists and fields are plain surfaces. No glass here,
+ *    and never glass on glass.
+ * Bars stay monochrome; colour is kept for the one primary action (orange), the current tab (sage)
+ * and the three verdicts.
+ */
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
   }
 
   body {
-    @apply bg-canvas text-ink font-sans antialiased;
+    @apply bg-canvas font-sans text-ink antialiased;
     font-size: 16px;
-    line-height: 1.55;
-    /* Soft daylight on the sand: sage from the top, a warm orange glow low down.
-       Gives the glass something to bend. */
+    line-height: 1.5;
+    letter-spacing: -0.006em;
+    /* A breath of the brand colours in the ground, so the glass has something to pick up */
     background-image:
-      radial-gradient(60rem 40rem at 0% -10%, rgba(139, 168, 80, 0.28), transparent 60%),
-      radial-gradient(50rem 36rem at 105% 15%, rgba(243, 240, 230, 0.75), transparent 60%),
-      radial-gradient(48rem 32rem at 90% 110%, rgba(255, 138, 65, 0.18), transparent 60%);
+      radial-gradient(52rem 34rem at 8% -12%, var(--wash-sage), transparent 62%),
+      radial-gradient(44rem 30rem at 100% 108%, var(--wash-orange), transparent 60%);
     background-attachment: fixed;
+  }
+
+  [dir='rtl'] body {
+    letter-spacing: 0;
   }
 
   h1,
@@ -28,7 +41,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid #2f261d;
+    outline: 2px solid rgb(var(--c-ink));
     outline-offset: 2px;
   }
 
@@ -38,33 +51,34 @@
   }
 
   ::selection {
-    background: #ff8a41;
-    color: #2f261d;
+    background: rgba(255, 138, 65, 0.4);
+    color: rgb(var(--c-ink));
   }
 
   input::placeholder,
   textarea::placeholder {
-    color: #7a6a58;
+    color: rgb(var(--c-placeholder));
     opacity: 1;
   }
 }
 
 @layer components {
-  /* Liquid glass: a blurred, brightened pane of the page behind, with a light rim
-     on top and a soft shadow under. Used for the dock, the scrolled top bar and the lens. */
+  /* ---------- Functional layer: glass ---------- */
+
+  /* Regular glass: the page behind, blurred and brightened, under a specular rim.
+     Everything placed on it is a plain fill or text, never another pane of glass. */
   .glass {
     position: relative;
     isolation: isolate;
-    background: linear-gradient(180deg, rgba(250, 248, 241, 0.62), rgba(230, 225, 207, 0.48));
-    -webkit-backdrop-filter: blur(22px) saturate(180%);
-    backdrop-filter: blur(22px) saturate(180%);
+    background: var(--glass-fill);
+    -webkit-backdrop-filter: var(--glass-filter);
+    backdrop-filter: var(--glass-filter);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.85),
-      inset 0 -1px 0 rgba(117, 100, 82, 0.12),
-      0 10px 30px -8px rgba(47, 38, 29, 0.28),
-      0 2px 6px rgba(47, 38, 29, 0.08);
+      inset 0 1px 0 var(--glass-spec),
+      inset 0 -1px 0 var(--glass-low),
+      var(--glass-shadow);
   }
-  /* Specular rim: bright on the top-left edge, fading out by the bottom-right */
+  /* The rim: bright where the light lands (top-left), darker where it leaves (bottom-right) */
   .glass::before {
     content: '';
     position: absolute;
@@ -72,95 +86,139 @@
     z-index: -1;
     border-radius: inherit;
     padding: 1px;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.15) 40%, rgba(117, 100, 82, 0.18) 100%);
+    background: var(--glass-rim);
     -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
     pointer-events: none;
   }
-  .glass-bar {
-    background: rgba(219, 213, 191, 0.6);
-    -webkit-backdrop-filter: blur(18px) saturate(170%);
-    backdrop-filter: blur(18px) saturate(170%);
-    box-shadow: inset 0 -1px 0 rgba(194, 185, 156, 0.7), 0 6px 24px -12px rgba(47, 38, 29, 0.25);
-  }
-  /* The active-tab lens: orange droplet with a highlight across its top */
-  .glass-lens {
-    background:
-      radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, 0.55), transparent 55%),
-      linear-gradient(180deg, #ffa066, #ff8a41);
+  /* Larger panes (sheets, menus) are more opaque so long text stays readable */
+  .glass-thick {
+    background: var(--glass-thick-fill);
+    -webkit-backdrop-filter: blur(36px) saturate(180%);
+    backdrop-filter: blur(36px) saturate(180%);
     box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.8),
-      inset 0 -2px 4px rgba(154, 69, 16, 0.25),
-      0 4px 12px -2px rgba(255, 138, 65, 0.55);
+      inset 0 1px 0 var(--glass-spec),
+      var(--glass-thick-shadow);
   }
+  /* Tinted glass: the single primary action in a bar */
+  .glass-tint {
+    background: linear-gradient(180deg, rgba(255, 158, 97, 0.96), rgba(255, 138, 65, 0.92));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.6),
+      inset 0 -1px 0 rgba(134, 59, 13, 0.18),
+      0 8px 22px -8px rgba(255, 138, 65, 0.75),
+      0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  /* A glass control answers the touch: it gives slightly, then springs back */
+  .glass-control {
+    @apply inline-flex h-11 min-w-11 items-center justify-center gap-2 whitespace-nowrap rounded-full px-3 text-[15px] font-medium text-ink;
+    transition: transform 320ms cubic-bezier(0.3, 1.5, 0.5, 1), filter 200ms ease-out;
+  }
+  .glass-control:hover {
+    filter: brightness(1.04);
+  }
+  .glass-control:active {
+    transform: scale(0.94);
+  }
+  /* The selected tab: a soft fill inside the bar (a fill, not a second pane of glass) */
+  .tab-lens {
+    background: var(--lens);
+  }
+
+  /* Scroll edge: content softens and fades as it slides under the floating controls */
+  .scroll-edge-top {
+    background: linear-gradient(180deg, rgb(var(--c-ground) / 0.7) 0%, rgb(var(--c-ground) / 0.35) 55%, rgb(var(--c-ground) / 0) 100%);
+    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px);
+    -webkit-mask-image: linear-gradient(180deg, #000 45%, transparent 100%);
+    mask-image: linear-gradient(180deg, #000 45%, transparent 100%);
+  }
+  .scroll-edge-bottom {
+    background: linear-gradient(0deg, rgb(var(--c-ground) / 0.75) 0%, rgb(var(--c-ground) / 0.35) 55%, rgb(var(--c-ground) / 0) 100%);
+    -webkit-backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px);
+    -webkit-mask-image: linear-gradient(0deg, #000 40%, transparent 100%);
+    mask-image: linear-gradient(0deg, #000 40%, transparent 100%);
+  }
+
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .glass,
-    .glass-bar {
-      background: #e6e1cf;
+    .glass-thick {
+      background: var(--glass-solid);
     }
   }
 
-  /* Buttons */
+  /* ---------- Content layer: plain surfaces ---------- */
+
+  /* Buttons are capsules */
   .btn {
-    @apply inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition-[background-color,box-shadow,transform] active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full px-5 py-2.5 text-[15px] font-medium transition-[background-color,transform,filter] active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45;
   }
   .btn-primary {
-    @apply btn bg-accent text-ink hover:bg-[#F27A2E];
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 4px 14px -4px rgba(255, 138, 65, 0.6);
+    @apply btn bg-accent font-semibold text-onbright hover:brightness-[1.04];
   }
   .btn-quiet {
-    @apply btn border border-white/60 bg-canvas-paper/70 text-ink backdrop-blur hover:bg-canvas-paper;
-    box-shadow: 0 1px 2px rgba(47, 38, 29, 0.06);
+    @apply btn bg-ink/[0.07] text-ink hover:bg-ink/[0.11];
   }
   .btn-ghost {
-    @apply btn text-ink-soft hover:bg-canvas-paper/60 hover:text-ink;
+    @apply btn text-ink-soft hover:bg-ink/[0.06] hover:text-ink;
   }
   .btn-danger {
-    @apply btn bg-status-unsafe text-white hover:bg-status-unsafe-ink;
+    @apply btn bg-status-unsafe font-semibold text-white hover:brightness-90;
   }
 
   /* Form fields */
   .field {
-    @apply w-full rounded-xl border border-canvas-line/70 bg-canvas-paper/80 px-3.5 py-2.5 text-[15px] text-ink transition-[border-color,box-shadow] focus:border-accent focus:outline-none focus:ring-0;
+    @apply w-full rounded-xl border border-canvas-edge/80 bg-canvas-paper px-4 py-2.5 text-base text-ink transition-[border-color,box-shadow] focus:border-accent focus:outline-none focus:ring-0;
+  }
+  /* The page draws its own clear button */
+  .field[type='search']::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
   }
   .field:focus {
-    box-shadow: 0 0 0 4px rgba(255, 138, 65, 0.18);
+    box-shadow: 0 0 0 4px rgba(255, 138, 65, 0.22);
   }
   .field-label {
-    @apply mb-1.5 block text-sm font-medium text-ink;
+    @apply mb-1.5 block text-sm font-medium text-ink-soft;
   }
 
-  /* Panels: frosted sheets instead of boxed cards */
+  /* Cards: white on the ground, as in a grouped list. No glass. */
   .panel {
-    @apply rounded-2xl border border-white/50 bg-canvas-raised/60 backdrop-blur-sm;
-    box-shadow: 0 1px 2px rgba(47, 38, 29, 0.04), 0 8px 24px -16px rgba(47, 38, 29, 0.2);
+    @apply rounded-2xl bg-canvas-paper;
+    box-shadow: 0 0 0 1px var(--hairline), 0 1px 2px rgba(0, 0, 0, 0.03);
   }
 
   /* Toggle chips (filters) */
   .chip {
-    @apply inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-full border border-white/60 bg-canvas-paper/60 px-3.5 py-1.5 text-sm text-ink-soft transition-colors hover:text-ink;
+    @apply inline-flex min-h-10 items-center gap-1.5 whitespace-nowrap rounded-full bg-canvas-paper px-4 py-1.5 text-[15px] text-ink-soft transition-colors hover:text-ink;
+    box-shadow: inset 0 0 0 1px var(--chip-line);
   }
   .chip[aria-pressed='true'] {
-    @apply border-ink bg-ink text-canvas-paper;
+    @apply bg-ink font-medium text-canvas-paper;
+    box-shadow: none;
   }
 
-  /* Page heading block */
+  /* Page heading block: a large title, as on iOS */
   .page-title {
-    @apply text-[2rem] font-semibold leading-[1.1] tracking-[-0.03em] sm:text-[2.75rem];
+    @apply text-[2.125rem] font-bold leading-[1.12] tracking-[-0.025em] sm:text-[2.75rem];
+  }
+  [dir='rtl'] .page-title {
+    @apply leading-[1.4] tracking-normal;
   }
   .page-lede {
-    @apply mt-3 max-w-[62ch] text-[15px] text-ink-soft sm:text-base;
+    @apply mt-2.5 max-w-[60ch] text-[17px] leading-relaxed text-ink-soft;
   }
 }
 
 @layer base {
   /* Distance pages slide when switching tabs; mirrored in Arabic */
   :root {
-    --page-shift: 28px;
+    --page-shift: 24px;
   }
   [dir='rtl'] {
-    --page-shift: -28px;
+    --page-shift: -24px;
   }
 }
 
@@ -173,33 +231,104 @@
   }
 }
 
-/* Leaflet */
+/* Leaflet: the map is content, its controls float above it and are glass */
 .leaflet-container {
   width: 100%;
   height: 100%;
   font-family: inherit;
-  background: #cfc8af;
+  background: rgb(var(--c-sunk));
+}
+
+/* Only the map imagery is recoloured in dark; the markers and controls above it are not */
+.leaflet-tile-pane {
+  filter: var(--map-tiles);
+}
+
+.leaflet-touch .leaflet-bar,
+.leaflet-bar {
+  overflow: hidden;
+  border: 0;
+  border-radius: 9999px;
+  background: var(--glass-fill);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  box-shadow:
+    inset 0 1px 0 var(--glass-spec),
+    var(--glass-shadow);
+}
+.leaflet-touch .leaflet-bar a,
+.leaflet-bar a {
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+  border: 0;
+  background: transparent;
+  color: rgb(var(--c-ink));
+  font-weight: 400;
+}
+.leaflet-bar a:hover,
+.leaflet-bar a:focus {
+  background: var(--lens);
+}
+.leaflet-bar a.leaflet-disabled {
+  background: transparent;
+  color: rgb(var(--c-ink-faint) / 0.6);
 }
 
 .leaflet-popup-content-wrapper {
-  background: #f3f0e6;
-  color: #2f261d;
-  border-radius: 14px;
-  box-shadow: 0 6px 20px rgba(47, 38, 29, 0.18);
+  background: rgb(var(--c-paper));
+  color: rgb(var(--c-ink));
+  border-radius: 18px;
+  box-shadow: 0 14px 34px -12px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .leaflet-popup-content {
-  margin: 12px 14px;
+  margin: 14px 16px;
   line-height: 1.45;
 }
 
 .leaflet-popup-tip {
-  background: #f3f0e6;
+  background: rgb(var(--c-paper));
 }
 
 .cs-marker {
   background: none;
   border: none;
+}
+
+/* People who ask for less transparency get frosted, near-opaque panes */
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .glass-thick,
+  .leaflet-bar {
+    background: var(--glass-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .scroll-edge-top,
+  .scroll-edge-bottom {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* People who ask for more contrast get solid panes with a visible edge */
+@media (prefers-contrast: more) {
+  .glass,
+  .glass-thick,
+  .leaflet-bar {
+    background: rgb(var(--c-paper));
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: 0 0 0 1.5px rgb(var(--c-ink));
+  }
+  .glass::before {
+    display: none;
+  }
+  .tab-lens {
+    background: transparent;
+    box-shadow: inset 0 0 0 2px rgb(var(--c-ink));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

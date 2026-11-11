@@ -151,7 +151,7 @@ function ReportForm({ target, lang, onDone }) {
         <div className="space-y-1.5">
           {reasons.map((r) => (
             <label key={r} className="flex cursor-pointer items-start gap-3 rounded-xl border border-canvas-line/70 bg-canvas-paper/70 px-3.5 py-2.5 text-[15px] has-[:checked]:border-ink">
-              <input type="radio" name="report-reason" value={r} checked={reason === r} onChange={() => setReason(r)} className="mt-1 accent-[#4E6127]" />
+              <input type="radio" name="report-reason" value={r} checked={reason === r} onChange={() => setReason(r)} className="mt-1 accent-[#4F6B1C]" />
               <span>{tr(...REASONS[r])}</span>
             </label>
           ))}
