@@ -117,10 +117,10 @@ function AppShell() {
   // Document language, direction, title and description follow the page and the language
   useEffect(() => {
     const site = SITE[lang];
-    const [fr, ar] = PAGE_TITLES[activeTab] || PAGE_TITLES.atmc;
+    const [fr, ar] = PAGE_TITLES[activeTab] || PAGE_TITLES.vision;
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
-    document.title = activeTab === 'atmc' ? `${site.name} — ${site.tagline}` : `${lang === 'ar' ? ar : fr} · ${site.name}`;
+    document.title = activeTab === 'vision' ? `${site.name} — ${site.tagline}` : `${lang === 'ar' ? ar : fr} · ${site.name}`;
     setMeta('meta[name="description"]', site.description);
     setMeta('meta[property="og:title"]', `${site.name} — ${site.tagline}`);
     setMeta('meta[property="og:description"]', site.description);

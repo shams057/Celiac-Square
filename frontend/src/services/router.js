@@ -6,8 +6,9 @@ import { useEffect, useState } from 'react';
  * (Vercel serves index.html for every path; see vercel.json.)
  */
 export const ROUTES = {
-  atmc: '/',
-  vision: '/scanner',
+  // The scanner is the landing page; the guide has its own address
+  vision: '/',
+  atmc: '/guide',
   search: '/recherche',
   map: '/carte',
   market: '/marche',
@@ -21,6 +22,9 @@ export const ROUTES = {
   orders: '/mes-commandes',
 };
 
+// Addresses from before the scanner became the home page, kept so old links and bookmarks still work
+const ALIASES = { '/scanner': 'vision' };
+
 const STORE_RE = /^\/marche\/boutique\/([0-9a-f-]{36})\/?$/i;
 
 /** { tab, params, query } for a location */
@@ -29,7 +33,7 @@ export const parseLocation = (loc = window.location) => {
   const query = Object.fromEntries(new URLSearchParams(loc.search));
   const store = STORE_RE.exec(path);
   if (store) return { tab: 'market', params: { storeId: store[1] }, query };
-  const tab = Object.keys(ROUTES).find((key) => ROUTES[key] === path) || 'atmc';
+  const tab = Object.keys(ROUTES).find((key) => ROUTES[key] === path) || ALIASES[path] || 'vision';
   return { tab, params: {}, query };
 };
 

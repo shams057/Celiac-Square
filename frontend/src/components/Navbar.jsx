@@ -39,7 +39,7 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSubmitModal, lan
         <div className="relative mx-auto grid h-[4.5rem] max-w-6xl grid-cols-[1fr_auto] items-center gap-3 px-4 sm:px-6 lg:grid-cols-[1fr_auto_1fr]">
           <button
             type="button"
-            onClick={() => setActiveTab('atmc')}
+            onClick={() => setActiveTab('vision')}
             className="pointer-events-auto flex min-h-11 items-center gap-2.5 justify-self-start rounded-full"
             aria-label={tr('Celiac Square, accueil', 'Celiac Square، الصفحة الرئيسية')}
           >

@@ -18,8 +18,8 @@
     { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Scanner un produit", "short_name": "Scanner", "url": "/scanner", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Guide ATMC", "short_name": "Guide", "url": "/", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Scanner un produit", "short_name": "Scanner", "url": "/", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Guide ATMC", "short_name": "Guide", "url": "/guide", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
     { "name": "Carte des adresses", "short_name": "Carte", "url": "/carte", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
   ]
 }
