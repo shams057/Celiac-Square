@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { t } from './ui';
+import { SegmentedSlider } from './Slider';
 
 /**
  * Drawings and motion for the "Comprendre" page (AboutCeliac.jsx): the scroll reveal,
@@ -64,6 +65,9 @@ export function VilliWindow({ lang }) {
   const tr = t(lang);
   const [gluten, setGluten] = useState(false);
   const [grown, setGrown] = useState(false);
+  const [hint, setHint] = useState(false);
+  const figureRef = useRef(null);
+  const touched = useRef(false);
 
   // The villi grow in when the page opens
   useEffect(() => {
@@ -71,11 +75,43 @@ export function VilliWindow({ lang }) {
     return () => clearTimeout(id);
   }, []);
 
+  // After 2.5 s in view, gluten arrives on its own and the switch glows orange, to show it can be moved.
+  // Only once, and never after the person has used the switch.
+  useEffect(() => {
+    const el = figureRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    let timer;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        clearTimeout(timer);
+        if (!entry.isIntersecting) return;
+        timer = setTimeout(() => {
+          io.disconnect();
+          if (touched.current) return;
+          setGluten(true);
+          setHint(true);
+        }, 2500);
+      },
+      { threshold: 0.6 }
+    );
+    io.observe(el);
+    return () => {
+      clearTimeout(timer);
+      io.disconnect();
+    };
+  }, []);
+
+  const choose = (id) => {
+    touched.current = true;
+    setHint(false);
+    setGluten(id === 'with');
+  };
+
   const heights = gluten ? FLATTENED : HEALTHY;
   const tissue = gluten ? '#DB8468' : '#8BA850';
   const options = [
-    { on: false, fr: 'Sans gluten', ar: 'بدون غلوتين' },
-    { on: true, fr: 'Avec gluten', ar: 'مع الغلوتين' },
+    { id: 'without', fr: 'Sans gluten', ar: 'بدون غلوتين' },
+    { id: 'with', fr: 'Avec gluten', ar: 'مع الغلوتين' },
   ];
   const nutrients = [
     ['Fer', 'حديد'],
@@ -84,7 +120,7 @@ export function VilliWindow({ lang }) {
   ];
 
   return (
-    <figure>
+    <figure ref={figureRef}>
       <div className={`relative aspect-[5/4] overflow-hidden rounded-[2.25rem] transition-colors duration-700 ${gluten ? 'bg-accent-tint' : 'bg-primary-tint'}`}>
         <p className="absolute inset-x-5 top-4 text-sm font-medium text-ink-soft">{tr('L’intestin grêle, vu de très près', 'الأمعاء الدقيقة عن قرب شديد')}</p>
 
@@ -127,7 +163,7 @@ export function VilliWindow({ lang }) {
           ))}
         </div>
         <div
-          className="absolute inset-x-0 bottom-0 flex h-[18%] items-center justify-center text-xs font-medium text-onbright/80 transition-colors duration-700"
+          className="absolute inset-x-0 bottom-0 flex h-[18%] items-center justify-center text-[15px] font-bold tracking-[-0.01em] text-onbright transition-colors duration-700 sm:text-[17px]"
           style={{ backgroundColor: tissue }}
           aria-hidden="true"
         >
@@ -136,23 +172,17 @@ export function VilliWindow({ lang }) {
       </div>
 
       <div className="mt-4 flex justify-center">
-        <div className="inline-flex rounded-full bg-ink/[0.07] p-1" role="radiogroup" aria-label={tr('État de l’intestin', 'حالة الأمعاء')}>
-          {options.map(({ on, fr, ar }) => {
-            const active = gluten === on;
-            return (
-              <button
-                key={fr}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => setGluten(on)}
-                className={`min-h-10 rounded-full px-4 text-[15px] transition-colors ${active ? 'bg-canvas-paper font-semibold text-ink shadow-sm dark:bg-canvas-edge' : 'text-ink-soft hover:text-ink'}`}
-              >
-                {tr(fr, ar)}
-              </button>
-            );
-          })}
-        </div>
+        <SegmentedSlider
+          options={options}
+          value={gluten ? 'with' : 'without'}
+          onChange={choose}
+          hint={hint}
+          ariaLabel={tr('État de l’intestin', 'حالة الأمعاء')}
+          className="inline-flex rounded-full bg-ink/[0.07] p-1"
+          thumbClassName="rounded-full bg-canvas-paper shadow-sm dark:bg-canvas-edge"
+          segmentClassName={(on) => `min-h-10 rounded-full px-4 text-[15px] transition-colors ${on ? 'font-semibold text-ink' : 'text-ink-soft hover:text-ink'}`}
+          renderOption={(o) => tr(o.fr, o.ar)}
+        />
       </div>
 
       <figcaption className="mx-auto mt-3 min-h-[5.5rem] max-w-[46ch] text-center text-[15px] leading-relaxed text-ink-soft" aria-live="polite">

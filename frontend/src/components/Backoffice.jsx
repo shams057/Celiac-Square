@@ -7,6 +7,7 @@ import BackofficeReports from './BackofficeReports';
 import BackofficeOrders from './BackofficeOrders';
 import BackofficeDashboard from './BackofficeDashboard';
 import { t } from './ui';
+import { SegmentedSlider } from './Slider';
 
 // staff: open to the team (STAFF role); the rest is for admins only
 const SECTIONS = [
@@ -42,18 +43,19 @@ export default function Backoffice({ lang }) {
   return (
     <div className="space-y-6">
       {sections.length > 1 && (
-        <div className="flex gap-1 overflow-x-auto scrollbar-none rounded-full bg-canvas-sunk/60 p-1 sm:inline-flex" role="tablist" aria-label={tr('Back-office', 'الإدارة')}>
-          {sections.map(({ id, icon: Icon, fr, ar }) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={section === id}
-              onClick={() => setSection(id)}
-              className={`flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-sm transition-colors ${
-                section === id ? 'bg-canvas-paper font-medium text-ink shadow-sm dark:bg-canvas-edge' : 'text-ink-soft hover:text-ink'
-              }`}
-            >
+        // The bar scrolls sideways on phones, so a swipe on it scrolls; only the selected section is dragged
+        <SegmentedSlider
+          role="tablist"
+          options={sections}
+          value={section}
+          onChange={setSection}
+          grabAnywhere={false}
+          ariaLabel={tr('Back-office', 'الإدارة')}
+          className="flex gap-1 overflow-x-auto scrollbar-none rounded-full bg-canvas-sunk/60 p-1 sm:inline-flex"
+          thumbClassName="rounded-full bg-canvas-paper shadow-sm dark:bg-canvas-edge"
+          segmentClassName={(on) => `flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-sm transition-colors ${on ? 'font-medium text-ink' : 'text-ink-soft hover:text-ink'}`}
+          renderOption={({ id, icon: Icon, fr, ar }) => (
+            <>
               <Icon className="h-4 w-4" />
               {tr(fr, ar)}
               {id === 'reports' && openReports > 0 && (
@@ -62,9 +64,9 @@ export default function Backoffice({ lang }) {
               {id === 'orders' && newOrders > 0 && (
                 <span className="rounded-full bg-status-unsafe px-1.5 text-xs font-medium tabular-nums text-white">{newOrders}</span>
               )}
-            </button>
-          ))}
-        </div>
+            </>
+          )}
+        />
       )}
       {section === 'dashboard' ? (
         <BackofficeDashboard lang={lang} isAdmin={isAdmin} onGo={(id) => sections.some((s) => s.id === id) && setSection(id)} />

@@ -3,6 +3,7 @@ import { UserRound } from 'lucide-react';
 import { logIn, signUp, requestPasswordReset, errorMessage } from '../services/api';
 import { useAuth } from './AuthContext';
 import { t, Notice } from './ui';
+import { SegmentedSlider } from './Slider';
 
 /** Same rule as the API (backend/src/routes/authRoutes.js): 10+ characters, a letter and a digit */
 export const passwordHint = (password, tr) => {
@@ -76,23 +77,20 @@ export default function AuthPanel({ lang, title, lede, onDone }) {
         {mode === 'forgot' ? (
           <p className="mt-2 text-sm text-ink-soft">{tr('Indiquez votre e-mail : vous recevrez un lien pour choisir un nouveau mot de passe.', 'أدخل بريدك الإلكتروني: سيصلك رابط لاختيار كلمة مرور جديدة.')}</p>
         ) : (
-        <div className="mt-6 grid grid-cols-2 gap-1 rounded-full bg-canvas-sunk/60 p-1" role="tablist">
-          {[
-            ['login', tr('Connexion', 'الدخول')],
-            ['signup', tr('Nouveau compte', 'حساب جديد')],
-          ].map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={mode === id}
-              onClick={() => switchTo(id)}
-              className={`rounded-full py-2 text-sm transition-colors ${mode === id ? 'bg-canvas-paper font-medium text-ink shadow-sm dark:bg-canvas-edge' : 'text-ink-soft hover:text-ink'}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <SegmentedSlider
+          role="tablist"
+          options={[
+            { id: 'login', label: tr('Connexion', 'الدخول') },
+            { id: 'signup', label: tr('Nouveau compte', 'حساب جديد') },
+          ]}
+          value={mode}
+          onChange={switchTo}
+          ariaLabel={tr('Se connecter ou créer un compte', 'تسجيل الدخول أو إنشاء حساب')}
+          className="mt-6 grid grid-cols-2 gap-1 rounded-full bg-canvas-sunk/60 p-1"
+          thumbClassName="rounded-full bg-canvas-paper shadow-sm dark:bg-canvas-edge"
+          segmentClassName={(on) => `rounded-full py-2 text-sm transition-colors ${on ? 'font-medium text-ink' : 'text-ink-soft hover:text-ink'}`}
+          renderOption={(o) => o.label}
+        />
         )}
 
         <form onSubmit={submit} className="mt-5 space-y-4">

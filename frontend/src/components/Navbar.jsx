@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { WheatOff, Camera, Search, MapPin, Plus, Languages, ShoppingBag, UserRound, Store, LogOut, BadgePlus, Bookmark, Package, LayoutDashboard } from 'lucide-react';
+import { WheatOff, Camera, Search, MapPin, Plus, Languages, ShoppingBag, UserRound, Store, LogOut, BadgePlus, Bookmark, Package, LayoutDashboard, LogIn, Moon, Sun, SunMoon } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { BrandMark, t } from './ui';
 import { pathFor } from '../services/router';
+import { useSlideSelect, SegmentedSlider } from './Slider';
+import { useTheme } from '../services/theme';
 
 // Plain clicks navigate in the page; Ctrl/Cmd/middle clicks keep the browser's "open in new tab"
 const linkClick = (go, tab) => (e) => {
@@ -92,35 +94,51 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSubmitModal, lan
 
 /**
  * The floating glass tab bar. The bar is monochrome; the current tab is marked by a soft fill
- * that slides to it (a fill inside the glass, not a second pane) and by the sage tint.
+ * (a fill inside the glass, not a second pane) and by the sage tint.
+ * The fill is a real slider: press anywhere on the bar and slide to another tab, it opens on release.
  */
 function TabBar({ activeTab, setActiveTab, lang, placement }) {
   const tr = t(lang);
   const top = placement === 'top';
-  // The scan button carries its own tint, so the sliding fill only marks the other tabs
   const isActive = (tab) => tab.id === activeTab || Boolean(tab.covers?.includes(activeTab));
-  const activeIndex = TABS.findIndex((tab) => isActive(tab) && !tab.primary);
+  const activeIndex = TABS.findIndex(isActive);
+  const { trackRef, segRef, thumbStyle, dragging, current, trackProps } = useSlideSelect({
+    count: TABS.length,
+    // On a page outside the tabs (account, privacy…) a drag starts from the scan button
+    index: activeIndex >= 0 ? activeIndex : TABS.findIndex((tab) => tab.primary),
+    onSelect: (i) => setActiveTab(TABS[i].id),
+    // Links: Tab moves between them, arrows are left to the browser
+    keyboard: false,
+  });
+  // The scan button carries its own tint, so at rest the fill only marks the other tabs
+  const lensShown = dragging || (activeIndex >= 0 && !TABS[activeIndex].primary);
 
   return (
-    <div className={`glass pointer-events-auto relative grid grid-cols-5 rounded-full p-1 ${top ? 'w-[35rem]' : 'w-full max-w-md'}`}>
-      {/* inset-inline-start keeps the fill on the right tab in Arabic */}
-      {activeIndex >= 0 && (
-        <span
-          aria-hidden="true"
-          className="tab-lens absolute inset-y-1 rounded-full transition-[inset-inline-start] duration-500 ease-[cubic-bezier(0.3,1.3,0.5,1)]"
-          style={{ insetInlineStart: `calc(4px + ${activeIndex} * (100% - 8px) / ${TABS.length})`, width: `calc((100% - 8px) / ${TABS.length})` }}
-        />
-      )}
-      {TABS.map((tab) => {
+    <div
+      ref={trackRef}
+      className={`slider-track slider-grab glass pointer-events-auto relative grid grid-cols-5 rounded-full p-1 ${top ? 'w-[35rem]' : 'w-full max-w-md'}`}
+      {...trackProps}
+    >
+      <span
+        aria-hidden="true"
+        data-dragging={dragging}
+        className="tab-lens slider-thumb rounded-full"
+        style={{ ...thumbStyle, ...(lensShown ? null : { opacity: 0 }) }}
+      />
+      {TABS.map((tab, i) => {
         const { id, icon: Icon, fr, ar, primary } = tab;
-        const active = isActive(tab);
+        // While sliding, the tab under the finger is the one shown as selected
+        const active = dragging ? i === current : isActive(tab);
+        const ariaCurrent = activeTab === id ? 'page' : isActive(tab) ? 'true' : undefined;
         if (primary) {
           return (
             <a
               key={id}
+              ref={segRef(i)}
               href={pathFor(id)}
+              draggable={false}
               onClick={linkClick(setActiveTab, id)}
-              aria-current={active ? 'page' : undefined}
+              aria-current={ariaCurrent}
               className={`relative flex items-center justify-center rounded-full ${
                 top ? 'h-10' : `flex-col gap-0.5 pb-1.5 text-[11px] font-semibold leading-tight ${active ? 'text-primary-dark' : 'text-ink'}`
               }`}
@@ -135,7 +153,7 @@ function TabBar({ activeTab, setActiveTab, lang, placement }) {
                   <span
                     className={`glass-tint -mt-8 flex h-[4.25rem] w-[4.25rem] items-center justify-center rounded-full text-onbright transition-transform active:scale-95 ${
                       active ? 'ring-4 ring-primary-dark/30' : ''
-                    }`}
+                    } ${dragging && active ? 'scale-105' : ''}`}
                   >
                     <Icon aria-hidden="true" className="h-8 w-8" strokeWidth={2.25} />
                   </span>
@@ -148,9 +166,11 @@ function TabBar({ activeTab, setActiveTab, lang, placement }) {
         return (
           <a
             key={id}
+            ref={segRef(i)}
             href={pathFor(id)}
+            draggable={false}
             onClick={linkClick(setActiveTab, id)}
-            aria-current={activeTab === id ? 'page' : active ? 'true' : undefined}
+            aria-current={ariaCurrent}
             className={`relative flex items-center justify-center rounded-full transition-colors ${
               top ? 'h-10 text-[15px]' : 'flex-col gap-0.5 py-1.5 text-[11px] leading-tight'
             } ${active ? 'font-semibold text-primary-dark' : 'font-medium text-ink'}`}
@@ -164,106 +184,158 @@ function TabBar({ activeTab, setActiveTab, lang, placement }) {
   );
 }
 
-/** Sign-in button, or the signed-in account's menu */
+const THEMES = [
+  { id: 'auto', icon: SunMoon, fr: 'Auto', ar: 'تلقائي' },
+  { id: 'light', icon: Sun, fr: 'Clair', ar: 'فاتح' },
+  { id: 'dark', icon: Moon, fr: 'Sombre', ar: 'داكن' },
+];
+
+/** Appearance: follow the device, or always light, or always dark */
+function ThemeSwitch({ lang }) {
+  const tr = t(lang);
+  const [choice, choose] = useTheme();
+  return (
+    <div className="px-1 pb-1 pt-1.5">
+      <p aria-hidden="true" className="px-2 pb-2 text-sm font-medium text-ink-soft">
+        {tr('Apparence', 'المظهر')}
+      </p>
+      <SegmentedSlider
+        options={THEMES}
+        value={choice}
+        onChange={choose}
+        ariaLabel={tr('Apparence', 'المظهر')}
+        className="grid grid-cols-3 rounded-full bg-ink/[0.07] p-1"
+        thumbClassName="rounded-full bg-canvas-paper shadow-sm dark:bg-canvas-edge"
+        segmentClassName={(on) => `flex min-h-9 items-center justify-center gap-1.5 rounded-full px-2 text-sm transition-colors ${on ? 'font-medium text-ink' : 'text-ink-soft hover:text-ink'}`}
+        renderOption={({ icon: Icon, fr, ar }) => (
+          <>
+            <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+            {tr(fr, ar)}
+          </>
+        )}
+      />
+    </div>
+  );
+}
+
+/**
+ * The profile button and its menu: account pages when signed in, sign-in otherwise,
+ * and the appearance switch for everyone.
+ */
 function AccountMenu({ lang, go }) {
   const tr = t(lang);
   const { user, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const buttonRef = useRef(null);
 
   useEffect(() => {
     if (!open) return undefined;
     const onDown = (e) => !ref.current?.contains(e.target) && setOpen(false);
-    const onKey = (e) => e.key === 'Escape' && setOpen(false);
-    document.addEventListener('mousedown', onDown);
+    const onKey = (e) => {
+      if (e.key !== 'Escape') return;
+      setOpen(false);
+      buttonRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', onDown);
     document.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('pointerdown', onDown);
       document.removeEventListener('keydown', onKey);
     };
   }, [open]);
-
-  if (!user) {
-    return (
-      <button type="button" onClick={() => go('account')} className="glass glass-control w-11 px-0" aria-label={tr('Se connecter', 'تسجيل الدخول')} title={tr('Se connecter', 'تسجيل الدخول')}>
-        <UserRound className="h-[18px] w-[18px]" aria-hidden="true" />
-      </button>
-    );
-  }
 
   const choose = (tab) => {
     setOpen(false);
     go(tab);
   };
-  const initial = (user.fullName || user.email || '?').trim().charAt(0).toUpperCase();
-  const [roleFr, roleAr] = ROLE_LABELS[user.role] || ROLE_LABELS.CLIENT;
+  const initial = user ? (user.fullName || user.email || '?').trim().charAt(0).toUpperCase() : null;
+  const [roleFr, roleAr] = (user && ROLE_LABELS[user.role]) || ROLE_LABELS.CLIENT;
   const item = 'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-start text-[15px] text-ink hover:bg-ink/[0.06]';
+  const divider = <div className="mx-3 my-1 border-t border-ink/10" />;
 
   return (
     <div ref={ref} className="relative">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={tr('Mon compte', 'حسابي')}
-        className="glass glass-control w-11 px-0 text-base font-semibold"
+        aria-controls="account-menu"
+        aria-label={user ? tr('Mon compte', 'حسابي') : tr('Compte et apparence', 'الحساب والمظهر')}
+        title={user ? undefined : tr('Compte et apparence', 'الحساب والمظهر')}
+        className={`glass glass-control w-11 px-0 ${user ? 'text-base font-semibold' : ''}`}
       >
-        {initial}
+        {user ? initial : <UserRound className="h-[18px] w-[18px]" aria-hidden="true" />}
       </button>
       {open && (
-        <div role="menu" className="glass glass-thick absolute end-0 top-[3.25rem] w-64 animate-pop-in rounded-3xl p-2">
-          <div className="px-3 pb-2 pt-1.5">
-            <p className="truncate font-medium">{user.fullName || user.email}</p>
-            <p className="truncate text-xs text-ink-soft" dir="ltr">{user.email}</p>
-            <p className="mt-1.5 inline-block rounded-full bg-ink/[0.07] px-2 py-0.5 text-xs font-medium text-ink-soft">{tr(roleFr, roleAr)}</p>
-          </div>
-          <div className="mx-3 my-1 border-t border-ink/10" />
-          {(user.role === 'ADMIN' || user.role === 'STAFF') && (
+        <div id="account-menu" className="glass glass-thick absolute end-0 top-[3.25rem] w-72 animate-pop-in rounded-3xl p-2">
+          {user ? (
             <>
-              <button type="button" role="menuitem" className={`${item} font-medium`} onClick={() => choose('backoffice')}>
-                <LayoutDashboard className="h-4 w-4 text-ink-soft" aria-hidden="true" />
-                {tr('Back-office et tableau de bord', 'الإدارة ولوحة القيادة')}
+              <div className="px-3 pb-2 pt-1.5">
+                <p className="truncate font-medium">{user.fullName || user.email}</p>
+                <p className="truncate text-xs text-ink-soft" dir="ltr">{user.email}</p>
+                <p className="mt-1.5 inline-block rounded-full bg-ink/[0.07] px-2 py-0.5 text-xs font-medium text-ink-soft">{tr(roleFr, roleAr)}</p>
+              </div>
+              {divider}
+              {(user.role === 'ADMIN' || user.role === 'STAFF') && (
+                <>
+                  <button type="button" className={`${item} font-medium`} onClick={() => choose('backoffice')}>
+                    <LayoutDashboard className="h-4 w-4 text-ink-soft" aria-hidden="true" />
+                    {tr('Back-office et tableau de bord', 'الإدارة ولوحة القيادة')}
+                  </button>
+                  {divider}
+                </>
+              )}
+              <button type="button" className={item} onClick={() => choose('saved')}>
+                <Bookmark className="h-4 w-4 text-ink-soft" aria-hidden="true" />
+                {tr('Mes produits et scans', 'منتجاتي وعمليات المسح')}
               </button>
-              <div className="mx-3 my-1 border-t border-ink/10" />
+              <button type="button" className={item} onClick={() => choose('account')}>
+                <UserRound className="h-4 w-4 text-ink-soft" aria-hidden="true" />
+                {tr('Mon profil', 'ملفي الشخصي')}
+              </button>
+              <button type="button" className={item} onClick={() => choose('orders')}>
+                <Package className="h-4 w-4 text-ink-soft" aria-hidden="true" />
+                {tr('Mes commandes', 'طلباتي')}
+              </button>
+              {(user.role === 'SELLER' || user.role === 'ADMIN') && (
+                <button type="button" className={item} onClick={() => choose('seller')}>
+                  <Store className="h-4 w-4 text-ink-soft" aria-hidden="true" />
+                  {tr('Ma boutique', 'محلي')}
+                </button>
+              )}
+              {user.role === 'CLIENT' && (
+                <button type="button" className={item} onClick={() => choose('become-seller')}>
+                  <BadgePlus className="h-4 w-4 text-ink-soft" aria-hidden="true" />
+                  {tr('Devenir vendeur', 'كن بائعا')}
+                </button>
+              )}
+            </>
+          ) : (
+            <button type="button" className={`${item} font-medium`} onClick={() => choose('account')}>
+              <LogIn className="h-4 w-4 text-ink-soft rtl:rotate-180" aria-hidden="true" />
+              {tr('Se connecter ou créer un compte', 'تسجيل الدخول أو إنشاء حساب')}
+            </button>
+          )}
+          {divider}
+          <ThemeSwitch lang={lang} />
+          {user && (
+            <>
+              {divider}
+              <button
+                type="button"
+                className={item}
+                onClick={async () => {
+                  setOpen(false);
+                  await signOut();
+                }}
+              >
+                <LogOut className="h-4 w-4 text-ink-soft rtl:rotate-180" aria-hidden="true" />
+                {tr('Se déconnecter', 'تسجيل الخروج')}
+              </button>
             </>
           )}
-          <button type="button" role="menuitem" className={item} onClick={() => choose('saved')}>
-            <Bookmark className="h-4 w-4 text-ink-soft" aria-hidden="true" />
-            {tr('Mes produits et scans', 'منتجاتي وعمليات المسح')}
-          </button>
-          <button type="button" role="menuitem" className={item} onClick={() => choose('account')}>
-            <UserRound className="h-4 w-4 text-ink-soft" aria-hidden="true" />
-            {tr('Mon profil', 'ملفي الشخصي')}
-          </button>
-          <button type="button" role="menuitem" className={item} onClick={() => choose('orders')}>
-            <Package className="h-4 w-4 text-ink-soft" aria-hidden="true" />
-            {tr('Mes commandes', 'طلباتي')}
-          </button>
-          {(user.role === 'SELLER' || user.role === 'ADMIN') && (
-            <button type="button" role="menuitem" className={item} onClick={() => choose('seller')}>
-              <Store className="h-4 w-4 text-ink-soft" aria-hidden="true" />
-              {tr('Ma boutique', 'محلي')}
-            </button>
-          )}
-          {user.role === 'CLIENT' && (
-            <button type="button" role="menuitem" className={item} onClick={() => choose('become-seller')}>
-              <BadgePlus className="h-4 w-4 text-ink-soft" aria-hidden="true" />
-              {tr('Devenir vendeur', 'كن بائعا')}
-            </button>
-          )}
-          <button
-            type="button"
-            role="menuitem"
-            className={item}
-            onClick={async () => {
-              setOpen(false);
-              await signOut();
-            }}
-          >
-            <LogOut className="h-4 w-4 text-ink-soft" aria-hidden="true" />
-            {tr('Se déconnecter', 'تسجيل الخروج')}
-          </button>
         </div>
       )}
     </div>

@@ -7,6 +7,7 @@ import { detectBarcode, preloadBarcodeReader } from '../services/barcode';
 import { addToHistory } from '../services/history';
 import { navigate, pathFor } from '../services/router';
 import { t, statusKind, STATUS, StatusTile, PageHead, Notice } from './ui';
+import { SegmentedSlider } from './Slider';
 import { SourceLine, SaveButton, ReportButton, productTargetType, productTargetId } from './community';
 
 // Phone photos are often 4–12 MB: they are shrunk before reading, and again (1280 px JPEG) before upload
@@ -381,28 +382,23 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
       />
 
       {/* Mode switch */}
-      <div className="grid grid-cols-2 gap-2 rounded-2xl border border-canvas-line bg-canvas-raised/60 p-1" role="tablist" aria-label={tr('Type de scan', 'نوع المسح')}>
-        {Object.entries(MODES).map(([id, m]) => {
-          const Icon = m.icon;
-          const active = mode === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              onClick={() => switchMode(id)}
-              disabled={Boolean(busy)}
-              className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors sm:text-[15px] ${
-                active ? 'bg-ink font-medium text-canvas-paper shadow-sm' : 'text-ink-soft hover:text-ink'
-              }`}
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {tr(m.fr, m.ar)}
-            </button>
-          );
-        })}
-      </div>
+      <SegmentedSlider
+        role="tablist"
+        options={Object.entries(MODES).map(([id, m]) => ({ id, ...m }))}
+        value={mode}
+        onChange={switchMode}
+        disabled={Boolean(busy)}
+        ariaLabel={tr('Type de scan', 'نوع المسح')}
+        className="grid grid-cols-2 gap-2 rounded-2xl border border-canvas-line bg-canvas-raised/60 p-1"
+        thumbClassName="rounded-lg bg-ink shadow-sm"
+        segmentClassName={(on) => `flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm transition-colors disabled:cursor-not-allowed sm:text-[15px] ${on ? 'font-medium text-canvas-paper' : 'text-ink-soft hover:text-ink'}`}
+        renderOption={({ icon: Icon, fr, ar }) => (
+          <>
+            <Icon className="h-4 w-4 shrink-0" />
+            {tr(fr, ar)}
+          </>
+        )}
+      />
 
       <div className="grid items-start gap-6 lg:grid-cols-[1.15fr_1fr] lg:gap-8">
         {/* Capture */}
