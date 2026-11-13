@@ -210,6 +210,70 @@
   .page-lede {
     @apply mt-2.5 max-w-[60ch] text-[17px] leading-relaxed text-ink-soft;
   }
+  /* Section heading on long pages (the "Comprendre" page) */
+  .section-title {
+    @apply text-[1.75rem] font-bold leading-[1.15] tracking-[-0.022em] sm:text-[2.25rem];
+  }
+  [dir='rtl'] .section-title {
+    @apply leading-[1.45] tracking-normal;
+  }
+
+  /* ---------- Scroll reveal (components/celiacArt.jsx) ---------- */
+
+  /* Hidden until it scrolls into view, then it settles in place, once */
+  .reveal {
+    opacity: 0;
+    transition:
+      opacity 520ms ease-out,
+      transform 680ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+  .reveal[data-reveal='rise'] {
+    transform: translateY(26px);
+  }
+  .reveal[data-reveal='pop'] {
+    transform: scale(0.8);
+  }
+  /* From its own side of the page; --page-shift is negative in Arabic */
+  .reveal[data-reveal='start'] {
+    transform: translateX(calc(var(--page-shift) * -1.75));
+  }
+  .reveal[data-reveal='end'] {
+    transform: translateX(calc(var(--page-shift) * 1.75));
+  }
+  .reveal.is-shown {
+    opacity: 1;
+    transform: none;
+  }
+  /* The verdict lands on a food tile after the tile has appeared */
+  .reveal .stamp {
+    transform: scale(0) rotate(-24deg);
+    transition: transform 460ms cubic-bezier(0.3, 1.7, 0.5, 1);
+    transition-delay: calc(var(--reveal-delay, 0ms) + 420ms);
+  }
+  .reveal.is-shown .stamp {
+    transform: none;
+  }
+
+  /* Villi: they shrink under gluten and spring back without it */
+  .villus {
+    width: 9.5%;
+    border-radius: 999px 999px 0 0;
+    transition:
+      height 900ms cubic-bezier(0.3, 1.35, 0.5, 1),
+      background-color 600ms ease-out;
+  }
+  .grain {
+    animation: grain-drift 3.6s ease-in-out infinite alternate;
+  }
+  @keyframes grain-drift {
+    from {
+      translate: 0 -3px;
+    }
+    to {
+      translate: 0 4px;
+    }
+  }
 }
 
 @layer base {
@@ -339,5 +403,11 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  /* Nothing waits off-screen to be revealed */
+  .reveal,
+  .reveal .stamp {
+    opacity: 1;
+    transform: none;
   }
 }

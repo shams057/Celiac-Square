@@ -4,6 +4,7 @@ import Navbar from './components/Navbar';
 import VisionScanner from './components/VisionScanner';
 import ProductSearch from './components/ProductSearch';
 import AtmcCatalog from './components/AtmcCatalog';
+import AboutCeliac from './components/AboutCeliac';
 import TunisiaMap from './components/TunisiaMap';
 import Marketplace from './components/Marketplace';
 import AuthPanel from './components/AuthPanel';
@@ -23,10 +24,11 @@ import { WifiOff } from 'lucide-react';
 import { AuthProvider, useAuth } from './components/AuthContext';
 import { navigate, pathFor, useRoute } from './services/router';
 
-// Dock tabs first, then pages reached from the account menu and the footer
-const TAB_ORDER = ['atmc', 'search', 'vision', 'map', 'market', 'account', 'reset-password', 'seller', 'become-seller', 'backoffice', 'privacy', 'saved', 'orders'];
+// Dock tabs first (the guide sits behind the search tab), then pages reached from the account menu and the footer
+const TAB_ORDER = ['learn', 'search', 'atmc', 'vision', 'map', 'market', 'account', 'reset-password', 'seller', 'become-seller', 'backoffice', 'privacy', 'saved', 'orders'];
 
 const PAGE_TITLES = {
+  learn: ['Comprendre la maladie cœliaque', 'افهم مرض الأبطن'],
   atmc: ['Guide ATMC', 'دليل الجمعية'],
   vision: ['Scanner un produit', 'امسح منتجا'],
   search: ['Rechercher un produit', 'ابحث عن منتج'],
@@ -155,6 +157,10 @@ function AppShell() {
     switch (activeTab) {
       case 'vision':
         return <VisionScanner onSwitchToSearch={handleSwitchToSearch} lang={lang} />;
+      case 'learn':
+        return <AboutCeliac lang={lang} />;
+      case 'atmc':
+        return <AtmcCatalog lang={lang} />;
       case 'search':
         return <ProductSearch initialQuery={route.query.q || ''} lang={lang} />;
       case 'map':
@@ -185,7 +191,7 @@ function AppShell() {
       case 'orders':
         return <MyOrders lang={lang} />;
       default:
-        return <AtmcCatalog lang={lang} />;
+        return <VisionScanner onSwitchToSearch={handleSwitchToSearch} lang={lang} />;
     }
   })();
 

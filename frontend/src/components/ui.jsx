@@ -1,8 +1,27 @@
 import React from 'react';
 import { Check, X, TriangleAlert, HelpCircle, LoaderCircle, SlidersHorizontal, UtensilsCrossed, Croissant, Coffee, Palette } from 'lucide-react';
+import { navigate, pathFor } from '../services/router';
 
 // Translation helper: t(lang)('Français', 'العربية')
 export const t = (lang) => (fr, ar) => (lang === 'ar' ? ar : fr);
+
+/**
+ * Link to another page of the app (`to` is a route id from services/router).
+ * A plain click navigates in the page; Ctrl/Cmd/middle clicks keep the browser's "open in new tab".
+ */
+export function PageLink({ to, options, className, children, ...rest }) {
+  const href = pathFor(to, options);
+  const onClick = (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    navigate(href);
+  };
+  return (
+    <a href={href} onClick={onClick} className={className} {...rest}>
+      {children}
+    </a>
+  );
+}
 
 /**
  * Every gluten status in the app (ATMC guide, association DB, Open Food Facts, vision)

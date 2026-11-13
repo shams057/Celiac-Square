@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BookOpen, Camera, Search, MapPin, Plus, Languages, ShoppingBag, UserRound, Store, LogOut, BadgePlus, Bookmark, Package, LayoutDashboard } from 'lucide-react';
+import { WheatOff, Camera, Search, MapPin, Plus, Languages, ShoppingBag, UserRound, Store, LogOut, BadgePlus, Bookmark, Package, LayoutDashboard } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { BrandMark, t } from './ui';
 import { pathFor } from '../services/router';
@@ -12,8 +12,9 @@ const linkClick = (go, tab) => (e) => {
 };
 
 const TABS = [
-  { id: 'atmc', icon: BookOpen, fr: 'Guide ATMC', ar: 'دليل الجمعية' },
-  { id: 'search', icon: Search, fr: 'Recherche', ar: 'بحث' },
+  { id: 'learn', icon: WheatOff, fr: 'Comprendre', ar: 'افهم' },
+  // The ATMC guide is opened from the search page, so this tab stays marked while it is open
+  { id: 'search', icon: Search, fr: 'Recherche', ar: 'بحث', covers: ['atmc'] },
   // The main action sits in the middle, larger than the other tabs
   { id: 'vision', icon: Camera, fr: 'Scanner', ar: 'الماسح', primary: true },
   { id: 'map', icon: MapPin, fr: 'Carte', ar: 'الخريطة' },
@@ -97,7 +98,8 @@ function TabBar({ activeTab, setActiveTab, lang, placement }) {
   const tr = t(lang);
   const top = placement === 'top';
   // The scan button carries its own tint, so the sliding fill only marks the other tabs
-  const activeIndex = TABS.findIndex((tab) => tab.id === activeTab && !tab.primary);
+  const isActive = (tab) => tab.id === activeTab || Boolean(tab.covers?.includes(activeTab));
+  const activeIndex = TABS.findIndex((tab) => isActive(tab) && !tab.primary);
 
   return (
     <div className={`glass pointer-events-auto relative grid grid-cols-5 rounded-full p-1 ${top ? 'w-[35rem]' : 'w-full max-w-md'}`}>
@@ -109,8 +111,9 @@ function TabBar({ activeTab, setActiveTab, lang, placement }) {
           style={{ insetInlineStart: `calc(4px + ${activeIndex} * (100% - 8px) / ${TABS.length})`, width: `calc((100% - 8px) / ${TABS.length})` }}
         />
       )}
-      {TABS.map(({ id, icon: Icon, fr, ar, primary }) => {
-        const active = activeTab === id;
+      {TABS.map((tab) => {
+        const { id, icon: Icon, fr, ar, primary } = tab;
+        const active = isActive(tab);
         if (primary) {
           return (
             <a
@@ -147,7 +150,7 @@ function TabBar({ activeTab, setActiveTab, lang, placement }) {
             key={id}
             href={pathFor(id)}
             onClick={linkClick(setActiveTab, id)}
-            aria-current={active ? 'page' : undefined}
+            aria-current={activeTab === id ? 'page' : active ? 'true' : undefined}
             className={`relative flex items-center justify-center rounded-full transition-colors ${
               top ? 'h-10 text-[15px]' : 'flex-col gap-0.5 py-1.5 text-[11px] leading-tight'
             } ${active ? 'font-semibold text-primary-dark' : 'font-medium text-ink'}`}

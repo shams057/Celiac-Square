@@ -6,8 +6,11 @@ import { useEffect, useState } from 'react';
  * (Vercel serves index.html for every path; see vercel.json.)
  */
 export const ROUTES = {
-  // The scanner is the landing page; the guide has its own address
+  // The scanner is the landing page
   vision: '/',
+  // What celiac disease is and how to live with it: the first tab
+  learn: '/comprendre',
+  // The ATMC guide is opened from the search page; it keeps its own address
   atmc: '/guide',
   search: '/recherche',
   map: '/carte',

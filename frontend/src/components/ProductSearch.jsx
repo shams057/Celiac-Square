@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, LoaderCircle, X } from 'lucide-react';
+import { Search, LoaderCircle, X, BookOpen } from 'lucide-react';
 import { searchProducts, fetchAtmcProducts } from '../services/api';
-import { t, statusKind, STATUS, StatusTile, PageHead, Notice, EmptyState } from './ui';
+import { t, statusKind, STATUS, StatusTile, PageHead, PageLink, Notice, EmptyState } from './ui';
 import { SourceLine, SaveButton, ReportButton, atmcAsProduct, productTargetType, productTargetId } from './community';
 
 const fold = (str) =>
@@ -117,6 +117,13 @@ export default function ProductSearch({ initialQuery = '', lang }) {
           'Un nom, une marque ou un code-barres. La recherche couvre les guides tunisiens (produits locaux, vrac, souk) et Open Food Facts (produits emballés du monde entier).',
           'اسم، علامة أو رمز شريطي. يشمل البحث الأدلة التونسية (المنتجات المحلية والسائبة) وقاعدة Open Food Facts للمنتجات المعلبة.'
         )}
+        // The whole ATMC guide, shelf by shelf, for browsing rather than searching
+        action={
+          <PageLink to="atmc" className="btn-quiet">
+            <BookOpen className="h-[18px] w-[18px]" aria-hidden="true" />
+            {tr('Parcourir le guide ATMC', 'تصفح دليل الجمعية')}
+          </PageLink>
+        }
       />
 
       <form role="search" onSubmit={runSearch} className="flex gap-2">

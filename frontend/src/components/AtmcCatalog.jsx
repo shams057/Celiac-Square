@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Fuse from 'fuse.js';
-import { Search, X } from 'lucide-react';
+import { Search, X, ChevronLeft } from 'lucide-react';
 import { fetchAtmcProducts, fetchAtmcCategories, fetchAtmcStats } from '../services/api';
-import { t, statusKind, STATUS, StatusTile, PageHead, Notice, EmptyState, FilterSheet } from './ui';
+import { t, statusKind, STATUS, StatusTile, PageHead, PageLink, Notice, EmptyState, FilterSheet } from './ui';
 import { SaveButton, ReportButton, atmcAsProduct } from './community';
 
 // Lowercase without accents, so "the" matches "Thé"
@@ -136,6 +136,11 @@ export default function AtmcCatalog({ lang = 'fr' }) {
 
   return (
     <div className="space-y-8">
+      {/* The guide is opened from the search page: this leads back to it */}
+      <PageLink to="search" className="-mb-4 -ms-1.5 inline-flex min-h-11 items-center gap-0.5 rounded-full pe-3 text-[15px] font-medium text-primary-dark">
+        <ChevronLeft className="h-5 w-5 rtl:rotate-180" aria-hidden="true" />
+        {tr('Recherche', 'البحث')}
+      </PageLink>
       <PageHead
         title={tr('Que puis-je manger ?', 'ماذا يمكنني أن آكل؟')}
         lede={tr(
