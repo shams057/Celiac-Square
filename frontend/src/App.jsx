@@ -201,7 +201,7 @@ function AppShell() {
         {lang === 'ar' ? 'انتقل إلى المحتوى' : 'Aller au contenu'}
       </a>
 
-      <Navbar activeTab={activeTab} setActiveTab={goTo} onOpenSubmitModal={() => setIsSubmitModalOpen(true)} lang={lang} setLang={setLang} />
+      <Navbar activeTab={activeTab} setActiveTab={goTo} lang={lang} setLang={setLang} />
 
       {!online && (
         <div role="status" className="mx-auto mt-1 flex w-[calc(100%-2rem)] max-w-6xl items-start gap-2.5 rounded-2xl bg-status-warning/20 px-4 py-3 text-sm">
@@ -227,6 +227,7 @@ function AppShell() {
       <Footer
         lang={lang}
         onBecomeSeller={() => goTo('become-seller')}
+        onSuggestAddress={() => setIsSubmitModalOpen(true)}
         onOpenPrivacy={() => goTo('privacy')}
       />
       {/* Explicit mode: auto-detection picks the debug script from va.vercel-scripts.com when NODE_ENV

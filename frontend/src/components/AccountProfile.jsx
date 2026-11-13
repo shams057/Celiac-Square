@@ -1,15 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { UserRound, Package } from 'lucide-react';
+import { UserRound, Package, ShoppingCart } from 'lucide-react';
 import { updateProfile, errorMessage } from '../services/api';
 import { updateUser } from '../services/session';
 import { navigate, pathFor } from '../services/router';
 import { useAuth } from './AuthContext';
 import { t, Notice } from './ui';
+import { useCart } from './orders';
 
 /** The signed-in account: name and phone number (used to prefill orders and confirm them) */
 export default function AccountProfile({ lang }) {
   const tr = t(lang);
   const { user } = useAuth();
+  const cart = useCart();
   const [form, setForm] = useState({ fullName: user.fullName || '', phone: user.phone || '' });
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState({ tone: 'info', text: '' });
@@ -76,10 +78,18 @@ export default function AccountProfile({ lang }) {
           </button>
         </form>
       </div>
-      <button type="button" className="btn-quiet w-full" onClick={() => navigate(pathFor('orders'))}>
-        <Package className="h-4 w-4" />
-        {tr('Mes commandes', 'طلباتي')}
-      </button>
+      {/* What is being bought, and what was bought */}
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" className="btn-quiet" onClick={() => cart.setOpen(true)}>
+          <ShoppingCart className="h-4 w-4" aria-hidden="true" />
+          {tr('Mon panier', 'سلتي')}
+          {cart.count > 0 && <span className="rounded-md bg-accent px-1.5 text-sm font-medium tabular-nums text-onbright">{cart.count}</span>}
+        </button>
+        <button type="button" className="btn-quiet" onClick={() => navigate(pathFor('orders'))}>
+          <Package className="h-4 w-4" aria-hidden="true" />
+          {tr('Mes commandes', 'طلباتي')}
+        </button>
+      </div>
     </div>
   );
 }

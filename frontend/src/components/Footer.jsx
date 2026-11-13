@@ -1,7 +1,8 @@
 import React from 'react';
+import { Plus } from 'lucide-react';
 import { BrandMark, t } from './ui';
 
-export default function Footer({ lang, onBecomeSeller, onOpenPrivacy }) {
+export default function Footer({ lang, onBecomeSeller, onSuggestAddress, onOpenPrivacy }) {
   const tr = t(lang);
 
   return (
@@ -19,6 +20,12 @@ export default function Footer({ lang, onBecomeSeller, onOpenPrivacy }) {
             )}
           </p>
           <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm">
+            <li>
+              <button type="button" onClick={onSuggestAddress} className="inline-flex items-center gap-1 font-medium text-primary-dark underline-offset-4 hover:underline">
+                <Plus className="h-4 w-4" strokeWidth={2.25} aria-hidden="true" />
+                {tr('Proposer une adresse', 'اقترح عنوانا')}
+              </button>
+            </li>
             <li>
               <button type="button" onClick={onBecomeSeller} className="font-medium text-primary-dark underline-offset-4 hover:underline">
                 {tr('Devenir vendeur sur le marché', 'كن بائعا في السوق')}

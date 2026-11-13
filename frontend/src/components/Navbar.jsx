@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { WheatOff, Camera, Search, MapPin, Plus, Languages, ShoppingBag, UserRound, Store, LogOut, BadgePlus, Bookmark, Package, LayoutDashboard, LogIn, Moon, Sun, SunMoon } from 'lucide-react';
+import { WheatOff, Camera, Search, MapPin, ShoppingCart, Languages, ShoppingBag, UserRound, Store, LogOut, Bookmark, Package, LayoutDashboard, LogIn, Moon, Sun, SunMoon } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { BrandMark, t } from './ui';
 import { pathFor } from '../services/router';
 import { useSlideSelect, SegmentedSlider } from './Slider';
 import { useTheme } from '../services/theme';
+import { useCart } from './orders';
 
 // Plain clicks navigate in the page; Ctrl/Cmd/middle clicks keep the browser's "open in new tab"
 const linkClick = (go, tab) => (e) => {
@@ -30,7 +31,7 @@ const ROLE_LABELS = {
   CLIENT: ['Client', 'عميل'],
 };
 
-export default function Navbar({ activeTab, setActiveTab, onOpenSubmitModal, lang, setLang }) {
+export default function Navbar({ activeTab, setActiveTab, lang, setLang }) {
   const tr = t(lang);
 
   return (
@@ -66,16 +67,7 @@ export default function Navbar({ activeTab, setActiveTab, onOpenSubmitModal, lan
               <Languages className="h-[18px] w-[18px]" aria-hidden="true" />
               <span className="hidden pe-1 sm:inline" aria-hidden="true">{lang === 'fr' ? 'العربية' : 'Français'}</span>
             </button>
-            {/* The one tinted control in the bar: the primary action */}
-            <button
-              type="button"
-              onClick={onOpenSubmitModal}
-              className="glass-tint glass-control w-11 px-0 text-onbright"
-              aria-label={tr('Proposer une adresse', 'اقترح عنوانا')}
-              title={tr('Proposer une adresse', 'اقترح عنوانا')}
-            >
-              <Plus className="h-5 w-5" strokeWidth={2.25} aria-hidden="true" />
-            </button>
+            <CartBarButton lang={lang} />
             <AccountMenu lang={lang} go={setActiveTab} />
           </div>
         </div>
@@ -181,6 +173,35 @@ function TabBar({ activeTab, setActiveTab, lang, placement }) {
         );
       })}
     </div>
+  );
+}
+
+/**
+ * The cart, in the top bar. Tinted orange once something is in it (then it is the action to take),
+ * plain glass while it is empty.
+ */
+function CartBarButton({ lang }) {
+  const tr = t(lang);
+  const { count, setOpen } = useCart();
+  const label = count > 0 ? tr(`Panier, ${count} article${count > 1 ? 's' : ''}`, `السلة، ${count}`) : tr('Panier, vide', 'السلة فارغة');
+  return (
+    <button
+      type="button"
+      onClick={() => setOpen(true)}
+      className={`glass-control relative w-11 px-0 ${count > 0 ? 'glass-tint text-onbright' : 'glass'}`}
+      aria-label={label}
+      title={tr('Panier', 'السلة')}
+    >
+      <ShoppingCart className="h-[18px] w-[18px]" strokeWidth={count > 0 ? 2.25 : 2} aria-hidden="true" />
+      {count > 0 && (
+        <span
+          aria-hidden="true"
+          className="absolute -end-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-ink px-1 text-[11px] font-semibold tabular-nums text-canvas-paper ring-2 ring-canvas"
+        >
+          {count > 99 ? '99+' : count}
+        </span>
+      )}
+    </button>
   );
 }
 
@@ -303,12 +324,6 @@ function AccountMenu({ lang, go }) {
                 <button type="button" className={item} onClick={() => choose('seller')}>
                   <Store className="h-4 w-4 text-ink-soft" aria-hidden="true" />
                   {tr('Ma boutique', 'محلي')}
-                </button>
-              )}
-              {user.role === 'CLIENT' && (
-                <button type="button" className={item} onClick={() => choose('become-seller')}>
-                  <BadgePlus className="h-4 w-4 text-ink-soft" aria-hidden="true" />
-                  {tr('Devenir vendeur', 'كن بائعا')}
                 </button>
               )}
             </>
