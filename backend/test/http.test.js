@@ -104,3 +104,16 @@ test('the forum is read by everyone, written by signed-in accounts only', async 
   assert.equal((await list.json()).message, 'Erreur interne du serveur.');
   assert.equal((await fetch(`${base}/api/health`)).status, 200);
 });
+
+test('forum moderation is for the team only', async () => {
+  const id = '11111111-1111-4111-8111-111111111111';
+  const send = (method, path, body) =>
+    fetch(`${base}${path}`, { method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer some-static-token' }, body: body ? JSON.stringify(body) : undefined });
+  for (const path of ['overview', 'reports', 'threads', 'replies', 'members?q=a']) {
+    assert.equal((await send('GET', `/api/admin/forum/${path}`)).status, 401, path);
+  }
+  assert.equal((await send('PUT', `/api/admin/forum/blocks/${id}`, { days: 7 })).status, 401);
+  assert.equal((await send('DELETE', `/api/admin/forum/blocks/${id}`)).status, 401);
+  assert.equal((await send('DELETE', `/api/admin/forum/members/${id}/posts`)).status, 401);
+  assert.equal((await send('PATCH', `/api/admin/forum/reports/${id}`, { status: 'RESOLVED' })).status, 401);
+});

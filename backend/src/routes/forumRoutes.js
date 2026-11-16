@@ -8,6 +8,8 @@ import { audit } from '../services/audit.js';
 /**
  * The forum: questions asked by signed-in users, answered by the others.
  * Reading is public; asking, answering, liking and saving need an account.
+ * A member blocked by the team (forum_blocks) still reads, likes and saves, but cannot ask, answer or edit.
+ * The team's own tools are in forumAdminRoutes.js.
  * Tables: supabase/migrations/20261116100000_forum.sql
  */
 const router = asyncRouter();
@@ -42,7 +44,44 @@ const rows = ({ data, error }) => {
 const notFound = (res, message = 'Question introuvable.') => res.status(404).json({ success: false, message });
 const forbidden = (res) => res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'Vous ne pouvez pas modifier ce message.' });
 
-const isModerator = (user) => Boolean(user) && (user.role === 'ADMIN' || user.role === 'STAFF');
+export const isModerator = (user) => Boolean(user) && (user.role === 'ADMIN' || user.role === 'STAFF');
+
+/**
+ * The member's current posting block ({ reason, expires_at }), or null.
+ * A block past its end date no longer counts. No table yet (migration not applied): nobody is blocked.
+ */
+export const activeBlock = async (userId) => {
+  const { data, error } = await db().from('forum_blocks').select('reason, expires_at, created_at').eq('user_id', userId).maybeSingle();
+  if (isMissingTable(error)) return null;
+  if (error) throw new Error(error.message);
+  if (!data || (data.expires_at && new Date(data.expires_at) <= new Date())) return null;
+  return data;
+};
+
+/** Whether this account may post, sent with the lists so the page can say so before anything is typed */
+const postingOf = async (user) => {
+  if (!user) return null;
+  const block = isModerator(user) ? null : await activeBlock(user.id);
+  return { blocked: Boolean(block), reason: block?.reason || '', until: block?.expires_at || null };
+};
+
+/**
+ * Stops a blocked member from asking, answering or editing: answers 403 and returns true.
+ * The team is never blocked.
+ */
+const refuseIfBlocked = async (req, res) => {
+  if (isModerator(req.user)) return false;
+  const block = await activeBlock(req.user.id);
+  if (!block) return false;
+  const until = block.expires_at ? ` jusqu’au ${new Date(block.expires_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}` : '';
+  res.status(403).json({
+    success: false,
+    code: 'FORUM_BLOCKED',
+    message: `Votre compte ne peut plus publier sur le forum${until}.${block.reason ? ` Motif : ${block.reason}` : ''}`,
+    data: { reason: block.reason, until: block.expires_at },
+  });
+  return true;
+};
 
 /**
  * The name shown next to a post: first name and the initial of the last name ("Amira B."),
@@ -192,7 +231,7 @@ router.get('/threads', async (req, res) => {
   const q = clean(req.query.q).slice(0, 100);
   const page = Math.min(Math.max(parseInt(req.query.page, 10) || 1, 1), 500);
 
-  const empty = { success: true, count: 0, page, pageSize: PAGE_SIZE, hasMore: false, data: [] };
+  const empty = { success: true, posting: null, count: 0, page, pageSize: PAGE_SIZE, hasMore: false, data: [] };
   if (view !== 'all' && !user) {
     return res.status(401).json({ success: false, code: 'AUTH_REQUIRED', message: 'Connectez-vous pour continuer.' });
   }
@@ -203,7 +242,7 @@ router.get('/threads', async (req, res) => {
     const saved = rows(
       await db().from('forum_saved_threads').select('thread_id').eq('user_id', user.id).order('created_at', { ascending: false }).limit(MAX_SAVED)
     );
-    if (saved.length === 0) return res.json(empty);
+    if (saved.length === 0) return res.json({ ...empty, posting: await postingOf(user) });
     query = query.in('id', saved.map((s) => s.thread_id));
   }
   if (view === 'mine') query = query.eq('author_id', user.id);
@@ -221,10 +260,15 @@ router.get('/threads', async (req, res) => {
   rows({ data, error });
 
   const ids = data.map((r) => r.id);
-  const [liked, saved] = await Promise.all([idsOf('forum_thread_likes', 'thread_id', user, ids), idsOf('forum_saved_threads', 'thread_id', user, ids)]);
+  const [liked, saved, posting] = await Promise.all([
+    idsOf('forum_thread_likes', 'thread_id', user, ids),
+    idsOf('forum_saved_threads', 'thread_id', user, ids),
+    postingOf(user),
+  ]);
 
   return res.json({
     success: true,
+    posting,
     count: count ?? data.length,
     page,
     pageSize: PAGE_SIZE,
@@ -243,9 +287,10 @@ router.get('/threads/:id', async (req, res) => {
   if (!row) return notFound(res);
 
   const replies = rows(await db().from('forum_replies').select(REPLY_COLUMNS).eq('thread_id', row.id).order('created_at').limit(MAX_REPLIES));
-  const [thread, likedReplies] = await Promise.all([
+  const [thread, likedReplies, posting] = await Promise.all([
     threadFor(row, user),
     idsOf('forum_reply_likes', 'reply_id', user, replies.map((r) => r.id)),
+    postingOf(user),
   ]);
 
   // One more read; never worth failing the page for
@@ -258,6 +303,7 @@ router.get('/threads/:id', async (req, res) => {
     data: {
       ...thread,
       canModerate: isModerator(user),
+      posting,
       replies: replies.map((r) => toReply(r, user, { liked: likedReplies.has(r.id), askerId: row.author_id })),
     },
   });
@@ -272,6 +318,7 @@ router.get('/threads/:id', async (req, res) => {
  * Body: { title, body?, category, lang? }
  */
 router.post('/threads', limits.forumPosts, requireUser, async (req, res) => {
+  if (await refuseIfBlocked(req, res)) return undefined;
   const fields = threadFields(req.body);
   if (fields.error) return badRequest(res, fields.error);
 
@@ -296,6 +343,7 @@ router.patch('/threads/:id', requireUser, async (req, res) => {
   if (!row) return notFound(res);
   const moderator = isModerator(req.user);
   if (row.author_id !== req.user.id && !moderator) return forbidden(res);
+  if (await refuseIfBlocked(req, res)) return undefined;
 
   const fields = threadFields(req.body, { partial: true });
   if (fields.error) return badRequest(res, fields.error);
@@ -335,6 +383,7 @@ router.post('/threads/:id/replies', limits.forumPosts, requireUser, async (req, 
   const thread = await findThread(req.params.id);
   if (!thread) return notFound(res);
   if (thread.is_locked && !isModerator(req.user)) return badRequest(res, 'Cette discussion est fermée : elle n’accepte plus de réponses.');
+  if (await refuseIfBlocked(req, res)) return undefined;
 
   const { text, error } = replyBody(req.body?.body);
   if (error) return badRequest(res, error);
@@ -364,6 +413,7 @@ router.patch('/replies/:id', requireUser, async (req, res) => {
   if (!row) return notFound(res, 'Réponse introuvable.');
   const moderator = isModerator(req.user);
   if (row.author_id !== req.user.id && !moderator) return forbidden(res);
+  if (await refuseIfBlocked(req, res)) return undefined;
 
   const { text, error } = replyBody(req.body?.body);
   if (error) return badRequest(res, error);

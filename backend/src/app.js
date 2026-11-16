@@ -21,6 +21,7 @@ import orderAdminRoutes from './routes/orderAdminRoutes.js';
 import whatsappRoutes from './routes/whatsappRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import forumRoutes from './routes/forumRoutes.js';
+import forumAdminRoutes from './routes/forumAdminRoutes.js';
 
 dotenv.config();
 
@@ -71,8 +72,9 @@ app.use('/api/vision', visionRoutes);
 app.use('/api/atmc', atmcRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/market', marketRoutes);
-// Before /api/admin: the order pipeline and the dashboard are open to the team (STAFF), the rest of /api/admin is not
+// Before /api/admin: the order pipeline, the dashboard and forum moderation are open to the team (STAFF), the rest of /api/admin is not
 app.use('/api/admin/orders', orderAdminRoutes);
+app.use('/api/admin/forum', forumAdminRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reports', reportRoutes);

@@ -284,6 +284,33 @@ export const acceptForumReply = async (threadId, replyId) => (await axios.put(`$
 /** kind: 'threads' | 'replies'; mark: 'like' | 'save' (save is for threads only) */
 export const setForumMark = async (kind, id, mark, on) => (await axios({ method: on ? 'put' : 'delete', url: `${API_BASE}/forum/${kind}/${id}/${mark}` })).data;
 
+// Back-office: forum moderation (team and admins)
+
+export const fetchForumOverview = () => adminRequest({ method: 'get', url: `${API_BASE}/admin/forum/overview` });
+
+export const fetchForumReports = (status = 'OPEN') => adminRequest({ method: 'get', url: `${API_BASE}/admin/forum/reports`, params: { status } });
+
+export const setForumReportStatus = (id, status) => adminRequest({ method: 'patch', url: `${API_BASE}/admin/forum/reports/${id}`, data: { status } });
+
+/** filter: 'all' | 'pinned' | 'locked' | 'unanswered'; author: an account id */
+export const fetchAdminForumThreads = ({ q = '', filter = 'all', author = '', page = 1 } = {}) =>
+  adminRequest({ method: 'get', url: `${API_BASE}/admin/forum/threads`, params: { q: q || undefined, filter: filter === 'all' ? undefined : filter, author: author || undefined, page: page > 1 ? page : undefined } });
+
+export const fetchAdminForumReplies = ({ q = '', author = '', page = 1 } = {}) =>
+  adminRequest({ method: 'get', url: `${API_BASE}/admin/forum/replies`, params: { q: q || undefined, author: author || undefined, page: page > 1 ? page : undefined } });
+
+/** With q: accounts matching a name or an e-mail. Without: the members blocked now. */
+export const fetchForumMembers = (q = '') => adminRequest({ method: 'get', url: `${API_BASE}/admin/forum/members`, params: { q: q || undefined } });
+
+/** days: 1, 7 or 30; null blocks until it is lifted */
+export const blockForumMember = (userId, { reason = '', days = null } = {}) =>
+  adminRequest({ method: 'put', url: `${API_BASE}/admin/forum/blocks/${userId}`, data: { reason, days } });
+
+export const unblockForumMember = (userId) => adminRequest({ method: 'delete', url: `${API_BASE}/admin/forum/blocks/${userId}` });
+
+/** Removes every question and answer the member wrote */
+export const deleteForumMemberPosts = (userId) => adminRequest({ method: 'delete', url: `${API_BASE}/admin/forum/members/${userId}/posts` });
+
 /** The message to show for a failed request: the API's own message for 4xx, a fallback otherwise */
 export const errorMessage = (err, fallback) => {
   const status = err?.response?.status;

@@ -34,6 +34,7 @@ import {
   LogIn,
   LoaderCircle,
   ShieldCheck,
+  Ban,
 } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import {
@@ -330,6 +331,29 @@ function Counter({ value, max }) {
   return <span className={`text-xs tabular-nums ${left < 0 ? 'font-medium text-status-unsafe-ink' : 'text-ink-faint'}`}>{left}</span>;
 }
 
+/** Shown in place of the forms to a member the team has stopped from posting. posting: { blocked, reason, until } */
+function BlockedNotice({ posting, lang }) {
+  const tr = t(lang);
+  const until = posting?.until ? new Date(posting.until).toLocaleDateString(lang === 'ar' ? 'ar-TN' : 'fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-status-unsafe/40 bg-status-unsafe/10 px-4 py-3.5 text-sm" role="status">
+      <Ban className="mt-0.5 h-4 w-4 shrink-0 text-status-unsafe-ink" aria-hidden="true" />
+      <div>
+        <p className="font-medium">
+          {until ? tr(`Vous ne pouvez plus publier sur le forum jusqu’au ${until}.`, `لا يمكنك النشر في المنتدى حتى ${until}.`) : tr('Vous ne pouvez plus publier sur le forum.', 'لم يعد بإمكانك النشر في المنتدى.')}
+        </p>
+        {posting?.reason && (
+          <p dir="auto" className="mt-0.5 text-start text-ink-soft">
+            {tr('Motif donné par l’équipe : ', 'السبب الذي قدمه الفريق: ')}
+            {posting.reason}
+          </p>
+        )}
+        <p className="mt-0.5 text-ink-soft">{tr('Vous pouvez toujours lire, réagir et enregistrer des discussions.', 'ما زال بإمكانك القراءة والتفاعل وحفظ النقاشات.')}</p>
+      </div>
+    </div>
+  );
+}
+
 const RULES = [
   ['Racontez votre expérience : ce qui a marché pour vous, où, et quand.', 'شارك تجربتك: ما الذي نجح معك، وأين ومتى.'],
   ['Une recette change : donnez la marque, et vérifiez toujours l’étiquette.', 'الوصفات تتغير: اذكر العلامة وتحقق دائما من الملصق.'],
@@ -479,6 +503,8 @@ function ThreadList({ lang, query, onOpenThread, onNavigate, askSignIn }) {
   const [state, setState] = useState({ loading: !cached, error: '', unavailable: false, more: false });
   const [search, setSearch] = useState(filters.q);
   const [asking, setAsking] = useState(false);
+  const [posting, setPosting] = useState(cached?.posting || null);
+  const blocked = Boolean(user && posting?.blocked);
   const needsAccount = filters.view !== 'all' && !user;
 
   const go = (changes, options) => onNavigate(queryOf({ ...filters, ...changes }), options);
@@ -518,10 +544,11 @@ function ThreadList({ lang, query, onOpenThread, onNavigate, askSignIn }) {
     setState({ loading: !known, error: '', unavailable: false, more: false });
     try {
       const res = await fetchForumThreads({ ...filters, page: 1 });
-      const next = { threads: res.data || [], meta: { count: res.count || 0, page: 1, hasMore: Boolean(res.hasMore) } };
+      const next = { threads: res.data || [], meta: { count: res.count || 0, page: 1, hasMore: Boolean(res.hasMore) }, posting: res.posting || null };
       listCache.set(cacheKey, next);
       setThreads(next.threads);
       setMeta(next.meta);
+      setPosting(next.posting);
       setState({ loading: false, error: '', unavailable: false, more: false });
     } catch (err) {
       setState({
@@ -542,7 +569,7 @@ function ThreadList({ lang, query, onOpenThread, onNavigate, askSignIn }) {
     try {
       const res = await fetchForumThreads({ ...filters, page: meta.page + 1 });
       const seen = new Set(threads.map((th) => th._id));
-      const next = { threads: [...threads, ...(res.data || []).filter((th) => !seen.has(th._id))], meta: { count: res.count || 0, page: meta.page + 1, hasMore: Boolean(res.hasMore) } };
+      const next = { threads: [...threads, ...(res.data || []).filter((th) => !seen.has(th._id))], meta: { count: res.count || 0, page: meta.page + 1, hasMore: Boolean(res.hasMore) }, posting };
       listCache.set(cacheKey, next);
       setThreads(next.threads);
       setMeta(next.meta);
@@ -582,6 +609,8 @@ function ThreadList({ lang, query, onOpenThread, onNavigate, askSignIn }) {
         )}
         action={askButton}
       />
+
+      {blocked && <BlockedNotice posting={posting} lang={lang} />}
 
       {/* Whose questions */}
       <SegmentedSlider
@@ -760,7 +789,10 @@ function ThreadList({ lang, query, onOpenThread, onNavigate, askSignIn }) {
       </div>
 
       {asking && (
-        <Modal open onClose={() => setAsking(false)} lang={lang} title={tr('Poser une question', 'اطرح سؤالا')} subtitle={tr('Elle sera visible par tous, avec votre prénom.', 'سيراه الجميع مع اسمك الأول.')}>
+        <Modal open onClose={() => setAsking(false)} lang={lang} title={tr('Poser une question', 'اطرح سؤالا')} subtitle={blocked ? undefined : tr('Elle sera visible par tous, avec votre prénom.', 'سيراه الجميع مع اسمك الأول.')}>
+          {blocked ? (
+            <BlockedNotice posting={posting} lang={lang} />
+          ) : (
           <QuestionForm
             lang={lang}
             defaultCategory={filters.category === 'ALL' ? '' : filters.category}
@@ -771,6 +803,7 @@ function ThreadList({ lang, query, onOpenThread, onNavigate, askSignIn }) {
               onOpenThread(thread._id);
             }}
           />
+          )}
         </Modal>
       )}
     </div>
@@ -946,7 +979,10 @@ function ThreadPage({ lang, threadId, onOpenThread, askSignIn }) {
     );
   }
 
-  const canEdit = thread.mine || thread.canModerate;
+  const blocked = Boolean(user && thread.posting?.blocked);
+  // A blocked member can still delete what they wrote, not change it
+  const canEdit = (thread.mine && !blocked) || thread.canModerate;
+  const canDelete = thread.mine || thread.canModerate;
   const canAccept = thread.mine || thread.canModerate;
   const closed = thread.isLocked && !thread.canModerate;
 
@@ -1123,7 +1159,7 @@ function ThreadPage({ lang, threadId, onOpenThread, askSignIn }) {
           <SaveThreadButton thread={thread} lang={lang} onChange={patch} askSignIn={askSignIn} />
           <ActionButton icon={Share2} label={tr('Partager', 'مشاركة')} onClick={share} />
           {canEdit && <ActionButton icon={Pencil} label={tr('Modifier', 'تعديل')} onClick={() => setEditing(true)} />}
-          {canEdit && <ActionButton icon={Trash2} label={tr('Supprimer', 'حذف')} onClick={() => setConfirm({ kind: 'thread' })} />}
+          {canDelete && <ActionButton icon={Trash2} label={tr('Supprimer', 'حذف')} onClick={() => setConfirm({ kind: 'thread' })} />}
           {!thread.mine && (
             <span className="ms-auto px-2">
               <ReportButton target={{ type: 'FORUM_THREAD', id: thread._id, label: thread.title }} lang={lang} />
@@ -1190,6 +1226,7 @@ function ThreadPage({ lang, threadId, onOpenThread, askSignIn }) {
               parent={reply.parentId ? byId.get(reply.parentId) : null}
               thread={thread}
               lang={lang}
+              blocked={blocked}
               accepted={reply._id === thread.acceptedReplyId}
               canAccept={canAccept}
               busy={busy}
@@ -1214,6 +1251,8 @@ function ThreadPage({ lang, threadId, onOpenThread, askSignIn }) {
         <Notice tone="info" title={tr('Cette discussion est fermée', 'هذا النقاش مغلق')}>
           {tr('Elle n’accepte plus de réponses. Vous pouvez poser une nouvelle question.', 'لم يعد يقبل ردودا. يمكنك طرح سؤال جديد.')}
         </Notice>
+      ) : blocked ? (
+        <BlockedNotice posting={thread.posting} lang={lang} />
       ) : user ? (
         <ReplyComposer
           lang={lang}
@@ -1296,9 +1335,10 @@ function ThreadPage({ lang, threadId, onOpenThread, askSignIn }) {
   );
 }
 
-function ReplyCard({ reply, parent, thread, lang, accepted, canAccept, busy, editing, onEdit, onEdited, onCancelEdit, onLike, onReply, onAccept, onDelete }) {
+function ReplyCard({ reply, parent, thread, lang, blocked, accepted, canAccept, busy, editing, onEdit, onEdited, onCancelEdit, onLike, onReply, onAccept, onDelete }) {
   const tr = t(lang);
-  const canEdit = reply.mine || thread.canModerate;
+  const canEdit = (reply.mine && !blocked) || thread.canModerate;
+  const canDelete = reply.mine || thread.canModerate;
   const closed = thread.isLocked && !thread.canModerate;
   return (
     <li id={`reponse-${reply._id}`} className={`panel p-4 sm:p-5 ${accepted ? 'ring-2 ring-primary/70' : ''}`}>
@@ -1353,7 +1393,7 @@ function ReplyCard({ reply, parent, thread, lang, accepted, canAccept, busy, edi
             disabled={reply.mine}
             title={reply.mine ? tr('C’est votre réponse', 'هذا ردك') : tr('Cette réponse m’a aidé', 'هذا الرد أفادني')}
           />
-          {!closed && <ActionButton icon={Reply} label={tr('Répondre', 'رد')} onClick={onReply} />}
+          {!closed && !blocked && <ActionButton icon={Reply} label={tr('Répondre', 'رد')} onClick={onReply} />}
           {canAccept && (
             <ActionButton
               icon={CircleCheckBig}
@@ -1364,7 +1404,7 @@ function ReplyCard({ reply, parent, thread, lang, accepted, canAccept, busy, edi
             />
           )}
           {canEdit && <ActionButton icon={Pencil} label={tr('Modifier', 'تعديل')} onClick={onEdit} hideLabel />}
-          {canEdit && <ActionButton icon={Trash2} label={tr('Supprimer', 'حذف')} onClick={onDelete} hideLabel />}
+          {canDelete && <ActionButton icon={Trash2} label={tr('Supprimer', 'حذف')} onClick={onDelete} hideLabel />}
           {!reply.mine && (
             <span className="ms-auto">
               <ReportButton

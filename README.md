@@ -33,6 +33,7 @@ Plateforme web et mobile pour manger sans gluten en Tunisie : le guide officiel 
 | **Avis des membres** | Sur chaque lieu, trois questions oui/non aux membres connectés (réaction ? cuisine dédiée ? personnel informé ?) ; seuls les totaux sont publiés. |
 | **Signalements** | « Signaler un problème » sur les produits, les lieux, les résultats du scanner et les messages du forum ; ils arrivent dans le back-office. |
 | **Forum** | Questions et réponses entre membres (`/forum`, une adresse par question). Lecture ouverte à tous ; un compte pour poser une question, répondre, dire « même question » ou « utile », et **enregistrer** une discussion pour la retrouver (onglet *Enregistrées*). Huit rubriques, recherche, tri (récentes, populaires, sans réponse). L’auteur choisit la réponse qui a résolu sa question ; l’équipe peut épingler, fermer ou supprimer. Seuls le prénom et l’initiale du nom sont affichés. |
+| **Modération du forum** | Onglet *Forum* du back-office (équipe et administrateurs) : file des messages signalés (voir, supprimer le message, bloquer son auteur, classer), toutes les questions et réponses avec le nom complet et l’e-mail de leur auteur, et les membres. Un membre **bloqué** (1, 7, 30 jours ou jusqu’à nouvel ordre, avec un motif qui lui est montré) lit, réagit et enregistre toujours, mais ne peut plus poser de question, répondre ni modifier ; on peut aussi supprimer d’un coup tous ses messages. L’équipe ne peut pas être bloquée. Chaque action est notée dans le journal. |
 | **Mes produits** | Produits enregistrés (compte), avec alerte si le guide change leur statut, et historique des scans (sur l’appareil seulement). |
 | **Propositions** | Les visiteurs proposent des adresses ; elles arrivent dans une boîte de réception administrateur avant publication. |
 | **Marché** | Produits sans gluten des restaurants, boulangeries, cafés et artisans : tout voir d’un coup (rangé par boutique, comme un menu) ou boutique par boutique, recherche par produit, filtres par type. Réservé aux membres connectés. |
@@ -56,7 +57,7 @@ app/
 │       ├── app.js          # Application Express (sans écoute réseau)
 │       ├── server.js       # Serveur local (port 5000)
 │       ├── config/db.js    # Client Supabase côté serveur
-│       ├── routes/         # /api/map, /api/products, /api/atmc, /api/vision, /api/auth, /api/market, /api/orders, /api/admin, /api/admin/orders, /api/reports, /api/me, /api/forum
+│       ├── routes/         # /api/map, /api/products, /api/atmc, /api/vision, /api/auth, /api/market, /api/orders, /api/admin, /api/admin/orders, /api/reports, /api/me, /api/forum, /api/admin/forum
 │       ├── services/       # Open Food Facts, vision, aiBalancer (rotation des IA), photos du marché (Storage)
 │       ├── middleware/     # Comptes connectés, rôles, accès administrateur
 │       ├── seed/           # Données initiales et script de seed
@@ -112,7 +113,8 @@ npm install
    - `20261105120000_marketplace.sql` : comptes (`profiles`, avec le rôle), `stores`, `market_products`, `seller_applications` et le bucket Storage public `marketplace` pour les photos ;
    - `20261105130000_lock_handle_new_user.sql` : interdit d’appeler la fonction de création de profil depuis l’API ;
    - `20261105160000_audit_fixes.sql` : plus de notes inventées sur les adresses, date et auteur de la vérification, limites de longueur des textes, journal des actions admin (`admin_audit_log`) ;
-   - les fichiers suivants, dans l’ordre de leur date, jusqu’à `20261116100000_forum.sql` : le forum (`forum_threads`, `forum_replies`, les « même question » et « utile », `forum_saved_threads`) et le signalement de ses messages. Tant que ce dernier fichier n’est pas exécuté, la page Forum affiche « Le forum ouvre bientôt ».
+   - les fichiers suivants, dans l’ordre de leur date, jusqu’à `20261116100000_forum.sql` : le forum (`forum_threads`, `forum_replies`, les « même question » et « utile », `forum_saved_threads`) et le signalement de ses messages. Tant que ce dernier fichier n’est pas exécuté, la page Forum affiche « Le forum ouvre bientôt » ;
+   - `20261116130000_forum_moderation.sql` : `forum_blocks`, les membres que l’équipe empêche de publier. Sans lui, le forum et sa modération fonctionnent, sauf le blocage.
    Sur une base existante, n’exécutez que les fichiers qui ne l’ont pas encore été (**Database → Migrations** les liste).
    Dans **Authentication → Sign In / Providers → Email**, activez *Confirm email* (recommandé : sans confirmation, le formulaire d’inscription peut révéler qu’une adresse a déjà un compte). Réglez aussi la longueur minimale du mot de passe sur 10.
    Dans **Authentication → URL Configuration**, ajoutez `<SITE_URL>/compte/nouveau-mot-de-passe` aux *Redirect URLs* (lien des e-mails « mot de passe oublié »).
@@ -320,6 +322,12 @@ L’APK local est signé avec la clé de débogage : il convient pour vos appare
 | PUT | `/api/forum/threads/:id/accepted` | Auteur, Équipe | Choisir la réponse qui résout la question (`{ replyId }`, `null` pour l’enlever) |
 | PUT / DELETE | `/api/forum/threads/:id/like`, `/api/forum/replies/:id/like` | Membre | « Même question » / « Utile » (pas sur ses propres messages) |
 | PUT / DELETE | `/api/forum/threads/:id/save` | Membre | Enregistrer une discussion ou la retirer |
+| GET | `/api/admin/forum/overview` | Équipe | Chiffres du forum (questions, réponses, signalements à traiter, membres bloqués) |
+| GET / PATCH | `/api/admin/forum/reports[/:id]` | Équipe | Signalements de messages du forum, avec le message visé (`status`) ; `{ status }` pour traiter, classer ou rouvrir |
+| GET | `/api/admin/forum/threads`, `/replies` | Équipe | Toutes les questions (`q`, `filter=pinned\|locked\|unanswered`, `author`, `page`) et réponses (`q`, `author`, `page`), avec leur auteur |
+| GET | `/api/admin/forum/members` | Équipe | Comptes correspondant à `q` ; sans `q`, les membres bloqués |
+| PUT / DELETE | `/api/admin/forum/blocks/:userId` | Équipe | Empêcher un membre de publier (`{ reason, days: 1\|7\|30 }`, sans `days` : jusqu’à nouvel ordre) ; lever le blocage |
+| DELETE | `/api/admin/forum/members/:userId/posts` | Équipe | Supprimer toutes les questions et réponses d’un membre |
 | GET / POST | `/api/whatsapp/webhook` | Meta | Vérification du webhook ; réponses des clients (signature `X-Hub-Signature-256` vérifiée) |
 
 Les routes *Membre*, *Client*, *Vendeur* et *Admin* exigent l’en-tête `Authorization: Bearer <jeton d’accès>` d’un compte qui a le rôle voulu. Le jeton d’accès est renvoyé par `/login` et `/refresh` et gardé en mémoire par le site ; le jeton de renouvellement reste dans un cookie httpOnly. Les actions admin sont enregistrées dans `admin_audit_log` (onglet *Journal* du back-office).

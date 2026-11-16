@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
-import { MapPin, Store, Lock, Flag, Package, LayoutDashboard } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { MapPin, Store, Lock, Flag, Package, LayoutDashboard, MessagesSquare } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import BackofficeSpots from './BackofficeSpots';
 import BackofficeSellers from './BackofficeSellers';
 import BackofficeReports from './BackofficeReports';
 import BackofficeOrders from './BackofficeOrders';
 import BackofficeDashboard from './BackofficeDashboard';
+import BackofficeForum from './BackofficeForum';
+import { fetchForumOverview } from '../services/api';
 import { t } from './ui';
 import { SegmentedSlider } from './Slider';
 
@@ -13,20 +15,31 @@ import { SegmentedSlider } from './Slider';
 const SECTIONS = [
   { id: 'dashboard', icon: LayoutDashboard, fr: 'Tableau de bord', ar: 'لوحة القيادة', staff: true },
   { id: 'orders', icon: Package, fr: 'Commandes', ar: 'الطلبات', staff: true },
+  { id: 'forum', icon: MessagesSquare, fr: 'Forum', ar: 'المنتدى', staff: true },
   { id: 'reports', icon: Flag, fr: 'Signalements', ar: 'البلاغات' },
   { id: 'spots', icon: MapPin, fr: 'Adresses', ar: 'العناوين' },
   { id: 'sellers', icon: Store, fr: 'Vendeurs et comptes', ar: 'البائعون والحسابات' },
 ];
 
-/** Back-office. Admins see everything, the team (STAFF) only the orders; the API checks the role again on every call. */
+/** Back-office. Admins see everything, the team (STAFF) the orders and the forum; the API checks the role again on every call. */
 export default function Backoffice({ lang }) {
   const tr = t(lang);
   const { user } = useAuth();
   const [section, setSection] = useState('dashboard');
   const [openReports, setOpenReports] = useState(null);
   const [newOrders, setNewOrders] = useState(null);
+  const [forumReports, setForumReports] = useState(null);
   const isAdmin = user?.role === 'ADMIN';
+  const isTeam = isAdmin || user?.role === 'STAFF';
   const sections = SECTIONS.filter((s) => isAdmin || s.staff);
+
+  // The Forum tab shows how many reported posts wait, before it is opened
+  useEffect(() => {
+    if (!isTeam) return;
+    fetchForumOverview()
+      .then((res) => setForumReports(res.data.openReports))
+      .catch(() => {});
+  }, [isTeam]);
 
   if (!isAdmin && user?.role !== 'STAFF') {
     return (
@@ -64,12 +77,17 @@ export default function Backoffice({ lang }) {
               {id === 'orders' && newOrders > 0 && (
                 <span className="rounded-full bg-status-unsafe px-1.5 text-xs font-medium tabular-nums text-white">{newOrders}</span>
               )}
+              {id === 'forum' && forumReports > 0 && (
+                <span className="rounded-full bg-status-unsafe px-1.5 text-xs font-medium tabular-nums text-white">{forumReports}</span>
+              )}
             </>
           )}
         />
       )}
       {section === 'dashboard' ? (
         <BackofficeDashboard lang={lang} isAdmin={isAdmin} onGo={(id) => sections.some((s) => s.id === id) && setSection(id)} />
+      ) : section === 'forum' ? (
+        <BackofficeForum lang={lang} onCountChange={setForumReports} />
       ) : section === 'orders' || !isAdmin ? (
         <BackofficeOrders lang={lang} onCountChange={setNewOrders} />
       ) : section === 'reports' ? (
