@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Check, X, RotateCcw, Search, MapPin } from 'lucide-react';
+import { Check, X, RotateCcw, Search, MapPin, MessagesSquare } from 'lucide-react';
 import { fetchReports, setReportStatus, errorMessage } from '../services/api';
 import { navigate, pathFor } from '../services/router';
 import { t, Notice, EmptyState, Spinner } from './ui';
@@ -11,6 +11,9 @@ const REASON_LABELS = {
   NO_LONGER_GLUTEN_FREE: ['Plus de sans gluten sûr', 'لم يعد آمنا'],
   WRONG_INFO: ['Information fausse', 'معلومة خاطئة'],
   REACTION: ['Réaction signalée', 'عارض صحي'],
+  DANGEROUS_ADVICE: ['Conseil dangereux', 'نصيحة خطيرة'],
+  SPAM: ['Publicité / hors sujet', 'إعلان / خارج الموضوع'],
+  ABUSE: ['Propos irrespectueux', 'كلام مسيء'],
   OTHER: ['Autre', 'أخرى'],
 };
 
@@ -20,6 +23,8 @@ const TARGET_LABELS = {
   OFF_PRODUCT: ['Open Food Facts', 'Open Food Facts'],
   SPOT: ['Adresse', 'عنوان'],
   SCAN: ['Résultat du scanner', 'نتيجة الماسح'],
+  FORUM_THREAD: ['Forum : question', 'المنتدى: سؤال'],
+  FORUM_REPLY: ['Forum : réponse', 'المنتدى: رد'],
 };
 
 const FILTERS = [
@@ -74,6 +79,8 @@ export default function BackofficeReports({ lang, onCountChange }) {
 
   const openTarget = (r) => {
     if (r.targetType === 'SPOT') navigate(pathFor('map'));
+    // Forum posts: the id starts with the question's id ("<question id>:<reply id>" for a reply)
+    else if (r.targetType.startsWith('FORUM_')) navigate(pathFor('forum', { threadId: r.targetId.slice(0, 36) }));
     else navigate(pathFor('search', { query: { q: r.targetType === 'OFF_PRODUCT' && /^\d{8,14}$/.test(r.targetId) ? r.targetId : r.targetLabel.replace(/\s*\(.*\)$/, '') } }));
   };
 
@@ -116,7 +123,7 @@ export default function BackofficeReports({ lang, onCountChange }) {
           {reports.map((r) => {
             const [reasonFr, reasonAr] = REASON_LABELS[r.reason] || REASON_LABELS.OTHER;
             const [targetFr, targetAr] = TARGET_LABELS[r.targetType] || ['', ''];
-            const urgent = r.reason === 'REACTION' || r.reason === 'LABEL_CHANGED' || r.reason === 'NO_LONGER_GLUTEN_FREE';
+            const urgent = r.reason === 'REACTION' || r.reason === 'LABEL_CHANGED' || r.reason === 'NO_LONGER_GLUTEN_FREE' || r.reason === 'DANGEROUS_ADVICE';
             return (
               <li key={r._id} className={`panel space-y-2 p-4 ${urgent && r.status === 'OPEN' ? 'border-status-unsafe/50' : ''}`}>
                 <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -134,7 +141,13 @@ export default function BackofficeReports({ lang, onCountChange }) {
                 <div className="flex flex-wrap gap-2 pt-1">
                   {r.targetType !== 'SCAN' && (
                     <button type="button" className="btn-quiet" onClick={() => openTarget(r)}>
-                      {r.targetType === 'SPOT' ? <MapPin className="h-4 w-4" aria-hidden="true" /> : <Search className="h-4 w-4" aria-hidden="true" />}
+                      {r.targetType === 'SPOT' ? (
+                        <MapPin className="h-4 w-4" aria-hidden="true" />
+                      ) : r.targetType.startsWith('FORUM_') ? (
+                        <MessagesSquare className="h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        <Search className="h-4 w-4" aria-hidden="true" />
+                      )}
                       {tr('Voir', 'عرض')}
                     </button>
                   )}

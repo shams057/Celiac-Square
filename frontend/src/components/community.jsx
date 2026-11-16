@@ -81,12 +81,17 @@ const REASONS = {
   NO_LONGER_GLUTEN_FREE: ['Ce lieu ne propose plus de sans gluten sûr', 'لم يعد هذا المكان يقدم منتجات آمنة بدون غلوتين'],
   WRONG_INFO: ['Une information est fausse (adresse, horaires, nom…)', 'معلومة خاطئة (العنوان، الأوقات، الاسم…)'],
   REACTION: ['J’ai eu une réaction après en avoir mangé', 'أصابني عارض بعد تناوله'],
+  DANGEROUS_ADVICE: ['Conseil dangereux ou faux pour un cœliaque', 'نصيحة خطيرة أو خاطئة لمريض الأبطن'],
+  SPAM: ['Publicité ou message hors sujet', 'إعلان أو رسالة خارج الموضوع'],
+  ABUSE: ['Propos irrespectueux ou insultants', 'كلام غير محترم أو مسيء'],
   OTHER: ['Autre problème', 'مشكلة أخرى'],
 };
 
 const REASONS_BY_TARGET = {
   SPOT: ['CLOSED', 'NO_LONGER_GLUTEN_FREE', 'WRONG_INFO', 'REACTION', 'OTHER'],
   SCAN: ['WRONG_STATUS', 'WRONG_INFO', 'OTHER'],
+  FORUM_THREAD: ['DANGEROUS_ADVICE', 'SPAM', 'ABUSE', 'OTHER'],
+  FORUM_REPLY: ['DANGEROUS_ADVICE', 'SPAM', 'ABUSE', 'OTHER'],
   default: ['LABEL_CHANGED', 'WRONG_STATUS', 'WRONG_INFO', 'REACTION', 'OTHER'],
 };
 
@@ -170,7 +175,11 @@ function ReportForm({ target, lang, onDone }) {
           required={needsMessage}
           minLength={needsMessage ? 5 : undefined}
           className="field"
-          placeholder={tr('Ex. : « blé » apparaît maintenant dans les ingrédients (lot de mars 2026).', 'مثال: يظهر «القمح» الآن في المكونات (دفعة مارس 2026).')}
+          placeholder={
+            target.type.startsWith('FORUM_')
+              ? tr('Ex. : ce message conseille de « tester » un peu de gluten.', 'مثال: تنصح هذه الرسالة بـ«تجربة» القليل من الغلوتين.')
+              : tr('Ex. : « blé » apparaît maintenant dans les ingrédients (lot de mars 2026).', 'مثال: يظهر «القمح» الآن في المكونات (دفعة مارس 2026).')
+          }
         />
       </div>
       {/* Honeypot: hidden from people, filled in by bots */}
@@ -188,7 +197,7 @@ function ReportForm({ target, lang, onDone }) {
 
 /**
  * "Signaler un problème" link that opens the report form.
- * target: { type: 'ATMC_PRODUCT' | 'ASSOCIATION_PRODUCT' | 'OFF_PRODUCT' | 'SPOT' | 'SCAN', id?, label }
+ * target: { type: 'ATMC_PRODUCT' | 'ASSOCIATION_PRODUCT' | 'OFF_PRODUCT' | 'SPOT' | 'SCAN' | 'FORUM_THREAD' | 'FORUM_REPLY', id?, label }
  * iconOnly: a small flag button for dense lists.
  */
 export function ReportButton({ target, lang, iconOnly = false, className = '' }) {

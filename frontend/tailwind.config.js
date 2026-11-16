@@ -76,11 +76,12 @@ const dark = {
   '--map-tiles': 'invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.88) saturate(0.7)',
 };
 
-// Dark follows the device unless the person chose a theme (data-theme on <html>, see services/theme.js)
+// Light is the default. Dark only when the person chose it, or chose "auto" on a device set to dark
+// (data-theme on <html>, see services/theme.js)
 const themes = plugin(({ addBase }) =>
   addBase({
     ':root': light,
-    '@media (prefers-color-scheme: dark)': { ":root:not([data-theme='light'])": dark },
+    '@media (prefers-color-scheme: dark)': { ":root[data-theme='auto']": dark },
     ":root[data-theme='dark']": dark,
   })
 );
@@ -88,7 +89,7 @@ const themes = plugin(({ addBase }) =>
 /** @type {import('tailwindcss').Config} */
 export default {
   // `dark:` matches the same rule as the theme variables
-  darkMode: ['variant', ['@media (prefers-color-scheme: dark) { &:not([data-theme="light"] *) }', '&:is([data-theme="dark"] *)']],
+  darkMode: ['variant', ['@media (prefers-color-scheme: dark) { &:is([data-theme="auto"] *) }', '&:is([data-theme="dark"] *)']],
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
@@ -156,10 +157,11 @@ export default {
         // Dialogs and filter sheets: rise from the bottom on phones, settle in place on larger screens
         'sheet-up': { '0%': { opacity: '0', transform: 'translateY(32px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
         'pop-in': { '0%': { opacity: '0', transform: 'translateY(8px) scale(0.98)' }, '100%': { opacity: '1', transform: 'translateY(0) scale(1)' } },
-        // Page changes: the new page slides in from the side of the tab that was tapped.
+        // Page changes: the new page slides in from the side of the tab that was tapped. The tab bar is not
+        // mirrored in Arabic, so neither is this: "end" is the right-hand side in both languages.
         // "backwards" drops the transform when done, so fixed dialogs inside the page stay fixed to the screen
-        'page-from-end': { '0%': { opacity: '0', transform: 'translateX(var(--page-shift))' }, '100%': { opacity: '1', transform: 'translateX(0)' } },
-        'page-from-start': { '0%': { opacity: '0', transform: 'translateX(calc(var(--page-shift) * -1))' }, '100%': { opacity: '1', transform: 'translateX(0)' } },
+        'page-from-end': { '0%': { opacity: '0', transform: 'translateX(24px)' }, '100%': { opacity: '1', transform: 'translateX(0)' } },
+        'page-from-start': { '0%': { opacity: '0', transform: 'translateX(-24px)' }, '100%': { opacity: '1', transform: 'translateX(0)' } },
         'grow-x': { '0%': { transform: 'scaleX(0)' }, '100%': { transform: 'scaleX(1)' } },
         indeterminate: { '0%': { transform: 'translateX(-100%)' }, '100%': { transform: 'translateX(300%)' } },
       },

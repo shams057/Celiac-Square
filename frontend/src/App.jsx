@@ -7,6 +7,7 @@ import AtmcCatalog from './components/AtmcCatalog';
 import AboutCeliac from './components/AboutCeliac';
 import TunisiaMap from './components/TunisiaMap';
 import Marketplace from './components/Marketplace';
+import Forum from './components/Forum';
 import AuthPanel from './components/AuthPanel';
 import ResetPassword from './components/ResetPassword';
 import SellerDashboard from './components/SellerDashboard';
@@ -24,8 +25,8 @@ import { WifiOff } from 'lucide-react';
 import { AuthProvider, useAuth } from './components/AuthContext';
 import { navigate, pathFor, useRoute } from './services/router';
 
-// Dock tabs first (the guide sits behind the search tab), then pages reached from the account menu and the footer
-const TAB_ORDER = ['learn', 'search', 'atmc', 'vision', 'map', 'market', 'account', 'reset-password', 'seller', 'become-seller', 'backoffice', 'privacy', 'saved', 'orders'];
+// Dock tabs first, in the order of the bar (search and the guide sit behind the scanner), then pages reached from the account menu and the footer
+const TAB_ORDER = ['learn', 'map', 'vision', 'search', 'atmc', 'forum', 'market', 'account', 'reset-password', 'seller', 'become-seller', 'backoffice', 'privacy', 'saved', 'orders'];
 
 const PAGE_TITLES = {
   learn: ['Comprendre la maladie cœliaque', 'افهم مرض الأبطن'],
@@ -34,6 +35,7 @@ const PAGE_TITLES = {
   search: ['Rechercher un produit', 'ابحث عن منتج'],
   map: ['Carte des adresses', 'خريطة العناوين'],
   market: ['Marché sans gluten', 'سوق بدون غلوتين'],
+  forum: ['Forum', 'المنتدى'],
   account: ['Mon compte', 'حسابي'],
   'reset-password': ['Nouveau mot de passe', 'كلمة مرور جديدة'],
   seller: ['Ma boutique', 'محلي'],
@@ -147,7 +149,7 @@ function AppShell() {
         heading.focus({ preventScroll: true });
       }
     });
-  }, [activeTab, route.params.storeId]);
+  }, [activeTab, route.params.storeId, route.params.threadId]);
 
   const goTo = (tab, options) => navigate(pathFor(tab, options));
 
@@ -172,6 +174,16 @@ function AppShell() {
             storeId={route.params.storeId || null}
             onOpenStore={(id) => goTo('market', { storeId: id })}
             onCloseStore={() => goTo('market')}
+          />
+        );
+      case 'forum':
+        return (
+          <Forum
+            lang={lang}
+            threadId={route.params.threadId || null}
+            query={route.query}
+            onOpenThread={(id) => goTo('forum', { threadId: id })}
+            onNavigate={(query, options) => navigate(pathFor('forum', { query }), options)}
           />
         );
       case 'account':
@@ -215,7 +227,7 @@ function AppShell() {
       )}
 
       <main id="main" ref={mainRef} className="mx-auto w-full max-w-6xl flex-1 overflow-x-clip px-4 pb-32 pt-3 sm:px-6 sm:pt-6 lg:pb-20">
-        <div key={activeTab} className={slide}>
+        <div key={`${activeTab}:${route.params.threadId || ''}`} className={slide}>
           {page}
         </div>
       </main>

@@ -10,10 +10,12 @@ export const ROUTES = {
   vision: '/',
   // What celiac disease is and how to live with it: the first tab
   learn: '/comprendre',
-  // The ATMC guide is opened from the search page; it keeps its own address
+  // Search is opened from the scanner page, and the ATMC guide from the search page; both keep their own address
   atmc: '/guide',
   search: '/recherche',
   map: '/carte',
+  // Questions and answers between users; a question has its own address (see THREAD_RE)
+  forum: '/forum',
   market: '/marche',
   account: '/compte',
   'reset-password': '/compte/nouveau-mot-de-passe',
@@ -29,6 +31,7 @@ export const ROUTES = {
 const ALIASES = { '/scanner': 'vision' };
 
 const STORE_RE = /^\/marche\/boutique\/([0-9a-f-]{36})\/?$/i;
+const THREAD_RE = /^\/forum\/question\/([0-9a-f-]{36})\/?$/i;
 
 /** { tab, params, query } for a location */
 export const parseLocation = (loc = window.location) => {
@@ -36,12 +39,15 @@ export const parseLocation = (loc = window.location) => {
   const query = Object.fromEntries(new URLSearchParams(loc.search));
   const store = STORE_RE.exec(path);
   if (store) return { tab: 'market', params: { storeId: store[1] }, query };
+  const thread = THREAD_RE.exec(path);
+  if (thread) return { tab: 'forum', params: { threadId: thread[1] }, query };
   const tab = Object.keys(ROUTES).find((key) => ROUTES[key] === path) || ALIASES[path] || 'vision';
   return { tab, params: {}, query };
 };
 
-export const pathFor = (tab, { storeId, query } = {}) => {
-  const base = tab === 'market' && storeId ? `/marche/boutique/${storeId}` : ROUTES[tab] || '/';
+export const pathFor = (tab, { storeId, threadId, query } = {}) => {
+  const base =
+    tab === 'market' && storeId ? `/marche/boutique/${storeId}` : tab === 'forum' && threadId ? `/forum/question/${threadId}` : ROUTES[tab] || '/';
   const qs = query && Object.keys(query).length ? `?${new URLSearchParams(query)}` : '';
   return base + qs;
 };

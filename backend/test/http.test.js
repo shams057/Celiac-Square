@@ -76,3 +76,31 @@ test('scanner photo routes reject bad images and oversized bodies', async () => 
   assert.equal((await post('/api/vision/ingredients', { image: 'not-an-image' })).status, 400);
   assert.equal((await post('/api/vision/identify', { image: `data:image/jpeg;base64,${'A'.repeat(3.2 * 1024 * 1024)}` })).status, 413);
 });
+
+test('the forum is read by everyone, written by signed-in accounts only', async () => {
+  const id = '11111111-1111-4111-8111-111111111111';
+  const send = (method, path, body) =>
+    fetch(`${base}${path}`, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+
+  // Writing, liking and saving need an account
+  assert.equal((await send('POST', '/api/forum/threads', { title: 'Une question valide ?', category: 'OTHER' })).status, 401);
+  assert.equal((await send('POST', `/api/forum/threads/${id}/replies`, { body: 'Une réponse' })).status, 401);
+  assert.equal((await send('PATCH', `/api/forum/threads/${id}`, { isPinned: true })).status, 401);
+  assert.equal((await send('DELETE', `/api/forum/replies/${id}`)).status, 401);
+  assert.equal((await send('PUT', `/api/forum/threads/${id}/accepted`, { replyId: id })).status, 401);
+  for (const path of [`/api/forum/threads/${id}/like`, `/api/forum/replies/${id}/like`, `/api/forum/threads/${id}/save`]) {
+    assert.equal((await send('PUT', path)).status, 401);
+    assert.equal((await send('DELETE', path)).status, 401);
+  }
+  // So do the saved and "my questions" lists
+  assert.equal((await send('GET', '/api/forum/threads?view=saved')).status, 401);
+  assert.equal((await send('GET', '/api/forum/threads?view=mine')).status, 401);
+
+  // An id that is not one answers "not found" without asking the database
+  assert.equal((await send('GET', '/api/forum/threads/..%2Fetc')).status, 404);
+  // The database is unreachable here: reading fails cleanly, and the process stays up
+  const list = await send('GET', '/api/forum/threads?sort=popular&category=PRODUCTS&q=farine&page=2');
+  assert.equal(list.status, 500);
+  assert.equal((await list.json()).message, 'Erreur interne du serveur.');
+  assert.equal((await fetch(`${base}/api/health`)).status, 200);
+});

@@ -6,7 +6,7 @@ import { readText } from '../services/ocr';
 import { detectBarcode, preloadBarcodeReader } from '../services/barcode';
 import { addToHistory } from '../services/history';
 import { navigate, pathFor } from '../services/router';
-import { t, statusKind, STATUS, StatusTile, PageHead, Notice } from './ui';
+import { t, statusKind, STATUS, StatusTile, PageHead, PageLink, Notice } from './ui';
 import { SegmentedSlider } from './Slider';
 import { SourceLine, SaveButton, ReportButton, productTargetType, productTargetId } from './community';
 
@@ -379,6 +379,13 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
           'Photographiez l’emballage pour retrouver le produit dans le guide, ou la liste d’ingrédients pour savoir s’il contient du gluten.',
           'صوّر العلبة للعثور على المنتج في الدليل، أو قائمة المكونات لمعرفة إن كان يحتوي على الغلوتين.'
         )}
+        // The search page has no tab of its own: this is its way in
+        action={
+          <PageLink to="search" className="btn-quiet w-full sm:w-auto">
+            <Search className="h-[18px] w-[18px]" aria-hidden="true" />
+            {tr('Rechercher un produit', 'ابحث عن منتج')}
+          </PageLink>
+        }
       />
 
       {/* Mode switch */}

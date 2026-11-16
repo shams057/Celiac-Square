@@ -20,6 +20,7 @@ import orderRoutes from './routes/orderRoutes.js';
 import orderAdminRoutes from './routes/orderAdminRoutes.js';
 import whatsappRoutes from './routes/whatsappRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
+import forumRoutes from './routes/forumRoutes.js';
 
 dotenv.config();
 
@@ -78,6 +79,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/me', meRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/whatsapp', whatsappRoutes);
+app.use('/api/forum', forumRoutes);
 
 app.get('/', (req, res) => {
   res.send('Celiac Square Tunisia API is running smoothly.');

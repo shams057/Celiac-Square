@@ -244,6 +244,46 @@ export const fetchMySpotFeedback = async (spotId) => (await axios.get(`${API_BAS
 /** answers: { reacted, dedicatedKitchen, staffAware }, each true, false or null */
 export const sendSpotFeedback = async (spotId, answers) => (await axios.put(`${API_BASE}/map/spots/${spotId}/feedback`, answers)).data;
 
+// Forum ------------------------------------------------------------------
+
+/** filters: { category, sort: 'recent' | 'popular' | 'unanswered', q, view: 'all' | 'saved' | 'mine', page } */
+export const fetchForumThreads = async ({ category, sort, q, view, page } = {}) =>
+  (
+    await axios.get(`${API_BASE}/forum/threads`, {
+      params: {
+        category: category && category !== 'ALL' ? category : undefined,
+        sort: sort && sort !== 'recent' ? sort : undefined,
+        q: q || undefined,
+        view: view && view !== 'all' ? view : undefined,
+        page: page > 1 ? page : undefined,
+      },
+    })
+  ).data;
+
+/** The question with its answers */
+export const fetchForumThread = async (id) => (await axios.get(`${API_BASE}/forum/threads/${id}`)).data;
+
+/** thread: { title, body, category, lang } */
+export const createForumThread = async (thread) => (await axios.post(`${API_BASE}/forum/threads`, thread)).data;
+
+/** changes: { title?, body?, category? }; the team can also send { isPinned, isLocked } */
+export const updateForumThread = async (id, changes) => (await axios.patch(`${API_BASE}/forum/threads/${id}`, changes)).data;
+
+export const deleteForumThread = async (id) => (await axios.delete(`${API_BASE}/forum/threads/${id}`)).data;
+
+export const createForumReply = async (threadId, body, parentId = null) =>
+  (await axios.post(`${API_BASE}/forum/threads/${threadId}/replies`, { body, parentId })).data;
+
+export const updateForumReply = async (id, body) => (await axios.patch(`${API_BASE}/forum/replies/${id}`, { body })).data;
+
+export const deleteForumReply = async (id) => (await axios.delete(`${API_BASE}/forum/replies/${id}`)).data;
+
+/** replyId: the answer that solved the question, or null to unmark it */
+export const acceptForumReply = async (threadId, replyId) => (await axios.put(`${API_BASE}/forum/threads/${threadId}/accepted`, { replyId })).data;
+
+/** kind: 'threads' | 'replies'; mark: 'like' | 'save' (save is for threads only) */
+export const setForumMark = async (kind, id, mark, on) => (await axios({ method: on ? 'put' : 'delete', url: `${API_BASE}/forum/${kind}/${id}/${mark}` })).data;
+
 /** The message to show for a failed request: the API's own message for 4xx, a fallback otherwise */
 export const errorMessage = (err, fallback) => {
   const status = err?.response?.status;

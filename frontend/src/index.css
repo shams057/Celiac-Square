@@ -327,7 +327,7 @@
 }
 
 @layer base {
-  /* Distance pages slide when switching tabs; mirrored in Arabic */
+  /* Distance content travels when it is revealed from its own side of the page; mirrored in Arabic */
   :root {
     --page-shift: 24px;
   }

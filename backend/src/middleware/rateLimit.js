@@ -72,6 +72,13 @@ export const limits = {
     max: 10,
     message: 'Vous avez déjà passé plusieurs commandes. Réessayez plus tard ou appelez-nous.',
   }),
+  // Forum questions and answers; each account also has its own daily and hourly caps (see forumRoutes.js)
+  forumPosts: rateLimit({
+    name: 'forum-posts',
+    windowMs: 10 * MINUTE,
+    max: 20,
+    message: 'Vous publiez très vite. Patientez quelques minutes puis réessayez.',
+  }),
   // Proxied to Open Food Facts, which rate-limits our server's IP
   productSearch: rateLimit({ name: 'product-search', windowMs: MINUTE, max: 60 }),
 };

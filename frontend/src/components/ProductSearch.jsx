@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, LoaderCircle, X, BookOpen } from 'lucide-react';
+import { Search, LoaderCircle, X, BookOpen, ChevronLeft } from 'lucide-react';
 import { searchProducts, fetchAtmcProducts } from '../services/api';
 import { t, statusKind, STATUS, StatusTile, PageHead, PageLink, Notice, EmptyState } from './ui';
 import { SourceLine, SaveButton, ReportButton, atmcAsProduct, productTargetType, productTargetId } from './community';
@@ -111,6 +111,11 @@ export default function ProductSearch({ initialQuery = '', lang }) {
 
   return (
     <div className="space-y-6">
+      {/* Search is opened from the scanner page: this leads back to it */}
+      <PageLink to="vision" className="-mb-2 -ms-1.5 inline-flex min-h-11 items-center gap-0.5 rounded-full pe-3 text-[15px] font-medium text-primary-dark">
+        <ChevronLeft className="h-5 w-5 rtl:rotate-180" aria-hidden="true" />
+        {tr('Scanner', 'الماسح')}
+      </PageLink>
       <PageHead
         title={tr('Rechercher un produit', 'ابحث عن منتج')}
         lede={tr(

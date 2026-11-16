@@ -4,6 +4,7 @@ import { pathIn } from '../src/services/marketImages.js';
 import { similarity } from '../src/routes/atmcRoutes.js';
 import { rateLimit } from '../src/middleware/rateLimit.js';
 import { passwordProblem } from '../src/routes/authRoutes.js';
+import { publicName, cleanText } from '../src/routes/forumRoutes.js';
 
 process.env.SUPABASE_URL ||= 'https://example.supabase.co';
 const prefix = `${process.env.SUPABASE_URL}/storage/v1/object/public/marketplace/`;
@@ -77,4 +78,17 @@ test('spot categories keep the main one first, drop unknown values and duplicate
   assert.deepEqual(normalizeCategories('restaurant'), ['RESTAURANT']);
   assert.deepEqual(normalizeCategories(['nope']), []);
   assert.deepEqual(normalizeCategories(undefined), []);
+});
+
+test('forum posts show a first name and an initial, never the full name', () => {
+  assert.equal(publicName('Amira Ben Salah'), 'Amira S.');
+  assert.equal(publicName('  karim   trabelsi '), 'karim T.');
+  assert.equal(publicName('Sami'), 'Sami');
+  assert.equal(publicName(''), '');
+  assert.equal(publicName(undefined), '');
+});
+
+test('forum text keeps its line breaks, without runs of blank lines', () => {
+  assert.equal(cleanText('  Bonjour,  \r\n\r\n\r\n\r\nmerci   \n'), 'Bonjour,\n\nmerci');
+  assert.equal(cleanText(42), '');
 });

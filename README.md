@@ -31,7 +31,8 @@ Plateforme web et mobile pour manger sans gluten en Tunisie : le guide officiel 
 | **Hors ligne** | Application installable (manifest + service worker `frontend/src/sw.js`). Le guide ATMC est téléchargé à l’installation et reste consultable et cherchable sans réseau ; la carte garde la dernière liste vue. |
 | **Carte** | Médecins, boulangeries, restaurants, cafés et épiceries sans gluten, filtrables par type et par ville. « Près de moi » (la position reste sur l’appareil), « Ouvert maintenant » d’après les horaires indiqués. |
 | **Avis des membres** | Sur chaque lieu, trois questions oui/non aux membres connectés (réaction ? cuisine dédiée ? personnel informé ?) ; seuls les totaux sont publiés. |
-| **Signalements** | « Signaler un problème » sur les produits, les lieux et les résultats du scanner ; ils arrivent dans le back-office. |
+| **Signalements** | « Signaler un problème » sur les produits, les lieux, les résultats du scanner et les messages du forum ; ils arrivent dans le back-office. |
+| **Forum** | Questions et réponses entre membres (`/forum`, une adresse par question). Lecture ouverte à tous ; un compte pour poser une question, répondre, dire « même question » ou « utile », et **enregistrer** une discussion pour la retrouver (onglet *Enregistrées*). Huit rubriques, recherche, tri (récentes, populaires, sans réponse). L’auteur choisit la réponse qui a résolu sa question ; l’équipe peut épingler, fermer ou supprimer. Seuls le prénom et l’initiale du nom sont affichés. |
 | **Mes produits** | Produits enregistrés (compte), avec alerte si le guide change leur statut, et historique des scans (sur l’appareil seulement). |
 | **Propositions** | Les visiteurs proposent des adresses ; elles arrivent dans une boîte de réception administrateur avant publication. |
 | **Marché** | Produits sans gluten des restaurants, boulangeries, cafés et artisans : tout voir d’un coup (rangé par boutique, comme un menu) ou boutique par boutique, recherche par produit, filtres par type. Réservé aux membres connectés. |
@@ -55,7 +56,7 @@ app/
 │       ├── app.js          # Application Express (sans écoute réseau)
 │       ├── server.js       # Serveur local (port 5000)
 │       ├── config/db.js    # Client Supabase côté serveur
-│       ├── routes/         # /api/map, /api/products, /api/atmc, /api/vision, /api/auth, /api/market, /api/orders, /api/admin, /api/admin/orders, /api/reports, /api/me
+│       ├── routes/         # /api/map, /api/products, /api/atmc, /api/vision, /api/auth, /api/market, /api/orders, /api/admin, /api/admin/orders, /api/reports, /api/me, /api/forum
 │       ├── services/       # Open Food Facts, vision, aiBalancer (rotation des IA), photos du marché (Storage)
 │       ├── middleware/     # Comptes connectés, rôles, accès administrateur
 │       ├── seed/           # Données initiales et script de seed
@@ -110,7 +111,8 @@ npm install
    - `20261103210000_initial_schema.sql` : tables `atmc_products`, `association_products`, `spots` et `spot_proposals`, recherche insensible aux accents, règles de sécurité ;
    - `20261105120000_marketplace.sql` : comptes (`profiles`, avec le rôle), `stores`, `market_products`, `seller_applications` et le bucket Storage public `marketplace` pour les photos ;
    - `20261105130000_lock_handle_new_user.sql` : interdit d’appeler la fonction de création de profil depuis l’API ;
-   - `20261105160000_audit_fixes.sql` : plus de notes inventées sur les adresses, date et auteur de la vérification, limites de longueur des textes, journal des actions admin (`admin_audit_log`).
+   - `20261105160000_audit_fixes.sql` : plus de notes inventées sur les adresses, date et auteur de la vérification, limites de longueur des textes, journal des actions admin (`admin_audit_log`) ;
+   - les fichiers suivants, dans l’ordre de leur date, jusqu’à `20261116100000_forum.sql` : le forum (`forum_threads`, `forum_replies`, les « même question » et « utile », `forum_saved_threads`) et le signalement de ses messages. Tant que ce dernier fichier n’est pas exécuté, la page Forum affiche « Le forum ouvre bientôt ».
    Sur une base existante, n’exécutez que les fichiers qui ne l’ont pas encore été (**Database → Migrations** les liste).
    Dans **Authentication → Sign In / Providers → Email**, activez *Confirm email* (recommandé : sans confirmation, le formulaire d’inscription peut révéler qu’une adresse a déjà un compte). Réglez aussi la longueur minimale du mot de passe sur 10.
    Dans **Authentication → URL Configuration**, ajoutez `<SITE_URL>/compte/nouveau-mot-de-passe` aux *Redirect URLs* (lien des e-mails « mot de passe oublié »).
@@ -309,11 +311,20 @@ L’APK local est signé avec la clé de débogage : il convient pour vos appare
 | POST | `/api/admin/orders/:id/status` | Équipe | Étape suivante ou précédente, annulation (`{ status, cancelReason, carrier, trackingNumber, note }`) |
 | POST | `/api/admin/orders/:id/whatsapp` | Équipe | (Re)envoyer la demande de confirmation WhatsApp |
 | POST | `/api/admin/orders/:id/calls` / `notes` | Équipe | Noter un appel (`REACHED`, `NO_ANSWER`, `CALL_BACK`) ou une note |
+| GET | `/api/forum/threads` | Public | Questions du forum (`category`, `sort=recent\|popular\|unanswered`, `q`, `page` ; `view=saved\|mine` pour un membre) |
+| GET | `/api/forum/threads/:id` | Public | Une question et ses réponses |
+| POST | `/api/forum/threads` | Membre | Poser une question (`{ title, body, category, lang }`) ; 8 par jour et par compte |
+| PATCH / DELETE | `/api/forum/threads/:id` | Auteur, Équipe | Modifier ou supprimer ; l’équipe peut aussi `{ isPinned, isLocked }` |
+| POST | `/api/forum/threads/:id/replies` | Membre | Répondre (`{ body, parentId }`) |
+| PATCH / DELETE | `/api/forum/replies/:id` | Auteur, Équipe | Modifier ou supprimer une réponse |
+| PUT | `/api/forum/threads/:id/accepted` | Auteur, Équipe | Choisir la réponse qui résout la question (`{ replyId }`, `null` pour l’enlever) |
+| PUT / DELETE | `/api/forum/threads/:id/like`, `/api/forum/replies/:id/like` | Membre | « Même question » / « Utile » (pas sur ses propres messages) |
+| PUT / DELETE | `/api/forum/threads/:id/save` | Membre | Enregistrer une discussion ou la retirer |
 | GET / POST | `/api/whatsapp/webhook` | Meta | Vérification du webhook ; réponses des clients (signature `X-Hub-Signature-256` vérifiée) |
 
 Les routes *Membre*, *Client*, *Vendeur* et *Admin* exigent l’en-tête `Authorization: Bearer <jeton d’accès>` d’un compte qui a le rôle voulu. Le jeton d’accès est renvoyé par `/login` et `/refresh` et gardé en mémoire par le site ; le jeton de renouvellement reste dans un cookie httpOnly. Les actions admin sont enregistrées dans `admin_audit_log` (onglet *Journal* du back-office).
 
-Limites de débit (par IP) : 300 requêtes/min sur l’API, 10 connexions ou inscriptions par 15 min, 5 propositions d’adresse ou demandes de vendeur par heure, 60 recherches produits/min. Le scanner (`/api/vision`) n’est pas limité.
+Limites de débit (par IP) : 300 requêtes/min sur l’API, 10 connexions ou inscriptions par 15 min, 5 propositions d’adresse ou demandes de vendeur par heure, 60 recherches produits/min, 20 messages de forum par 10 min. Le scanner (`/api/vision`) n’est pas limité.
 
 ### Données
 

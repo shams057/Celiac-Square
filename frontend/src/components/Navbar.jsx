@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { WheatOff, Camera, Search, MapPin, ShoppingCart, Languages, ShoppingBag, UserRound, Store, LogOut, Bookmark, Package, LayoutDashboard, LogIn, Moon, Sun, SunMoon } from 'lucide-react';
+import { WheatOff, Camera, MapPin, MessagesSquare, ShoppingCart, Languages, ShoppingBag, UserRound, Store, LogOut, Bookmark, Package, LayoutDashboard, LogIn, Moon, Sun, SunMoon } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import { BrandMark, t } from './ui';
 import { pathFor } from '../services/router';
@@ -14,13 +14,14 @@ const linkClick = (go, tab) => (e) => {
   go(tab);
 };
 
+// The tabs keep these places in French and in Arabic: the bar is not mirrored (see TabBar)
 const TABS = [
   { id: 'learn', icon: WheatOff, fr: 'Comprendre', ar: 'افهم' },
-  // The ATMC guide is opened from the search page, so this tab stays marked while it is open
-  { id: 'search', icon: Search, fr: 'Recherche', ar: 'بحث', covers: ['atmc'] },
-  // The main action sits in the middle, larger than the other tabs
-  { id: 'vision', icon: Camera, fr: 'Scanner', ar: 'الماسح', primary: true },
   { id: 'map', icon: MapPin, fr: 'Carte', ar: 'الخريطة' },
+  // The main action sits in the middle, larger than the other tabs.
+  // Search and the ATMC guide are opened from the scanner page, so this tab stays marked while they are open
+  { id: 'vision', icon: Camera, fr: 'Scanner', ar: 'الماسح', primary: true, covers: ['search', 'atmc'] },
+  { id: 'forum', icon: MessagesSquare, fr: 'Forum', ar: 'المنتدى' },
   { id: 'market', icon: ShoppingBag, fr: 'Marché', ar: 'السوق' },
 ];
 
@@ -37,10 +38,12 @@ export default function Navbar({ activeTab, setActiveTab, lang, setLang }) {
   return (
     <>
       {/* Top: no bar. The brand sits on the page; the controls float above it as glass,
-          and the page softens as it scrolls underneath (the scroll edge). */}
+          and the page softens as it scrolls underneath (the scroll edge).
+          The row is laid out left to right in both languages (dir="ltr"), so the brand and the
+          buttons keep their places when the language changes; only the text inside is translated. */}
       <header className="pointer-events-none sticky top-0 z-[900]">
         <div aria-hidden="true" className="scroll-edge-top absolute inset-x-0 top-0 h-24" />
-        <div className="relative mx-auto grid h-[4.5rem] max-w-6xl grid-cols-[1fr_auto] items-center gap-3 px-4 sm:px-6 lg:grid-cols-[1fr_auto_1fr]">
+        <div dir="ltr" className="relative mx-auto grid h-[4.5rem] max-w-6xl grid-cols-[1fr_auto] items-center gap-3 px-4 sm:px-6 lg:grid-cols-[1fr_auto_1fr]">
           <button
             type="button"
             onClick={() => setActiveTab('vision')}
@@ -65,7 +68,7 @@ export default function Navbar({ activeTab, setActiveTab, lang, setLang }) {
               aria-label={lang === 'fr' ? 'العربية — عرض الموقع بالعربية' : 'Français — afficher le site en français'}
             >
               <Languages className="h-[18px] w-[18px]" aria-hidden="true" />
-              <span className="hidden pe-1 sm:inline" aria-hidden="true">{lang === 'fr' ? 'العربية' : 'Français'}</span>
+              <span className="hidden pr-1 sm:inline" aria-hidden="true">{lang === 'fr' ? 'العربية' : 'Français'}</span>
             </button>
             <CartBarButton lang={lang} />
             <AccountMenu lang={lang} go={setActiveTab} />
@@ -88,6 +91,7 @@ export default function Navbar({ activeTab, setActiveTab, lang, setLang }) {
  * The floating glass tab bar. The bar is monochrome; the current tab is marked by a soft fill
  * (a fill inside the glass, not a second pane) and by the sage tint.
  * The fill is a real slider: press anywhere on the bar and slide to another tab, it opens on release.
+ * The bar is laid out left to right in both languages (dir="ltr"): a tab stays where the thumb learned it.
  */
 function TabBar({ activeTab, setActiveTab, lang, placement }) {
   const tr = t(lang);
@@ -108,6 +112,7 @@ function TabBar({ activeTab, setActiveTab, lang, placement }) {
   return (
     <div
       ref={trackRef}
+      dir="ltr"
       className={`slider-track slider-grab glass pointer-events-auto relative grid grid-cols-5 rounded-full p-1 ${top ? 'w-[35rem]' : 'w-full max-w-md'}`}
       {...trackProps}
     >
@@ -196,7 +201,7 @@ function CartBarButton({ lang }) {
       {count > 0 && (
         <span
           aria-hidden="true"
-          className="absolute -end-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-ink px-1 text-[11px] font-semibold tabular-nums text-canvas-paper ring-2 ring-canvas"
+          className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-ink px-1 text-[11px] font-semibold tabular-nums text-canvas-paper ring-2 ring-canvas"
         >
           {count > 99 ? '99+' : count}
         </span>
@@ -266,9 +271,9 @@ function AccountMenu({ lang, go }) {
     };
   }, [open]);
 
-  const choose = (tab) => {
+  const choose = (tab, options) => {
     setOpen(false);
-    go(tab);
+    go(tab, options);
   };
   const initial = user ? (user.fullName || user.email || '?').trim().charAt(0).toUpperCase() : null;
   const [roleFr, roleAr] = (user && ROLE_LABELS[user.role]) || ROLE_LABELS.CLIENT;
@@ -290,7 +295,7 @@ function AccountMenu({ lang, go }) {
         {user ? initial : <UserRound className="h-[18px] w-[18px]" aria-hidden="true" />}
       </button>
       {open && (
-        <div id="account-menu" className="glass glass-thick absolute end-0 top-[3.25rem] w-72 animate-pop-in rounded-3xl p-2">
+        <div id="account-menu" dir={lang === 'ar' ? 'rtl' : 'ltr'} className="glass glass-thick absolute right-0 top-[3.25rem] w-72 animate-pop-in rounded-3xl p-2">
           {user ? (
             <>
               <div className="px-3 pb-2 pt-1.5">
@@ -311,6 +316,10 @@ function AccountMenu({ lang, go }) {
               <button type="button" className={item} onClick={() => choose('saved')}>
                 <Bookmark className="h-4 w-4 text-ink-soft" aria-hidden="true" />
                 {tr('Mes produits et scans', 'منتجاتي وعمليات المسح')}
+              </button>
+              <button type="button" className={item} onClick={() => choose('forum', { query: { vue: 'enregistrees' } })}>
+                <MessagesSquare className="h-4 w-4 text-ink-soft" aria-hidden="true" />
+                {tr('Mes discussions enregistrées', 'نقاشاتي المحفوظة')}
               </button>
               <button type="button" className={item} onClick={() => choose('account')}>
                 <UserRound className="h-4 w-4 text-ink-soft" aria-hidden="true" />

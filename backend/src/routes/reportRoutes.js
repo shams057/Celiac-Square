@@ -5,13 +5,16 @@ import { asyncRouter, clean, badRequest, MAX_LEN } from '../utils/http.js';
 
 const router = asyncRouter();
 
-export const REPORT_TARGETS = ['ATMC_PRODUCT', 'ASSOCIATION_PRODUCT', 'OFF_PRODUCT', 'SPOT', 'SCAN'];
-export const REPORT_REASONS = ['LABEL_CHANGED', 'WRONG_STATUS', 'CLOSED', 'NO_LONGER_GLUTEN_FREE', 'WRONG_INFO', 'REACTION', 'OTHER'];
+export const REPORT_TARGETS = ['ATMC_PRODUCT', 'ASSOCIATION_PRODUCT', 'OFF_PRODUCT', 'SPOT', 'SCAN', 'FORUM_THREAD', 'FORUM_REPLY'];
+export const REPORT_REASONS = ['LABEL_CHANGED', 'WRONG_STATUS', 'CLOSED', 'NO_LONGER_GLUTEN_FREE', 'WRONG_INFO', 'REACTION', 'DANGEROUS_ADVICE', 'SPAM', 'ABUSE', 'OTHER'];
 
 // Reasons that make sense for each kind of target
 const REASONS_BY_TARGET = {
   SPOT: ['CLOSED', 'NO_LONGER_GLUTEN_FREE', 'WRONG_INFO', 'REACTION', 'OTHER'],
   SCAN: ['WRONG_STATUS', 'WRONG_INFO', 'OTHER'],
+  // Forum posts: targetId is the question's id, or "<question id>:<reply id>"
+  FORUM_THREAD: ['DANGEROUS_ADVICE', 'SPAM', 'ABUSE', 'OTHER'],
+  FORUM_REPLY: ['DANGEROUS_ADVICE', 'SPAM', 'ABUSE', 'OTHER'],
   default: ['LABEL_CHANGED', 'WRONG_STATUS', 'WRONG_INFO', 'REACTION', 'OTHER'],
 };
 
