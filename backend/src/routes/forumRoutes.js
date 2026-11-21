@@ -18,7 +18,8 @@ export const FORUM_CATEGORIES = ['DIAGNOSIS', 'PRODUCTS', 'PLACES', 'RECIPES', '
 export const FORUM_LIMITS = { titleMin: 8, title: 160, body: 5000, replyMin: 2, reply: 3000 };
 
 const SORTS = ['recent', 'popular', 'unanswered'];
-const VIEWS = ['all', 'saved', 'mine'];
+// answered: the questions the member replied to
+const VIEWS = ['all', 'saved', 'mine', 'answered'];
 const PAGE_SIZE = 20;
 const MAX_REPLIES = 500;
 const MAX_SAVED = 300;
@@ -220,8 +221,8 @@ const countSince = async (table, userId, since) => {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * GET /api/forum/threads?category=&sort=recent|popular|unanswered&q=&view=all|saved|mine&page=1
- * Pinned questions first, then the chosen order. `saved` and `mine` need an account.
+ * GET /api/forum/threads?category=&sort=recent|popular|unanswered&q=&view=all|saved|mine|answered&page=1
+ * Pinned questions first, then the chosen order. `saved`, `mine` and `answered` need an account.
  */
 router.get('/threads', async (req, res) => {
   const user = await getRequestUser(req);
@@ -246,6 +247,15 @@ router.get('/threads', async (req, res) => {
     query = query.in('id', saved.map((s) => s.thread_id));
   }
   if (view === 'mine') query = query.eq('author_id', user.id);
+  if (view === 'answered') {
+    // The questions with at least one of the member's answers (the 300 answered most recently), in the chosen order
+    const mine = rows(
+      await db().from('forum_replies').select('thread_id').eq('author_id', user.id).order('created_at', { ascending: false }).limit(1000)
+    );
+    const ids = [...new Set(mine.map((r) => r.thread_id))].slice(0, MAX_SAVED);
+    if (ids.length === 0) return res.json({ ...empty, posting: await postingOf(user) });
+    query = query.in('id', ids);
+  }
   if (FORUM_CATEGORIES.includes(category)) query = query.eq('category', category);
   if (q) query = query.ilike('search_text', containsPattern(q));
 
@@ -277,6 +287,29 @@ router.get('/threads', async (req, res) => {
   });
 });
 
+/** A visitor's reader id: a random id the page keeps on the device (see services/api.js) */
+const VISITOR_RE = /^[0-9a-z-]{16,64}$/i;
+
+/**
+ * Counts a read once per reader: the account when signed in, otherwise the device's random id
+ * (no id, no count). The author's own reads are not counted. Resolves to true when the count went up.
+ * Never fails the page: an error (or the migration not applied yet) is only logged.
+ */
+const recordView = async (row, user, req) => {
+  if (user?.id === row.author_id) return false;
+  const visitor = clean(req.headers['x-forum-reader']);
+  const viewer = user ? `u:${user.id}` : VISITOR_RE.test(visitor) ? `v:${visitor.toLowerCase()}` : null;
+  if (!viewer) return false;
+  try {
+    const { data, error } = await db().rpc('forum_record_view', { p_thread: row.id, p_viewer: viewer });
+    if (error) throw new Error(error.message);
+    return data === true;
+  } catch (err) {
+    console.error(`[Forum] view count: ${err.message}`);
+    return false;
+  }
+};
+
 /**
  * GET /api/forum/threads/:id
  * The question and its answers, oldest first (the page puts the accepted answer on top).
@@ -287,21 +320,19 @@ router.get('/threads/:id', async (req, res) => {
   if (!row) return notFound(res);
 
   const replies = rows(await db().from('forum_replies').select(REPLY_COLUMNS).eq('thread_id', row.id).order('created_at').limit(MAX_REPLIES));
-  const [thread, likedReplies, posting] = await Promise.all([
+  const [thread, likedReplies, posting, newReader] = await Promise.all([
     threadFor(row, user),
     idsOf('forum_reply_likes', 'reply_id', user, replies.map((r) => r.id)),
     postingOf(user),
+    recordView(row, user, req),
   ]);
-
-  // One more read; never worth failing the page for
-  db()
-    .rpc('forum_bump_views', { p_thread: row.id })
-    .then(({ error }) => error && console.error(`[Forum] view count: ${error.message}`), () => {});
 
   return res.json({
     success: true,
     data: {
       ...thread,
+      // The read just recorded is not in the row loaded before it
+      viewCount: thread.viewCount + (newReader ? 1 : 0),
       canModerate: isModerator(user),
       posting,
       replies: replies.map((r) => toReply(r, user, { liked: likedReplies.has(r.id), askerId: row.author_id })),

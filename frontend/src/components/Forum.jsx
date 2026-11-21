@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   MessagesSquare,
   MessageCircle,
@@ -52,7 +52,6 @@ import {
 } from '../services/api';
 import { navigate, pathFor } from '../services/router';
 import { t, BrandMark, PageHead, PageLink, Modal, Notice, EmptyState, Spinner } from './ui';
-import { SegmentedSlider } from './Slider';
 import { ReportButton } from './community';
 
 /**
@@ -81,7 +80,10 @@ const categoryOf = (id) => FORUM_CATEGORIES.find((c) => c.id === id) || FORUM_CA
 const VIEWS = [
   { id: 'all', slug: '', icon: MessagesSquare, fr: 'Toutes', ar: 'الكل' },
   { id: 'saved', slug: 'enregistrees', icon: Bookmark, fr: 'Enregistrées', ar: 'المحفوظة' },
-  { id: 'mine', slug: 'miennes', icon: MessageCircle, fr: 'Mes questions', ar: 'أسئلتي' },
+  // short: the label on phones, where four tabs share the width
+  { id: 'mine', slug: 'miennes', icon: MessageCircle, fr: 'Mes questions', frShort: 'Questions', ar: 'أسئلتي' },
+  // The questions the member answered
+  { id: 'answered', slug: 'reponses', icon: Reply, fr: 'Mes réponses', frShort: 'Réponses', ar: 'ردودي' },
 ];
 
 const SORTS = [
@@ -488,6 +490,254 @@ function QuestionForm({ lang, thread = null, defaultCategory = '', onDone, onCan
 }
 
 // ---------------------------------------------------------------------------------------------
+// Swipeable tabs
+// ---------------------------------------------------------------------------------------------
+
+const clamp = (n, min, max) => Math.min(Math.max(n, min), max);
+
+// Past the first or last page the content gives a little, then stops
+const rubber = (d) => (d * 0.35) / (1 + d * 0.9);
+
+// Spring towards the page the swipe lands on: a little bounce, no wobble
+const SPRING = { stiffness: 360, damping: 0.86 };
+
+/**
+ * Pages side by side, tied to a tab bar, as in Material top tabs: a horizontal swipe moves the pages
+ * with the finger and the pill under the tabs follows the exact fractional position
+ * (pill.translateX(virtualIndex * tabWidth)); on release, both spring onto the nearest page,
+ * or the next one when the swipe was a flick. A tap on a tab springs there the same way.
+ *
+ * The position lives in a ref and is painted straight onto the DOM each frame (no React render per frame).
+ * The row is laid out left to right in both languages, like the app's tab bar.
+ */
+function usePager({ count, index, onChange }) {
+  const viewportRef = useRef(null);
+  const trackRef = useRef(null);
+  const pillRef = useRef(null);
+  const tabs = useRef([]);
+  const pages = useRef([]);
+  const pos = useRef(index); // virtual index: 1.4 = 40% of the way from the second page to the third
+  const goal = useRef(index);
+  const frame = useRef(0);
+  const gesture = useRef(null);
+  const suppressClickUntil = useRef(0);
+  const [current, setCurrent] = useState(index);
+
+  const paint = useCallback(() => {
+    const viewport = viewportRef.current;
+    const track = trackRef.current;
+    if (!viewport || !track) return;
+    const p = pos.current;
+    track.style.transform = `translate3d(${-p * viewport.clientWidth}px, 0, 0)`;
+
+    // The pill: on equal tabs this is virtualIndex * tabWidth; measured, so it also holds when widths differ
+    const pill = pillRef.current;
+    const els = tabs.current;
+    if (pill && els[0] && els[count - 1]) {
+      const i = clamp(Math.floor(p), 0, count - 2);
+      const f = p - i; // below 0 or above 1 past the ends: the pill follows the rubber band
+      const a = els[i];
+      const b = els[i + 1];
+      const left = a.offsetLeft + (b.offsetLeft - a.offsetLeft) * f;
+      const fw = clamp(f, 0, 1);
+      pill.style.width = `${a.offsetWidth + (b.offsetWidth - a.offsetWidth) * fw}px`;
+      pill.style.transform = `translate3d(${left}px, 0, 0)`;
+      // Each label brightens as the pill reaches it
+      els.forEach((el, k) => el.style.setProperty('--on', String(Math.max(0, 1 - Math.abs(p - k)))));
+    }
+
+    // Height: the page shown; between two pages, the taller one, so neither is cut while it slides
+    const near = Math.round(p);
+    const settled = Math.abs(p - near) < 0.02;
+    const k1 = clamp(settled ? near : Math.floor(p), 0, count - 1);
+    const k2 = clamp(settled ? near : Math.ceil(p), 0, count - 1);
+    const h = Math.max(pages.current[k1]?.offsetHeight || 0, pages.current[k2]?.offsetHeight || 0);
+    if (h) viewport.style.height = `${h}px`;
+  }, [count]);
+
+  const stop = () => {
+    cancelAnimationFrame(frame.current);
+    frame.current = 0;
+  };
+
+  /** Springs the position to `target`, starting with velocity v0 (pages per second) */
+  const springTo = useCallback(
+    (target, v0 = 0) => {
+      stop();
+      goal.current = target;
+      const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      if (reduced) {
+        pos.current = target;
+        paint();
+        return;
+      }
+      const k = SPRING.stiffness;
+      const c = 2 * Math.sqrt(k) * SPRING.damping;
+      let x = pos.current;
+      let v = v0;
+      let last = performance.now();
+      const step = (now) => {
+        const dt = Math.min(0.064, (now - last) / 1000);
+        last = now;
+        // Small fixed steps keep the spring stable whatever the frame rate
+        const n = Math.max(1, Math.ceil(dt / 0.004));
+        const h = dt / n;
+        for (let s = 0; s < n; s += 1) {
+          v += (-k * (x - target) - c * v) * h;
+          x += v * h;
+        }
+        if (Math.abs(x - target) < 0.0005 && Math.abs(v) < 0.01) {
+          pos.current = target;
+          paint();
+          frame.current = 0;
+          return;
+        }
+        pos.current = x;
+        paint();
+        frame.current = requestAnimationFrame(step);
+      };
+      frame.current = requestAnimationFrame(step);
+    },
+    [paint]
+  );
+
+  const select = (i, v0 = 0) => {
+    const target = clamp(i, 0, count - 1);
+    springTo(target, v0);
+    setCurrent(target);
+    if (target !== index) onChange(target);
+  };
+
+  // The address changed on its own (Back, a link to ?vue=…): go there
+  useEffect(() => {
+    if (index === goal.current) return;
+    springTo(index);
+    setCurrent(index);
+  }, [index]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // First paint, and again whenever a page, the tabs or the window change size (lists loading, fonts, rotation)
+  useLayoutEffect(() => {
+    paint();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => paint());
+    [viewportRef.current, ...pages.current, ...tabs.current].forEach((el) => el && ro.observe(el));
+    return () => ro.disconnect();
+  }, [paint]);
+
+  useEffect(() => stop, []);
+
+  // Pointer position, recent samples kept for the release velocity
+  const sample = (g, e) => {
+    g.samples.push({ x: e.clientX, t: e.timeStamp });
+    if (g.samples.length > 6) g.samples.shift();
+  };
+
+  const onPointerDown = (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    // Rows that scroll sideways, and fields, keep their own horizontal gestures
+    if (e.target.closest('[data-no-swipe], input, textarea, select')) return;
+    gesture.current = { id: e.pointerId, x: e.clientX, y: e.clientY, start: pos.current, from: goal.current, decided: false, horizontal: false, samples: [] };
+    sample(gesture.current, e);
+  };
+
+  const onPointerMove = (e) => {
+    const g = gesture.current;
+    if (!g || g.id !== e.pointerId) return;
+    const dx = e.clientX - g.x;
+    const dy = e.clientY - g.y;
+    if (!g.decided) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      g.decided = true;
+      g.horizontal = Math.abs(dx) > Math.abs(dy) * 1.2;
+      if (!g.horizontal) {
+        gesture.current = null; // a vertical swipe: the page scrolls
+        return;
+      }
+      // Caught mid-flight: the pages stop under the finger
+      stop();
+      g.start = pos.current;
+      g.x = e.clientX;
+      try {
+        viewportRef.current.setPointerCapture(e.pointerId);
+      } catch {
+        // the pointer is already gone
+      }
+      viewportRef.current.dataset.dragging = 'true';
+    }
+    sample(g, e);
+    let p = g.start - (e.clientX - g.x) / viewportRef.current.clientWidth;
+    if (p < 0) p = -rubber(-p);
+    if (p > count - 1) p = count - 1 + rubber(p - (count - 1));
+    pos.current = p;
+    paint();
+  };
+
+  const endDrag = (e, commit) => {
+    const g = gesture.current;
+    gesture.current = null;
+    if (!g?.horizontal) return;
+    delete viewportRef.current.dataset.dragging;
+    // The click that ends a drag must not open the card it ends on
+    suppressClickUntil.current = performance.now() + 350;
+    const w = viewportRef.current.clientWidth;
+    // Velocity over the last ~100 ms, in pages per second (a swipe to the left moves forward)
+    const last = g.samples[g.samples.length - 1];
+    const first = g.samples.find((s) => last.t - s.t <= 100) || g.samples[0];
+    const vx = last.t > first.t ? (last.x - first.x) / (last.t - first.t) : 0;
+    const v = commit ? (-vx * 1000) / w : 0;
+    // Where the motion would carry the pages, kept within one page of where the swipe started
+    const from = Math.round(g.from);
+    const target = commit ? clamp(Math.round(pos.current + v * 0.2), Math.max(0, from - 1), Math.min(count - 1, from + 1)) : from;
+    select(target, v);
+  };
+
+  const onClickCapture = (e) => {
+    if (performance.now() < suppressClickUntil.current) {
+      suppressClickUntil.current = 0;
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  };
+
+  // Tabs: arrow keys move between them (left to right, as laid out), Home and End jump to the ends
+  const onTabKeyDown = (e) => {
+    const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+    let next = null;
+    if (step) next = clamp(current + step, 0, count - 1);
+    else if (e.key === 'Home') next = 0;
+    else if (e.key === 'End') next = count - 1;
+    if (next === null) return;
+    e.preventDefault();
+    select(next);
+    tabs.current[next]?.focus();
+  };
+
+  return {
+    current,
+    select,
+    viewportRef,
+    trackRef,
+    pillRef,
+    tabRef: (i) => (el) => {
+      tabs.current[i] = el;
+    },
+    pageRef: (i) => (el) => {
+      pages.current[i] = el;
+    },
+    onTabKeyDown,
+    viewportProps: {
+      onPointerDown,
+      onPointerMove,
+      onPointerUp: (e) => endDrag(e, true),
+      onPointerCancel: (e) => endDrag(e, false),
+      onLostPointerCapture: (e) => gesture.current?.horizontal && endDrag(e, true),
+      onClickCapture,
+      onDragStart: (e) => e.preventDefault(),
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
 // The list
 // ---------------------------------------------------------------------------------------------
 
@@ -495,19 +745,26 @@ function ThreadList({ lang, query, onOpenThread, onNavigate, askSignIn }) {
   const tr = t(lang);
   const { user } = useAuth();
   const filters = useMemo(() => filtersOf(query), [query?.vue, query?.tri, query?.rubrique, query?.q]); // eslint-disable-line react-hooks/exhaustive-deps
-  const cacheKey = `${user?._id || ''}|${JSON.stringify(filters)}`;
-  const cached = listCache.get(cacheKey);
-
-  const [threads, setThreads] = useState(cached?.threads || []);
-  const [meta, setMeta] = useState(cached?.meta || { count: 0, page: 1, hasMore: false });
-  const [state, setState] = useState({ loading: !cached, error: '', unavailable: false, more: false });
   const [search, setSearch] = useState(filters.q);
   const [asking, setAsking] = useState(false);
-  const [posting, setPosting] = useState(cached?.posting || null);
+  const [posting, setPosting] = useState(null);
   const blocked = Boolean(user && posting?.blocked);
-  const needsAccount = filters.view !== 'all' && !user;
+  const tabsRef = useRef(null);
 
   const go = (changes, options) => onNavigate(queryOf({ ...filters, ...changes }), options);
+
+  const viewIndex = Math.max(0, VIEWS.findIndex((v) => v.id === filters.view));
+  // Switching tabs replaces the address rather than adding to the history, as tabs do
+  const pager = usePager({ count: VIEWS.length, index: viewIndex, onChange: (i) => go({ view: VIEWS[i].id }, { replace: true }) });
+
+  // Lists load when their page is shown or next to it, so a swipe reveals a list that is already there
+  const [visited, setVisited] = useState(() => new Set([viewIndex]));
+  useEffect(() => {
+    setVisited((s) => (s.has(pager.current) ? s : new Set([...s, pager.current])));
+    // A list scrolled far down: bring the tabs back into view on the new page
+    const top = tabsRef.current ? tabsRef.current.getBoundingClientRect().top + window.scrollY - 88 : 0;
+    if (window.scrollY > top) window.scrollTo({ top });
+  }, [pager.current]);
 
   // Remembered for the "back" link of a question
   useEffect(() => {
@@ -532,65 +789,7 @@ function ThreadList({ lang, query, onOpenThread, onNavigate, askSignIn }) {
     return () => clearTimeout(timer);
   }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const load = useCallback(async () => {
-    if (needsAccount) {
-      setThreads([]);
-      setState({ loading: false, error: '', unavailable: false, more: false });
-      return;
-    }
-    const known = listCache.get(cacheKey);
-    setThreads(known?.threads || []);
-    setMeta(known?.meta || { count: 0, page: 1, hasMore: false });
-    setState({ loading: !known, error: '', unavailable: false, more: false });
-    try {
-      const res = await fetchForumThreads({ ...filters, page: 1 });
-      const next = { threads: res.data || [], meta: { count: res.count || 0, page: 1, hasMore: Boolean(res.hasMore) }, posting: res.posting || null };
-      listCache.set(cacheKey, next);
-      setThreads(next.threads);
-      setMeta(next.meta);
-      setPosting(next.posting);
-      setState({ loading: false, error: '', unavailable: false, more: false });
-    } catch (err) {
-      setState({
-        loading: false,
-        more: false,
-        unavailable: unavailable(err),
-        error: unavailable(err) || known ? '' : errorMessage(err, tr('Les discussions n’ont pas pu être chargées.', 'تعذر تحميل النقاشات.')),
-      });
-    }
-  }, [cacheKey, needsAccount]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const loadMore = async () => {
-    setState((s) => ({ ...s, more: true }));
-    try {
-      const res = await fetchForumThreads({ ...filters, page: meta.page + 1 });
-      const seen = new Set(threads.map((th) => th._id));
-      const next = { threads: [...threads, ...(res.data || []).filter((th) => !seen.has(th._id))], meta: { count: res.count || 0, page: meta.page + 1, hasMore: Boolean(res.hasMore) }, posting };
-      listCache.set(cacheKey, next);
-      setThreads(next.threads);
-      setMeta(next.meta);
-    } catch {
-      // The button stays: another tap retries
-    } finally {
-      setState((s) => ({ ...s, more: false }));
-    }
-  };
-
-  const patchThread = (id, changes) => {
-    setThreads((list) => {
-      const next = list.map((th) => (th._id === id ? { ...th, ...changes } : th));
-      const known = listCache.get(cacheKey);
-      if (known) listCache.set(cacheKey, { ...known, threads: next });
-      return next;
-    });
-  };
-
   const ask = () => (user ? setAsking(true) : askSignIn('ask'));
-  const filtered = filters.category !== 'ALL' || filters.q || filters.sort !== 'recent';
 
   const askButton = (
     <button type="button" className="btn-primary w-full sm:w-auto" onClick={ask}>
@@ -612,151 +811,86 @@ function ThreadList({ lang, query, onOpenThread, onNavigate, askSignIn }) {
 
       {blocked && <BlockedNotice posting={posting} lang={lang} />}
 
-      {/* Whose questions */}
-      <SegmentedSlider
-        role="tablist"
-        options={VIEWS}
-        value={filters.view}
-        onChange={(view) => go({ view })}
-        ariaLabel={tr('Discussions affichées', 'النقاشات المعروضة')}
-        className="grid grid-cols-[0.75fr_1.1fr_1.15fr] gap-1 rounded-2xl border border-canvas-line bg-canvas-raised/60 p-1 sm:max-w-lg sm:grid-cols-3"
-        thumbClassName="rounded-xl bg-ink shadow-sm"
-        segmentClassName={(on) => `flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-1.5 text-sm transition-colors sm:px-2 sm:text-[15px] ${on ? 'font-medium text-canvas-paper' : 'text-ink-soft hover:text-ink'}`}
-        renderOption={({ icon: Icon, fr, ar }) => (
-          <>
-            <Icon className="hidden h-4 w-4 shrink-0 sm:block" aria-hidden="true" />
-            <span className="whitespace-nowrap">{tr(fr, ar)}</span>
-          </>
-        )}
-      />
-
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_17.5rem] lg:gap-8">
         <div className="min-w-0 space-y-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="pointer-events-none absolute start-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-ink-faint" aria-hidden="true" />
-            <input
-              type="search"
-              dir="auto"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              maxLength={100}
-              className="field rounded-full ps-11 pe-11"
-              placeholder={tr('Chercher dans le forum', 'ابحث في المنتدى')}
-              aria-label={tr('Chercher dans le forum', 'ابحث في المنتدى')}
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch('')}
-                className="absolute end-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-ink-faint hover:bg-ink/[0.06] hover:text-ink"
-                aria-label={tr('Effacer la recherche', 'مسح البحث')}
-              >
-                <X className="h-4 w-4" aria-hidden="true" />
-              </button>
-            )}
-          </div>
-
-          {/* Sections, on phones and tablets (wide screens list them on the side) */}
-          <div className="scrollbar-none -mx-4 flex gap-2 overflow-x-auto px-4 py-0.5 sm:-mx-6 sm:px-6 lg:hidden" role="group" aria-label={tr('Rubriques', 'الأقسام')}>
-            <button type="button" className="chip" aria-pressed={filters.category === 'ALL'} onClick={() => go({ category: 'ALL' })}>
-              {tr('Toutes les rubriques', 'كل الأقسام')}
-            </button>
-            {FORUM_CATEGORIES.map(({ id, icon: Icon, fr, ar }) => (
-              <button key={id} type="button" className="chip" aria-pressed={filters.category === id} onClick={() => go({ category: filters.category === id ? 'ALL' : id })}>
-                <Icon className="h-4 w-4" aria-hidden="true" />
-                {tr(fr, ar)}
-              </button>
-            ))}
-          </div>
-
-          {/* Order */}
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            <div className="flex gap-1" role="group" aria-label={tr('Trier', 'ترتيب')}>
-              {SORTS.map((s) => (
+          {/* Whose questions: tabs, with a pill that follows the pages as they are swiped */}
+          <div
+            ref={tabsRef}
+            dir="ltr"
+            role="tablist"
+            aria-label={tr('Discussions affichées', 'النقاشات المعروضة')}
+            onKeyDown={pager.onTabKeyDown}
+            className="relative grid grid-cols-4 rounded-2xl bg-canvas-sunk/70 p-1"
+          >
+            <span ref={pager.pillRef} aria-hidden="true" className="absolute bottom-1 left-0 top-1 rounded-xl bg-canvas-paper shadow-sm will-change-transform dark:bg-canvas-edge" />
+            {VIEWS.map(({ id, icon: Icon, fr, frShort, ar }, i) => {
+              const on = pager.current === i;
+              return (
                 <button
-                  key={s.id}
+                  key={id}
+                  ref={pager.tabRef(i)}
+                  id={`forum-tab-${id}`}
                   type="button"
-                  aria-pressed={filters.sort === s.id}
-                  onClick={() => go({ sort: s.id })}
-                  className={`min-h-10 rounded-full px-3.5 text-sm transition-colors ${filters.sort === s.id ? 'bg-ink/[0.08] font-medium text-ink' : 'text-ink-soft hover:text-ink'}`}
+                  role="tab"
+                  aria-selected={on}
+                  aria-controls={`forum-page-${id}`}
+                  tabIndex={on ? 0 : -1}
+                  onClick={() => pager.select(i)}
+                  dir={lang === 'ar' ? 'rtl' : 'ltr'}
+                  // --on goes from 0 to 1 as the pill reaches the tab (set while it moves)
+                  style={{ opacity: 'calc(0.7 + var(--on, 0) * 0.3)' }}
+                  className={`relative z-[1] flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-[12px] leading-tight text-ink sm:min-h-11 sm:flex-row sm:gap-1.5 sm:text-sm ${on ? 'font-semibold' : 'font-medium'}`}
                 >
-                  {tr(s.fr, s.ar)}
+                  <Icon className="h-[18px] w-[18px] shrink-0 sm:h-4 sm:w-4" aria-hidden="true" />
+                  {frShort && lang !== 'ar' ? (
+                    <>
+                      <span className="whitespace-nowrap sm:hidden">{frShort}</span>
+                      <span className="hidden whitespace-nowrap sm:inline">{fr}</span>
+                    </>
+                  ) : (
+                    <span className="whitespace-nowrap">{tr(fr, ar)}</span>
+                  )}
                 </button>
-              ))}
-            </div>
-            {!state.loading && !needsAccount && !state.error && !state.unavailable && threads.length > 0 && (
-              <p className="text-sm text-ink-faint" role="status">
-                {tr(`${meta.count} discussion${meta.count > 1 ? 's' : ''}`, `${meta.count} نقاش`)}
-              </p>
-            )}
+              );
+            })}
           </div>
 
-          {/* Questions */}
-          {needsAccount ? (
-            <EmptyState
-              title={filters.view === 'saved' ? tr('Retrouvez ici les discussions que vous enregistrez', 'تجد هنا النقاشات التي تحفظها') : tr('Retrouvez ici vos questions', 'تجد هنا أسئلتك')}
-              action={
-                <button type="button" className="btn-primary" onClick={() => navigate(pathFor('account'))}>
-                  <LogIn className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
-                  {tr('Se connecter', 'تسجيل الدخول')}
-                </button>
-              }
-            >
-              {tr('Connectez-vous : votre liste vous suit sur tous vos appareils.', 'سجّل الدخول: تتبعك قائمتك على كل أجهزتك.')}
-            </EmptyState>
-          ) : state.loading ? (
-            <Spinner label={tr('Chargement des discussions…', 'جاري تحميل النقاشات…')} />
-          ) : state.unavailable ? (
-            <EmptyState title={tr('Le forum ouvre bientôt', 'سيفتح المنتدى قريبا')}>{tr('Revenez dans quelques jours pour poser vos questions.', 'عد بعد أيام قليلة لطرح أسئلتك.')}</EmptyState>
-          ) : state.error ? (
-            <Notice
-              tone="error"
-              title={state.error}
-              action={
-                <button type="button" className="btn-quiet" onClick={load}>
-                  {tr('Réessayer', 'إعادة المحاولة')}
-                </button>
-              }
-            />
-          ) : threads.length === 0 ? (
-            filters.view === 'saved' ? (
-              <EmptyState title={tr('Aucune discussion enregistrée', 'لا توجد نقاشات محفوظة')} action={filtered ? null : <button type="button" className="btn-quiet" onClick={() => go({ view: 'all' })}>{tr('Parcourir le forum', 'تصفح المنتدى')}</button>}>
-                {tr('Touchez le signet d’une discussion pour la retrouver ici, même des mois plus tard.', 'المس علامة الحفظ في أي نقاش لتجده هنا، حتى بعد أشهر.')}
-              </EmptyState>
-            ) : filters.view === 'mine' ? (
-              <EmptyState title={tr('Vous n’avez pas encore posé de question', 'لم تطرح أي سؤال بعد')} action={askButton}>
-                {tr('Une marque, un restaurant, un doute sur une étiquette : demandez.', 'علامة تجارية، مطعم، شك في ملصق: اسأل.')}
-              </EmptyState>
-            ) : filtered ? (
-              <EmptyState
-                title={filters.q ? tr(`Aucune discussion pour « ${filters.q} »`, `لا يوجد نقاش عن «${filters.q}»`) : tr('Aucune discussion ici pour le moment', 'لا توجد نقاشات هنا حاليا')}
-                action={askButton}
-              >
-                {tr('Personne n’a encore posé cette question : soyez le premier.', 'لم يطرح أحد هذا السؤال بعد: كن الأول.')}
-              </EmptyState>
-            ) : (
-              <EmptyState title={tr('Le forum vient d’ouvrir', 'المنتدى فُتح للتو')} action={askButton}>
-                {tr('Aucune question pour l’instant. Lancez la première discussion : votre question aidera aussi les suivants.', 'لا توجد أسئلة حاليا. ابدأ أول نقاش: سؤالك سيفيد من يأتي بعدك.')}
-              </EmptyState>
-            )
-          ) : (
-            <>
-              <ul className="space-y-3">
-                {threads.map((thread) => (
-                  <ThreadCard key={thread._id} thread={thread} lang={lang} onOpen={onOpenThread} onChange={(changes) => patchThread(thread._id, changes)} askSignIn={askSignIn} />
-                ))}
-              </ul>
-              {meta.hasMore && (
-                <div className="flex justify-center pt-2">
-                  <button type="button" className="btn-quiet" onClick={loadMore} disabled={state.more}>
-                    {state.more && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
-                    {tr('Voir plus de discussions', 'عرض نقاشات أخرى')}
-                  </button>
-                </div>
-              )}
-            </>
-          )}
+          {/* The pages, side by side; only the one shown can be reached with the keyboard or a screen reader */}
+          <div ref={pager.viewportRef} dir="ltr" className="forum-pager -mx-1 overflow-clip" {...pager.viewportProps}>
+            <div ref={pager.trackRef} className="flex items-start will-change-transform">
+              {VIEWS.map((v, i) => {
+                const shown = pager.current === i;
+                return (
+                  <div
+                    key={v.id}
+                    ref={pager.pageRef(i)}
+                    id={`forum-page-${v.id}`}
+                    role="tabpanel"
+                    aria-labelledby={`forum-tab-${v.id}`}
+                    dir={lang === 'ar' ? 'rtl' : 'ltr'}
+                    className="w-full shrink-0"
+                    {...(shown ? {} : { inert: '', 'aria-hidden': 'true' })}
+                  >
+                    <ViewPage
+                      view={v.id}
+                      lang={lang}
+                      filters={filters}
+                      go={go}
+                      search={search}
+                      setSearch={setSearch}
+                      shown={shown}
+                      enabled={visited.has(i) || Math.abs(i - pager.current) <= 1}
+                      onPosting={setPosting}
+                      onOpenThread={onOpenThread}
+                      askSignIn={askSignIn}
+                      askButton={askButton}
+                      onShowAll={() => pager.select(0)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {/* Side: sections (wide screens) and how the forum works */}
@@ -793,19 +927,260 @@ function ThreadList({ lang, query, onOpenThread, onNavigate, askSignIn }) {
           {blocked ? (
             <BlockedNotice posting={posting} lang={lang} />
           ) : (
-          <QuestionForm
-            lang={lang}
-            defaultCategory={filters.category === 'ALL' ? '' : filters.category}
-            onCancel={() => setAsking(false)}
-            onDone={(thread) => {
-              listCache.clear();
-              setAsking(false);
-              onOpenThread(thread._id);
-            }}
-          />
+            <QuestionForm
+              lang={lang}
+              defaultCategory={filters.category === 'ALL' ? '' : filters.category}
+              onCancel={() => setAsking(false)}
+              onDone={(thread) => {
+                listCache.clear();
+                setAsking(false);
+                onOpenThread(thread._id);
+              }}
+            />
           )}
         </Modal>
       )}
+    </div>
+  );
+}
+
+const SIGN_IN_TITLES = {
+  saved: ['Retrouvez ici les discussions que vous enregistrez', 'تجد هنا النقاشات التي تحفظها'],
+  mine: ['Retrouvez ici vos questions', 'تجد هنا أسئلتك'],
+  answered: ['Retrouvez ici les discussions où vous avez répondu', 'تجد هنا النقاشات التي رددت فيها'],
+};
+
+/**
+ * One tab's page: search, sections, order, and the list for that view.
+ * The search, the section and the order are shared by every tab; each tab keeps its own list.
+ * `enabled`: load (the page is shown or next to it). `shown`: the page on screen, refreshed each time it comes back.
+ */
+function ViewPage({ view, lang, filters, go, search, setSearch, shown, enabled, onPosting, onOpenThread, askSignIn, askButton, onShowAll }) {
+  const tr = t(lang);
+  const { user } = useAuth();
+  const own = useMemo(() => ({ ...filters, view }), [filters, view]);
+  const cacheKey = `${user?._id || ''}|${JSON.stringify(own)}`;
+  const cached = listCache.get(cacheKey);
+  const needsAccount = view !== 'all' && !user;
+
+  const [threads, setThreads] = useState(cached?.threads || []);
+  const [meta, setMeta] = useState(cached?.meta || { count: 0, page: 1, hasMore: false });
+  const [state, setState] = useState({ loading: !cached && !needsAccount, error: '', unavailable: false, more: false });
+  const lastLoad = useRef(0);
+
+  const load = useCallback(async () => {
+    lastLoad.current = Date.now();
+    if (needsAccount) {
+      setThreads([]);
+      setState({ loading: false, error: '', unavailable: false, more: false });
+      return;
+    }
+    const known = listCache.get(cacheKey);
+    setThreads(known?.threads || []);
+    setMeta(known?.meta || { count: 0, page: 1, hasMore: false });
+    setState({ loading: !known, error: '', unavailable: false, more: false });
+    try {
+      const res = await fetchForumThreads({ ...own, page: 1 });
+      const next = { threads: res.data || [], meta: { count: res.count || 0, page: 1, hasMore: Boolean(res.hasMore) }, posting: res.posting || null };
+      listCache.set(cacheKey, next);
+      setThreads(next.threads);
+      setMeta(next.meta);
+      if (res.posting !== undefined) onPosting(res.posting);
+      setState({ loading: false, error: '', unavailable: false, more: false });
+    } catch (err) {
+      setState({
+        loading: false,
+        more: false,
+        unavailable: unavailable(err),
+        error: unavailable(err) || known ? '' : errorMessage(err, tr('Les discussions n’ont pas pu être chargées.', 'تعذر تحميل النقاشات.')),
+      });
+    }
+  }, [cacheKey, needsAccount]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (enabled) load();
+  }, [load, enabled]);
+
+  // Back on screen: refresh quietly (a question saved on another tab now belongs in "Enregistrées")
+  const wasShown = useRef(shown);
+  useEffect(() => {
+    if (shown && !wasShown.current && enabled && Date.now() - lastLoad.current > 1000) load();
+    wasShown.current = shown;
+  }, [shown]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadMore = async () => {
+    setState((s) => ({ ...s, more: true }));
+    try {
+      const res = await fetchForumThreads({ ...own, page: meta.page + 1 });
+      const seen = new Set(threads.map((th) => th._id));
+      const next = { threads: [...threads, ...(res.data || []).filter((th) => !seen.has(th._id))], meta: { count: res.count || 0, page: meta.page + 1, hasMore: Boolean(res.hasMore) } };
+      listCache.set(cacheKey, next);
+      setThreads(next.threads);
+      setMeta(next.meta);
+    } catch {
+      // The button stays: another tap retries
+    } finally {
+      setState((s) => ({ ...s, more: false }));
+    }
+  };
+
+  const patchThread = (id, changes) => {
+    setThreads((list) => {
+      const next = list.map((th) => (th._id === id ? { ...th, ...changes } : th));
+      const known = listCache.get(cacheKey);
+      if (known) listCache.set(cacheKey, { ...known, threads: next });
+      return next;
+    });
+  };
+
+  const filtered = filters.category !== 'ALL' || filters.q || filters.sort !== 'recent';
+
+  let body;
+  if (needsAccount) {
+    body = (
+      <EmptyState
+        title={tr(...SIGN_IN_TITLES[view])}
+        action={
+          <button type="button" className="btn-primary" onClick={() => navigate(pathFor('account'))}>
+            <LogIn className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
+            {tr('Se connecter', 'تسجيل الدخول')}
+          </button>
+        }
+      >
+        {tr('Connectez-vous : votre liste vous suit sur tous vos appareils.', 'سجّل الدخول: تتبعك قائمتك على كل أجهزتك.')}
+      </EmptyState>
+    );
+  } else if (state.loading || !enabled) {
+    body = <Spinner label={tr('Chargement des discussions…', 'جاري تحميل النقاشات…')} />;
+  } else if (state.unavailable) {
+    body = <EmptyState title={tr('Le forum ouvre bientôt', 'سيفتح المنتدى قريبا')}>{tr('Revenez dans quelques jours pour poser vos questions.', 'عد بعد أيام قليلة لطرح أسئلتك.')}</EmptyState>;
+  } else if (state.error) {
+    body = (
+      <Notice
+        tone="error"
+        title={state.error}
+        action={
+          <button type="button" className="btn-quiet" onClick={load}>
+            {tr('Réessayer', 'إعادة المحاولة')}
+          </button>
+        }
+      />
+    );
+  } else if (threads.length === 0) {
+    const browse = filtered ? null : (
+      <button type="button" className="btn-quiet" onClick={onShowAll}>
+        {tr('Parcourir le forum', 'تصفح المنتدى')}
+      </button>
+    );
+    body =
+      view === 'saved' ? (
+        <EmptyState title={tr('Aucune discussion enregistrée', 'لا توجد نقاشات محفوظة')} action={browse}>
+          {tr('Touchez le signet d’une discussion pour la retrouver ici, même des mois plus tard.', 'المس علامة الحفظ في أي نقاش لتجده هنا، حتى بعد أشهر.')}
+        </EmptyState>
+      ) : view === 'mine' ? (
+        <EmptyState title={tr('Vous n’avez pas encore posé de question', 'لم تطرح أي سؤال بعد')} action={askButton}>
+          {tr('Une marque, un restaurant, un doute sur une étiquette : demandez.', 'علامة تجارية، مطعم، شك في ملصق: اسأل.')}
+        </EmptyState>
+      ) : view === 'answered' ? (
+        <EmptyState title={tr('Vous n’avez pas encore répondu', 'لم ترد بعد على أي سؤال')} action={browse}>
+          {tr('Les discussions où vous avez laissé une réponse apparaissent ici, pour suivre la suite.', 'تظهر هنا النقاشات التي تركت فيها ردا، لتتابع ما يأتي بعده.')}
+        </EmptyState>
+      ) : filtered ? (
+        <EmptyState
+          title={filters.q ? tr(`Aucune discussion pour « ${filters.q} »`, `لا يوجد نقاش عن «${filters.q}»`) : tr('Aucune discussion ici pour le moment', 'لا توجد نقاشات هنا حاليا')}
+          action={askButton}
+        >
+          {tr('Personne n’a encore posé cette question : soyez le premier.', 'لم يطرح أحد هذا السؤال بعد: كن الأول.')}
+        </EmptyState>
+      ) : (
+        <EmptyState title={tr('Le forum vient d’ouvrir', 'المنتدى فُتح للتو')} action={askButton}>
+          {tr('Aucune question pour l’instant. Lancez la première discussion : votre question aidera aussi les suivants.', 'لا توجد أسئلة حاليا. ابدأ أول نقاش: سؤالك سيفيد من يأتي بعدك.')}
+        </EmptyState>
+      );
+  } else {
+    body = (
+      <>
+        <ul className="space-y-3">
+          {threads.map((thread) => (
+            <ThreadCard key={thread._id} thread={thread} lang={lang} onOpen={onOpenThread} onChange={(changes) => patchThread(thread._id, changes)} askSignIn={askSignIn} />
+          ))}
+        </ul>
+        {meta.hasMore && (
+          <div className="flex justify-center pt-2">
+            <button type="button" className="btn-quiet" onClick={loadMore} disabled={state.more}>
+              {state.more && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              {tr('Voir plus de discussions', 'عرض نقاشات أخرى')}
+            </button>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  return (
+    // A little room on every side, so card shadows and focus rings are not cut by the sliding frame
+    <div className="space-y-4 p-1">
+      {/* Search */}
+      <div className="relative">
+        <Search className="pointer-events-none absolute start-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-ink-faint" aria-hidden="true" />
+        <input
+          type="search"
+          dir="auto"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          maxLength={100}
+          className="field rounded-full ps-11 pe-11"
+          placeholder={tr('Chercher dans le forum', 'ابحث في المنتدى')}
+          aria-label={tr('Chercher dans le forum', 'ابحث في المنتدى')}
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch('')}
+            className="absolute end-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-ink-faint hover:bg-ink/[0.06] hover:text-ink"
+            aria-label={tr('Effacer la recherche', 'مسح البحث')}
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
+      </div>
+
+      {/* Sections, on phones and tablets (wide screens list them on the side). It scrolls sideways: no page swipe here */}
+      <div data-no-swipe="" className="scrollbar-none flex gap-2 overflow-x-auto py-0.5 lg:hidden" role="group" aria-label={tr('Rubriques', 'الأقسام')}>
+        <button type="button" className="chip" aria-pressed={filters.category === 'ALL'} onClick={() => go({ category: 'ALL' })}>
+          {tr('Toutes les rubriques', 'كل الأقسام')}
+        </button>
+        {FORUM_CATEGORIES.map(({ id, icon: Icon, fr, ar }) => (
+          <button key={id} type="button" className="chip" aria-pressed={filters.category === id} onClick={() => go({ category: filters.category === id ? 'ALL' : id })}>
+            <Icon className="h-4 w-4" aria-hidden="true" />
+            {tr(fr, ar)}
+          </button>
+        ))}
+      </div>
+
+      {/* Order */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex gap-1" role="group" aria-label={tr('Trier', 'ترتيب')}>
+          {SORTS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              aria-pressed={filters.sort === s.id}
+              onClick={() => go({ sort: s.id })}
+              className={`min-h-10 rounded-full px-3.5 text-sm transition-colors ${filters.sort === s.id ? 'bg-ink/[0.08] font-medium text-ink' : 'text-ink-soft hover:text-ink'}`}
+            >
+              {tr(s.fr, s.ar)}
+            </button>
+          ))}
+        </div>
+        {!state.loading && enabled && !needsAccount && !state.error && !state.unavailable && threads.length > 0 && (
+          <p className="text-sm text-ink-faint" role={shown ? 'status' : undefined}>
+            {tr(`${meta.count} discussion${meta.count > 1 ? 's' : ''}`, `${meta.count} نقاش`)}
+          </p>
+        )}
+      </div>
+
+      {body}
     </div>
   );
 }

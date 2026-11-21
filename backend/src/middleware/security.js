@@ -15,7 +15,7 @@ export const corsMiddleware = () =>
   cors({
     origin: (origin, callback) => callback(null, !origin || allowedOrigins().includes(origin)),
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Forum-Reader'],
     credentials: true,
   });
 

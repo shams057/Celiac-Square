@@ -32,7 +32,7 @@ Plateforme web et mobile pour manger sans gluten en Tunisie : le guide officiel 
 | **Carte** | Médecins, boulangeries, restaurants, cafés et épiceries sans gluten, filtrables par type et par ville. « Près de moi » (la position reste sur l’appareil), « Ouvert maintenant » d’après les horaires indiqués. |
 | **Avis des membres** | Sur chaque lieu, trois questions oui/non aux membres connectés (réaction ? cuisine dédiée ? personnel informé ?) ; seuls les totaux sont publiés. |
 | **Signalements** | « Signaler un problème » sur les produits, les lieux, les résultats du scanner et les messages du forum ; ils arrivent dans le back-office. |
-| **Forum** | Questions et réponses entre membres (`/forum`, une adresse par question). Lecture ouverte à tous ; un compte pour poser une question, répondre, dire « même question » ou « utile », et **enregistrer** une discussion pour la retrouver (onglet *Enregistrées*). Huit rubriques, recherche, tri (récentes, populaires, sans réponse). L’auteur choisit la réponse qui a résolu sa question ; l’équipe peut épingler, fermer ou supprimer. Seuls le prénom et l’initiale du nom sont affichés. |
+| **Forum** | Questions et réponses entre membres (`/forum`, une adresse par question). Lecture ouverte à tous ; un compte pour poser une question, répondre, dire « même question » ou « utile », et **enregistrer** une discussion pour la retrouver. Quatre onglets qui glissent d’un doigt (*Toutes*, *Enregistrées*, *Mes questions*, *Mes réponses*), la pastille suivant le glissement. Une lecture compte une fois par lecteur (le compte, ou un identifiant aléatoire gardé sur l’appareil d’un visiteur), jamais pour l’auteur. Huit rubriques, recherche, tri (récentes, populaires, sans réponse). L’auteur choisit la réponse qui a résolu sa question ; l’équipe peut épingler, fermer ou supprimer. Seuls le prénom et l’initiale du nom sont affichés. |
 | **Modération du forum** | Onglet *Forum* du back-office (équipe et administrateurs) : file des messages signalés (voir, supprimer le message, bloquer son auteur, classer), toutes les questions et réponses avec le nom complet et l’e-mail de leur auteur, et les membres. Un membre **bloqué** (1, 7, 30 jours ou jusqu’à nouvel ordre, avec un motif qui lui est montré) lit, réagit et enregistre toujours, mais ne peut plus poser de question, répondre ni modifier ; on peut aussi supprimer d’un coup tous ses messages. L’équipe ne peut pas être bloquée. Chaque action est notée dans le journal. |
 | **Mes produits** | Produits enregistrés (compte), avec alerte si le guide change leur statut, et historique des scans (sur l’appareil seulement). |
 | **Propositions** | Les visiteurs proposent des adresses ; elles arrivent dans une boîte de réception administrateur avant publication. |
@@ -114,7 +114,8 @@ npm install
    - `20261105130000_lock_handle_new_user.sql` : interdit d’appeler la fonction de création de profil depuis l’API ;
    - `20261105160000_audit_fixes.sql` : plus de notes inventées sur les adresses, date et auteur de la vérification, limites de longueur des textes, journal des actions admin (`admin_audit_log`) ;
    - les fichiers suivants, dans l’ordre de leur date, jusqu’à `20261116100000_forum.sql` : le forum (`forum_threads`, `forum_replies`, les « même question » et « utile », `forum_saved_threads`) et le signalement de ses messages. Tant que ce dernier fichier n’est pas exécuté, la page Forum affiche « Le forum ouvre bientôt » ;
-   - `20261116130000_forum_moderation.sql` : `forum_blocks`, les membres que l’équipe empêche de publier. Sans lui, le forum et sa modération fonctionnent, sauf le blocage.
+   - `20261116130000_forum_moderation.sql` : `forum_blocks`, les membres que l’équipe empêche de publier. Sans lui, le forum et sa modération fonctionnent, sauf le blocage ;
+   - `20261121100000_forum_unique_views.sql` : les lectures comptées une fois par lecteur (`forum_thread_views`). Sans lui, les questions s’ouvrent mais leurs lectures ne sont plus comptées.
    Sur une base existante, n’exécutez que les fichiers qui ne l’ont pas encore été (**Database → Migrations** les liste).
    Dans **Authentication → Sign In / Providers → Email**, activez *Confirm email* (recommandé : sans confirmation, le formulaire d’inscription peut révéler qu’une adresse a déjà un compte). Réglez aussi la longueur minimale du mot de passe sur 10.
    Dans **Authentication → URL Configuration**, ajoutez `<SITE_URL>/compte/nouveau-mot-de-passe` aux *Redirect URLs* (lien des e-mails « mot de passe oublié »).
@@ -313,8 +314,8 @@ L’APK local est signé avec la clé de débogage : il convient pour vos appare
 | POST | `/api/admin/orders/:id/status` | Équipe | Étape suivante ou précédente, annulation (`{ status, cancelReason, carrier, trackingNumber, note }`) |
 | POST | `/api/admin/orders/:id/whatsapp` | Équipe | (Re)envoyer la demande de confirmation WhatsApp |
 | POST | `/api/admin/orders/:id/calls` / `notes` | Équipe | Noter un appel (`REACHED`, `NO_ANSWER`, `CALL_BACK`) ou une note |
-| GET | `/api/forum/threads` | Public | Questions du forum (`category`, `sort=recent\|popular\|unanswered`, `q`, `page` ; `view=saved\|mine` pour un membre) |
-| GET | `/api/forum/threads/:id` | Public | Une question et ses réponses |
+| GET | `/api/forum/threads` | Public | Questions du forum (`category`, `sort=recent\|popular\|unanswered`, `q`, `page` ; `view=saved\|mine\|answered` pour un membre) |
+| GET | `/api/forum/threads/:id` | Public | Une question et ses réponses ; compte une lecture par lecteur (en-tête `X-Forum-Reader` pour un visiteur) |
 | POST | `/api/forum/threads` | Membre | Poser une question (`{ title, body, category, lang }`) ; 8 par jour et par compte |
 | PATCH / DELETE | `/api/forum/threads/:id` | Auteur, Équipe | Modifier ou supprimer ; l’équipe peut aussi `{ isPinned, isLocked }` |
 | POST | `/api/forum/threads/:id/replies` | Membre | Répondre (`{ body, parentId }`) |

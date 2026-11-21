@@ -95,6 +95,7 @@ test('the forum is read by everyone, written by signed-in accounts only', async 
   // So do the saved and "my questions" lists
   assert.equal((await send('GET', '/api/forum/threads?view=saved')).status, 401);
   assert.equal((await send('GET', '/api/forum/threads?view=mine')).status, 401);
+  assert.equal((await send('GET', '/api/forum/threads?view=answered')).status, 401);
 
   // An id that is not one answers "not found" without asking the database
   assert.equal((await send('GET', '/api/forum/threads/..%2Fetc')).status, 404);

@@ -246,7 +246,7 @@ export const sendSpotFeedback = async (spotId, answers) => (await axios.put(`${A
 
 // Forum ------------------------------------------------------------------
 
-/** filters: { category, sort: 'recent' | 'popular' | 'unanswered', q, view: 'all' | 'saved' | 'mine', page } */
+/** filters: { category, sort: 'recent' | 'popular' | 'unanswered', q, view: 'all' | 'saved' | 'mine' | 'answered', page } */
 export const fetchForumThreads = async ({ category, sort, q, view, page } = {}) =>
   (
     await axios.get(`${API_BASE}/forum/threads`, {
@@ -260,8 +260,27 @@ export const fetchForumThreads = async ({ category, sort, q, view, page } = {}) 
     })
   ).data;
 
-/** The question with its answers */
-export const fetchForumThread = async (id) => (await axios.get(`${API_BASE}/forum/threads/${id}`)).data;
+// A random id kept on this device, so a visitor who is not signed in counts once in a question's views.
+// It says nothing about the person; without storage, the read is simply not counted.
+const READER_KEY = 'celiac-square-forum-reader';
+const readerId = () => {
+  try {
+    let id = localStorage.getItem(READER_KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(READER_KEY, id);
+    }
+    return id;
+  } catch {
+    return '';
+  }
+};
+
+/** The question with its answers (and one more reader, the first time this person opens it) */
+export const fetchForumThread = async (id) => {
+  const reader = readerId();
+  return (await axios.get(`${API_BASE}/forum/threads/${id}`, { headers: reader ? { 'X-Forum-Reader': reader } : {} })).data;
+};
 
 /** thread: { title, body, category, lang } */
 export const createForumThread = async (thread) => (await axios.post(`${API_BASE}/forum/threads`, thread)).data;
