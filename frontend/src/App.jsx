@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import Navbar from './components/Navbar';
 import VisionScanner from './components/VisionScanner';
@@ -24,7 +24,9 @@ import { SavedProvider } from './components/community';
 import { WifiOff } from 'lucide-react';
 import { AuthProvider, useAuth } from './components/AuthContext';
 import { navigate, pathFor, useRoute } from './services/router';
+import { noteActivity } from './services/api';
 import { useFilmSwipe } from './components/filmSwipe';
+import { PageShownContext } from './components/ui';
 
 // Dock tabs first, in the order of the bar (search and the guide sit behind the scanner), then pages reached from the account menu and the footer
 const TAB_ORDER = ['learn', 'map', 'vision', 'search', 'atmc', 'forum', 'market', 'account', 'reset-password', 'seller', 'become-seller', 'backoffice', 'privacy', 'saved', 'orders'];
@@ -88,8 +90,9 @@ export default function App() {
 }
 
 /**
- * A page the film rolls past on its way (Comprendre → Marché passes Carte, Scanner, Forum): seen for a few
- * hundredths of a second, blurred, so its title and the shape of a page stand in for it.
+ * A page the film rolls past on its way (Comprendre → Marché passes Carte, Scanner, Forum) that has not been
+ * opened yet: seen for a few hundredths of a second, blurred, so its title and the shape of a page stand in for
+ * it. Pages already opened (all of them, once the app has preloaded them) pass as themselves.
  */
 function PassingFrame({ title }) {
   return (
@@ -149,6 +152,10 @@ function AppShell() {
   const alive = useRef(new Set());
   const lastRoute = useRef({});
   const scrollMemory = useRef({});
+  const rootRef = useRef(null);
+  const pageEls = useRef({});
+  const pageRefs = useRef({});
+  const pageRef = (tab) => (pageRefs.current[tab] ||= (el) => (el ? (pageEls.current[tab] = el) : delete pageEls.current[tab]));
   const shown = useRef({ tab: activeTab, sub: '' });
   if (BAR_TABS.includes(activeTab)) {
     alive.current.add(activeTab);
@@ -188,10 +195,62 @@ function AppShell() {
     index: BAR_TABS.indexOf(BAR_COVERS[activeTab] || activeTab),
     count: BAR_TABS.length,
     onCommit: (i) => {
+      // The page left keeps its scroll position (read now: once the new page is in, the browser may already
+      // have cut it down to fit the new page)
+      if (BAR_TABS.includes(shown.current.tab)) scrollMemory.current[shown.current.tab] = window.scrollY;
       filmLanded.current = true;
       navigate(lastPath(BAR_TABS[i]));
     },
   });
+
+  // Visits for the back-office statistics: on arrival, on each change of page, and on coming back to the tab
+  // (a new visit after 30 minutes away; see services/api.js)
+  useEffect(() => {
+    noteActivity();
+  }, [activeTab]);
+  useEffect(() => {
+    const onShow = () => document.visibilityState === 'visible' && noteActivity();
+    document.addEventListener('visibilitychange', onShow);
+    return () => document.removeEventListener('visibilitychange', onShow);
+  }, []);
+
+  // Each tab bar page's scroll position, as it scrolls. Not read when the page is left: by then the next page may
+  // be in, shorter, and the browser will have cut the position down to fit it
+  useEffect(() => {
+    const onScroll = () => {
+      const { tab } = shown.current;
+      if (BAR_TABS.includes(tab) && !stripRef.current?.dataset.filmMoving) scrollMemory.current[tab] = window.scrollY;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Once the app is idle, the tab bar's other pages are opened out of sight, one at a time: their data is
+  // loaded and they are laid out, so the first visit to each (and the roll that brings it in) shows the page
+  // itself at once. Not on a connection that asks to save data
+  const [, setPreloaded] = useState(0);
+  useEffect(() => {
+    const connection = navigator.connection;
+    if (connection?.saveData || /2g/.test(connection?.effectiveType || '')) return undefined;
+    const idle = window.requestIdleCallback || ((f) => setTimeout(f, 300));
+    const cancelIdle = window.cancelIdleCallback || clearTimeout;
+    let handle = 0;
+    const next = () => {
+      const tab = BAR_TABS.find((t) => !alive.current.has(t));
+      if (!tab) return;
+      // Never while the roll moves: opening a page then would hold it up
+      if (!stripRef.current?.dataset.filmMoving) {
+        alive.current.add(tab);
+        setPreloaded((n) => n + 1);
+      }
+      handle = idle(next, { timeout: 5000 });
+    };
+    const start = setTimeout(() => (handle = idle(next, { timeout: 5000 })), 2500);
+    return () => {
+      clearTimeout(start);
+      cancelIdle(handle);
+    };
+  }, []);
 
   // On every change of page, before the browser paints: the page left keeps its scroll position, the tab bar's
   // pages get theirs back, anything else opens at its top. After the roll, the frame shown is now the page:
@@ -200,7 +259,6 @@ function AppShell() {
     const prev = shown.current;
     const sub = route.params.threadId || route.params.storeId || '';
     if (prev.tab === activeTab && prev.sub === sub) return;
-    if (BAR_TABS.includes(prev.tab)) scrollMemory.current[prev.tab] = window.scrollY;
     shown.current = { tab: activeTab, sub };
     const back = prev.tab !== activeTab && BAR_TABS.includes(activeTab);
     window.scrollTo({ top: back ? scrollMemory.current[activeTab] || 0 : 0 });
@@ -247,8 +305,27 @@ function AppShell() {
   const keptPage = (tab) => {
     const { params, query } = routeOf(tab);
     const deps = [lang, JSON.stringify(params), JSON.stringify(query), tab === 'vision' && tab === activeTab];
-    return <KeptPage deps={deps}>{renderPage(tab)}</KeptPage>;
+    return (
+      <PageShownContext.Provider value={tab === activeTab}>
+        <KeptPage deps={deps}>{renderPage(tab)}</KeptPage>
+      </PageShownContext.Provider>
+    );
   };
+
+  // A page as the strip shows it: its column, then the footer. Each page carries its own footer, so the footer
+  // moves with its page during the roll and is already where it will be when the roll lands
+  const pageBox = (content, current) => (
+    <>
+      <div className="mx-auto w-full max-w-6xl flex-1 px-4 pb-32 pt-3 sm:px-6 sm:pt-6 lg:pb-20">{content}</div>
+      <Footer
+        lang={lang}
+        landmark={current}
+        onBecomeSeller={() => goTo('become-seller')}
+        onSuggestAddress={() => setIsSubmitModalOpen(true)}
+        onOpenPrivacy={() => goTo('privacy')}
+      />
+    </>
+  );
 
   const handleSwitchToSearch = (query) => goTo('search', { query: query ? { q: query } : undefined });
 
@@ -324,14 +401,40 @@ function AppShell() {
     if (film.go(BAR_TABS.indexOf(tab))) return;
     navigate(lastPath(tab));
   };
-  // The real frames the roll is moving (tab → its place in the roll, in frames); they stay alive afterwards
-  const frameTabs = new Map((film.film?.frames || []).filter((f) => f.real).map((f) => [BAR_TABS[f.index], f.slot]));
+  // The pages the roll moves as themselves (tab → its place in the roll, in frames): the one it heads to, and
+  // the ones it passes that are already open. They stay alive afterwards
+  const frameTabs = new Map(
+    (film.film?.frames || []).filter((f) => f.real || alive.current.has(BAR_TABS[f.index])).map((f) => [BAR_TABS[f.index], f.slot])
+  );
   frameTabs.forEach((_, tab) => alive.current.add(tab));
+
+  // Where the roll's frames sit, worked out once as the roll starts. Each is lined up so that it lands at its
+  // own scroll position, cut down to what the page can actually be scrolled to: then the scroll it gets when
+  // the roll lands is exactly the one shown, and nothing jumps. A short page keeps its footer at the foot of
+  // the screen, as it will once in place (`fill`, the room the page fills at least)
+  const placement = useMemo(() => {
+    if (!film.film || !stripRef.current || !rootRef.current) return null;
+    const strip = stripRef.current.getBoundingClientRect();
+    const root = rootRef.current.getBoundingClientRect();
+    const fill = Math.max(0, (parseFloat(getComputedStyle(rootRef.current).minHeight) || 0) - (strip.top - root.top));
+    const stripTop = strip.top + window.scrollY;
+    const tops = {};
+    BAR_TABS.forEach((tab) => {
+      const el = pageEls.current[tab];
+      if (tab === activeTab) return;
+      if (el) {
+        const reach = Math.max(0, stripTop + Math.max(el.scrollHeight, fill) - window.innerHeight);
+        scrollMemory.current[tab] = Math.min(scrollMemory.current[tab] || 0, reach);
+      }
+      tops[tab] = film.film.top - (scrollMemory.current[tab] || 0);
+    });
+    return { fill, tops };
+  }, [film.film]); // eslint-disable-line react-hooks/exhaustive-deps
   // While the roll heads to a page, the tab bar already shows it
   const barTab = film.pending >= 0 ? BAR_TABS[film.pending] : activeTab;
 
   return (
-    <div className="flex min-h-screen flex-col overflow-x-clip">
+    <div ref={rootRef} className="flex min-h-screen flex-col overflow-x-clip">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4 focus:z-[2000] focus:rounded-full focus:bg-ink focus:px-4 focus:py-2 focus:text-canvas-paper">
         {lang === 'ar' ? 'انتقل إلى المحتوى' : 'Aller au contenu'}
       </a>
@@ -349,54 +452,59 @@ function AppShell() {
         </div>
       )}
 
-      <main id="main" ref={mainRef} className="mx-auto w-full max-w-6xl flex-1 px-4 pb-32 pt-3 sm:px-6 sm:pt-6 lg:pb-20">
-        {/* The film strip: the page, and while the roll moves, the frames beside it. They run past the page's
-            column to the window's edge, where the app's outer box clips them.
+      <main id="main" ref={mainRef} className="flex w-full flex-1 flex-col">
+        {/* The film strip: the page, and while the roll moves, the frames beside it, one screen width apart.
             Pages are keyed by page, so when the roll lands the frame shown simply stays: it is not drawn again. */}
-        <div ref={stripRef} className="relative">
+        <div ref={stripRef} className="relative flex flex-1 flex-col">
           {BAR_TABS.filter((tab) => alive.current.has(tab) || frameTabs.has(tab)).map((tab) => {
             if (tab === activeTab) {
               return (
-                <div key={tab} data-page-current="">
-                  {keptPage(tab)}
+                <div key={tab} ref={pageRef(tab)} data-page-current="" className="flex flex-1 flex-col">
+                  {pageBox(keptPage(tab), true)}
                 </div>
               );
             }
             const slot = frameTabs.get(tab);
-            return slot === undefined ? (
+            return slot === undefined || !placement ? (
               // Kept alive, out of sight: still laid out (only not drawn), so the roll can show it at once
-              <div key={tab} inert="" aria-hidden="true" className="film-parked">
-                {keptPage(tab)}
+              <div key={tab} ref={pageRef(tab)} inert="" aria-hidden="true" className="film-parked flex flex-col">
+                {pageBox(keptPage(tab), false)}
               </div>
             ) : (
-              // In the roll: one frame to the side per page (gutters included), lined up so that it lands
-              // at its own scroll position
+              // In the roll: one frame to the side per page
               <div
                 key={tab}
+                ref={pageRef(tab)}
                 inert=""
                 aria-hidden="true"
-                className="absolute w-full"
-                style={{ top: film.film.top - (scrollMemory.current[tab] || 0), left: slot * film.film.offset }}
+                className="absolute flex w-full flex-col"
+                style={{ top: placement.tops[tab], left: slot * film.film.offset, minHeight: placement.fill }}
               >
-                {keptPage(tab)}
+                {pageBox(keptPage(tab), false)}
               </div>
             );
           })}
           {!BAR_TABS.includes(activeTab) && (
-            <div key={`${activeTab}:${route.params.threadId || route.params.storeId || ''}`} data-page-current="">
-              {renderPage(activeTab)}
+            <div key={`${activeTab}:${route.params.threadId || route.params.storeId || ''}`} data-page-current="" className="flex flex-1 flex-col">
+              {pageBox(renderPage(activeTab), true)}
             </div>
           )}
-          {film.film?.frames
-            .filter((f) => !f.real)
-            .map(({ index, slot }) => {
-              const tab = BAR_TABS[index];
-              return (
-                <div key={`pass:${tab}`} aria-hidden="true" className="absolute w-full" style={{ top: film.film.top, left: slot * film.film.offset }}>
-                  <PassingFrame title={(PAGE_TITLES[tab] || PAGE_TITLES.vision)[lang === 'ar' ? 1 : 0]} />
-                </div>
-              );
-            })}
+          {placement &&
+            film.film.frames
+              .filter((f) => !frameTabs.has(BAR_TABS[f.index]))
+              .map(({ index, slot }) => {
+                const tab = BAR_TABS[index];
+                return (
+                  <div
+                    key={`pass:${tab}`}
+                    aria-hidden="true"
+                    className="absolute flex w-full flex-col"
+                    style={{ top: film.film.top, left: slot * film.film.offset, minHeight: placement.fill }}
+                  >
+                    {pageBox(<PassingFrame title={(PAGE_TITLES[tab] || PAGE_TITLES.vision)[lang === 'ar' ? 1 : 0]} />, false)}
+                  </div>
+                );
+              })}
         </div>
       </main>
 
@@ -404,12 +512,6 @@ function AppShell() {
 
       <SpotModal isOpen={isSubmitModalOpen} onClose={() => setIsSubmitModalOpen(false)} lang={lang} />
 
-      <Footer
-        lang={lang}
-        onBecomeSeller={() => goTo('become-seller')}
-        onSuggestAddress={() => setIsSubmitModalOpen(true)}
-        onOpenPrivacy={() => goTo('privacy')}
-      />
       {/* Explicit mode: auto-detection picks the debug script from va.vercel-scripts.com when NODE_ENV
           is not "production" at build time, and the Content-Security-Policy blocks that host.
           In production mode the script is served by the site itself (/_vercel/insights). */}

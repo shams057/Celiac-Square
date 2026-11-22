@@ -79,6 +79,8 @@ export const limits = {
     max: 20,
     message: 'Vous publiez très vite. Patientez quelques minutes puis réessayez.',
   }),
+  // Visit counting (routes/visitRoutes.js): a browser sends one every 30 minutes at most
+  visits: rateLimit({ name: 'visits', windowMs: 60 * MINUTE, max: 30 }),
   // Proxied to Open Food Facts, which rate-limits our server's IP
   productSearch: rateLimit({ name: 'product-search', windowMs: MINUTE, max: 60 }),
 };

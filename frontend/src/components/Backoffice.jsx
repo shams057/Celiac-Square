@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MapPin, Store, Lock, Flag, Package, LayoutDashboard, MessagesSquare } from 'lucide-react';
+import { MapPin, Store, Lock, Flag, Package, LayoutDashboard, MessagesSquare, ChartColumn } from 'lucide-react';
 import { useAuth } from './AuthContext';
 import BackofficeSpots from './BackofficeSpots';
 import BackofficeSellers from './BackofficeSellers';
@@ -7,6 +7,7 @@ import BackofficeReports from './BackofficeReports';
 import BackofficeOrders from './BackofficeOrders';
 import BackofficeDashboard from './BackofficeDashboard';
 import BackofficeForum from './BackofficeForum';
+import BackofficeStats from './BackofficeStats';
 import { fetchForumOverview } from '../services/api';
 import { t } from './ui';
 import { SegmentedSlider } from './Slider';
@@ -14,6 +15,7 @@ import { SegmentedSlider } from './Slider';
 // staff: open to the team (STAFF role); the rest is for admins only
 const SECTIONS = [
   { id: 'dashboard', icon: LayoutDashboard, fr: 'Tableau de bord', ar: 'لوحة القيادة', staff: true },
+  { id: 'stats', icon: ChartColumn, fr: 'Statistiques', ar: 'الإحصائيات' },
   { id: 'orders', icon: Package, fr: 'Commandes', ar: 'الطلبات', staff: true },
   { id: 'forum', icon: MessagesSquare, fr: 'Forum', ar: 'المنتدى', staff: true },
   { id: 'reports', icon: Flag, fr: 'Signalements', ar: 'البلاغات' },
@@ -86,6 +88,8 @@ export default function Backoffice({ lang }) {
       )}
       {section === 'dashboard' ? (
         <BackofficeDashboard lang={lang} isAdmin={isAdmin} onGo={(id) => sections.some((s) => s.id === id) && setSection(id)} />
+      ) : section === 'stats' && isAdmin ? (
+        <BackofficeStats lang={lang} />
       ) : section === 'forum' ? (
         <BackofficeForum lang={lang} onCountChange={setForumReports} />
       ) : section === 'orders' || !isAdmin ? (

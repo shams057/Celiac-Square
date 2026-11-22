@@ -22,6 +22,8 @@ import whatsappRoutes from './routes/whatsappRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import forumRoutes from './routes/forumRoutes.js';
 import forumAdminRoutes from './routes/forumAdminRoutes.js';
+import statsRoutes from './routes/statsRoutes.js';
+import visitRoutes from './routes/visitRoutes.js';
 
 dotenv.config();
 
@@ -76,8 +78,10 @@ app.use('/api/market', marketRoutes);
 app.use('/api/admin/orders', orderAdminRoutes);
 app.use('/api/admin/forum', forumAdminRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);
+app.use('/api/admin/stats', statsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/visits', visitRoutes);
 app.use('/api/me', meRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/whatsapp', whatsappRoutes);

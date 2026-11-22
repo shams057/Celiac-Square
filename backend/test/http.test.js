@@ -54,6 +54,22 @@ test('admin routes need an admin account', async () => {
   assert.equal(res.status, 401);
 });
 
+test('statistics are for admins only', async () => {
+  assert.equal((await fetch(`${base}/api/admin/stats`)).status, 401);
+  assert.equal((await fetch(`${base}/api/admin/stats?days=7`, { headers: { Authorization: 'Bearer a.b.c' } })).status, 401);
+});
+
+test('counting a visit never fails, whatever is sent', async () => {
+  const post = (body, headers = {}) =>
+    fetch(`${base}/api/visits`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) });
+  // The database is unreachable here: the visit is lost, the visitor never sees an error
+  assert.equal((await post({ visitor: '3f1c2a9e-6b7d-4e1f-9a2b-1c3d4e5f6a7b' }, { 'User-Agent': 'Mozilla/5.0' })).status, 204);
+  assert.equal((await post({ visitor: 'x' })).status, 204);
+  assert.equal((await post({ visitor: { $gt: '' } })).status, 204);
+  assert.equal((await post({})).status, 204);
+  assert.equal((await post({ visitor: '3f1c2a9e-6b7d-4e1f-9a2b-1c3d4e5f6a7b' }, { 'User-Agent': 'Googlebot/2.1' })).status, 204);
+});
+
 test('invalid barcodes are rejected before calling Open Food Facts', async () => {
   const res = await fetch(`${base}/api/products/barcode/..%2Fetc`);
   assert.equal(res.status, 400);

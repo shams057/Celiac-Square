@@ -34,11 +34,13 @@ const SECTIONS = [
       'Un cookie de session (httpOnly) vous garde connecté. Il ne sert à rien d’autre et disparaît à la déconnexion.',
       'Votre navigateur retient la langue choisie et le nom du compte connecté, pour l’affichage.',
       'Les statistiques de visite (Vercel Analytics) sont agrégées et ne déposent pas de cookie.',
+      'Pour compter les visites, votre navigateur garde un identifiant tiré au hasard (le même qui compte une seule fois votre lecture d’une question du forum). Nous n’en gardons qu’une empreinte, avec l’heure de la visite : ni adresse IP, ni page vue, ni compte.',
     ]],
     ar: ['ملفات تعريف الارتباط والتخزين', [
       'ملف جلسة (httpOnly) يبقيك متصلا، ولا يُستعمل لغير ذلك ويُحذف عند تسجيل الخروج.',
       'يحفظ متصفحك اللغة المختارة واسم الحساب المتصل للعرض فقط.',
       'إحصائيات الزيارات (Vercel Analytics) مجمّعة ولا تستعمل ملفات تعريف الارتباط.',
+      'لعدّ الزيارات، يحتفظ متصفحك بمعرّف عشوائي (هو نفسه الذي يعدّ قراءتك لسؤال في المنتدى مرة واحدة). لا نحفظ منه إلا بصمة مع وقت الزيارة: لا عنوان IP ولا صفحة ولا حساب.',
     ]],
   },
   {

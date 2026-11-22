@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Check, X, TriangleAlert, HelpCircle, LoaderCircle, SlidersHorizontal, UtensilsCrossed, Croissant, Coffee, Palette } from 'lucide-react';
 import { navigate, pathFor } from '../services/router';
 
@@ -158,10 +159,21 @@ export function EmptyState({ title, children, action }) {
   );
 }
 
-/** Accessible modal shell */
+/**
+ * Whether the page a component sits in is the one shown. The tab bar's pages stay mounted out of sight (see
+ * App.jsx); a dialog left open on one of them waits there, closed, until its page is shown again.
+ */
+export const PageShownContext = React.createContext(true);
+
+/**
+ * Accessible modal shell. Drawn at the end of the document, outside the page: the page may be moving (the film
+ * roll in App.jsx), and a dialog must stay fixed to the screen.
+ */
 export function Modal({ open, onClose, title, subtitle, children, width = 'max-w-xl', lang }) {
+  const pageShown = React.useContext(PageShownContext);
+  const visible = open && pageShown;
   React.useEffect(() => {
-    if (!open) return undefined;
+    if (!visible) return undefined;
     const onKey = (e) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onKey);
     const prev = document.body.style.overflow;
@@ -170,10 +182,10 @@ export function Modal({ open, onClose, title, subtitle, children, width = 'max-w
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = prev;
     };
-  }, [open, onClose]);
+  }, [visible, onClose]);
 
-  if (!open) return null;
-  return (
+  if (!visible) return null;
+  return createPortal(
     <div className="fixed inset-0 z-[1000] flex animate-fade-in items-end justify-center bg-black/30 dark:bg-black/60 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
         role="dialog"
@@ -194,7 +206,8 @@ export function Modal({ open, onClose, title, subtitle, children, width = 'max-w
         </div>
         <div className="overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

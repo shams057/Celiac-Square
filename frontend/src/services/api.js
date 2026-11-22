@@ -242,6 +242,9 @@ export const cancelMyOrder = async (id) => (await axios.post(`${API_BASE}/orders
 
 export const fetchDashboard = (days = 30) => adminRequest({ method: 'get', url: `${API_BASE}/admin/dashboard`, params: { days } });
 
+// Back-office statistics (admins): visits, accounts, forum, marketplace
+export const fetchSiteStats = (days = 30) => adminRequest({ method: 'get', url: `${API_BASE}/admin/stats`, params: { days } });
+
 // Back-office: orders (team and admins)
 
 export const fetchOrders = ({ status = 'ACTIVE', q = '' } = {}) =>
@@ -295,19 +298,39 @@ export const fetchForumThreads = async ({ category, sort, q, view, page } = {}) 
     })
   ).data;
 
-// A random id kept on this device, so a visitor who is not signed in counts once in a question's views.
-// It says nothing about the person; without storage, the read is simply not counted.
+// A random id kept on this device, so a visitor who is not signed in counts once in a question's views, and
+// once among the site's visitors. It says nothing about the person; without storage, nothing is counted.
+// (crypto.randomUUID needs a secure page; random bytes work everywhere, on a plain http address too.)
 const READER_KEY = 'celiac-square-forum-reader';
 const readerId = () => {
   try {
     let id = localStorage.getItem(READER_KEY);
     if (!id) {
-      id = crypto.randomUUID();
+      id = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
       localStorage.setItem(READER_KEY, id);
     }
     return id;
   } catch {
     return '';
+  }
+};
+
+// Visits, for the back-office statistics: one when someone arrives, and again when they come back after 30
+// minutes away (the usual length of a visit). Production builds only, so testing the site counts nothing;
+// never for automated browsers. The server stores the id hashed, with nothing else (routes/visitRoutes.js).
+const LAST_SEEN_KEY = 'celiac-square-last-seen';
+const VISIT_GAP = 30 * 60 * 1000;
+export const noteActivity = () => {
+  if (!import.meta.env.PROD || navigator.webdriver) return;
+  try {
+    const now = Date.now();
+    const last = Number(localStorage.getItem(LAST_SEEN_KEY)) || 0;
+    localStorage.setItem(LAST_SEEN_KEY, String(now));
+    if (now - last < VISIT_GAP) return;
+    const visitor = readerId();
+    if (visitor) axios.post(`${API_BASE}/visits`, { visitor }).catch(() => {});
+  } catch {
+    // storage unavailable: not counted
   }
 };
 

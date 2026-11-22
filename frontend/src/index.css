@@ -433,16 +433,9 @@
   overflow: hidden;
   visibility: hidden;
 }
-/* While the roll moves: the strip is its own layer, and glass inside the pages is frosted instead of blurring
-   what is behind it on every frame */
+/* While the roll moves, the strip is its own layer (the compositor moves and blurs it) */
 [data-film-moving] {
-  will-change: transform;
-}
-[data-film-moving] .glass,
-[data-film-moving] .leaflet-bar {
-  background: var(--glass-solid);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
+  will-change: transform, filter;
 }
 
 /* People who ask for less transparency get frosted, near-opaque panes */

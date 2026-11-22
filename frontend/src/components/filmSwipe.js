@@ -6,13 +6,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  *    or back when the swipe was short. Places with their own sideways gesture keep it (see ownsSwipe).
  *  - Phones: a touch while the roll still moves catches it where it is: a swipe never waits for the last one
  *    to finish. Caught on its way onto a page, the roll lands there at once and the swipe goes on from it.
- *  - Any screen: a tap or click on the tab bar rolls the film there (with a slight motion blur on large screens).
+ *  - Any screen: a tap or click on the tab bar rolls the film there, with a slight motion blur.
  *    Over several pages (Comprendre → Marché) the roll rushes past the pages in between and slows down on the last.
  * Every animation stays under 0.3 s. The order is left to right in both languages, like the tab bar.
  *
- * Performance: rolls are handed to the browser as animations (the Web Animations API) on a transform only, so
- * the compositor runs them even while the page is busy (React drawing the new page, a map loading). A finger
- * moves the strip directly. The spring is worked out in advance, as keyframes.
+ * Performance: rolls are handed to the browser as animations (the Web Animations API) on transform and a CSS
+ * blur only, so the compositor runs them on the graphics chip, even while the page is busy (React drawing the
+ * new page, a map loading), and nothing is redrawn as they play. (An SVG blur, horizontal only, was redrawn on
+ * every frame: too slow for a phone.) A finger moves the strip directly. The spring is worked out in advance,
+ * as keyframes.
  *
  * Positions are counted in frames from the current page: +1 is the next page (to the right), -1 the one before.
  */
@@ -30,15 +32,14 @@ const SPRING = { stiffness: 520, damping: 0.92 };
 const ROLL_ONE = { duration: 230, ease: [0.2, 0.75, 0.25, 1] };
 const ROLL_MANY = { duration: 260, ease: [0.3, 0.6, 0.02, 1] };
 
-// Large screens only: the blur at the roll's fastest, in px. A phone would have to redraw the whole screen
-// blurred on every frame, which it cannot do smoothly
-const BLUR_PX = 2.5;
+// Motion blur on a tap's roll: px of blur per px/ms of speed, and its ceiling ("slight")
+const BLUR = { perSpeed: 0.3, max: 3 };
 
 const clamp = (n, min, max) => Math.min(Math.max(n, min), max);
 
 /**
- * One frame's step, in px: on a phone the page is the screen's width; on a wider screen the page is a centred
- * column, so the step is longer, enough for the next page to start just past the window's edge.
+ * One frame's step, in px: the strip's width (the window's). Kept as the larger of that and half way past a
+ * centred column, should the strip ever be narrower than the window, so the next page starts past its edge.
  */
 const frameStep = (main) => {
   const page = main?.clientWidth || window.innerWidth;
@@ -48,6 +49,40 @@ const frameStep = (main) => {
 
 const isPhone = () => typeof window !== 'undefined' && window.matchMedia?.(PHONE_QUERY).matches;
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+/** cubic-bezier(x1, y1, x2, y2) as a function of time (0 to 1) */
+const bezier = (x1, y1, x2, y2) => {
+  const at = (a, b, u) => 3 * a * u * (1 - u) ** 2 + 3 * b * u * u * (1 - u) + u ** 3;
+  return (t) => {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    let lo = 0;
+    let hi = 1;
+    for (let i = 0; i < 24; i += 1) {
+      const mid = (lo + hi) / 2;
+      if (at(x1, x2, mid) < t) lo = mid;
+      else hi = mid;
+    }
+    return at(y1, y2, (lo + hi) / 2);
+  };
+};
+
+/**
+ * The motion blur of a timed roll over `px`, as keyframes: it follows the speed (none at rest, most where the
+ * roll is fastest), capped to stay slight.
+ */
+const blurKeyframes = (ease, px, duration) => {
+  const curve = bezier(...ease);
+  const steps = 12;
+  return Array.from({ length: steps + 1 }, (_, k) => {
+    const t = k / steps;
+    const a = Math.max(0, t - 0.02);
+    const b = Math.min(1, t + 0.02);
+    const speed = ((curve(b) - curve(a)) * px) / ((b - a) * duration); // px per ms
+    const blur = k === 0 || k === steps ? 0 : Math.min(BLUR.max, speed * BLUR.perSpeed);
+    return { offset: t, filter: `blur(${blur.toFixed(2)}px)` };
+  });
+};
 
 /** Where the strip is drawn now, in px (mid-animation included) */
 const drawnX = (el) => {
@@ -211,9 +246,7 @@ export function useFilmSwipe({ stripRef, frameRef, index, count, onCommit }) {
         { duration, easing }
       );
       const a = { move };
-      if (blur) {
-        a.blur = strip.animate([{ filter: 'blur(0px)' }, { filter: `blur(${BLUR_PX}px)`, offset: 0.3 }, { filter: 'blur(0px)' }], { duration });
-      }
+      if (blur) a.blur = strip.animate(blur, { duration });
       anim.current = a;
       pos.current = to;
       paint();
@@ -253,7 +286,8 @@ export function useFilmSwipe({ stripRef, frameRef, index, count, onCommit }) {
   const roll = useCallback(
     (to) => {
       const { duration, ease } = Math.abs(to) > 1 ? ROLL_MANY : ROLL_ONE;
-      animate([0, to], duration, `cubic-bezier(${ease.join(', ')})`, !isPhone());
+      const blur = blurKeyframes(ease, Math.abs(to) * run.current.offset, duration);
+      animate([0, to], duration, `cubic-bezier(${ease.join(', ')})`, blur);
     },
     [animate]
   );
@@ -369,6 +403,8 @@ export function useFilmSwipe({ stripRef, frameRef, index, count, onCommit }) {
         if (Math.abs(dx) <= Math.abs(dy) * 1.15) {
           if (run.current) release();
           touch.current = null;
+          // Lets go of the touch: the rest of the scroll is the browser's alone, never held up by this
+          unfollow();
           return;
         }
         g.x = t.clientX; // the roll moves from here on, with no jump

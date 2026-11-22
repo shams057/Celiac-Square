@@ -157,8 +157,9 @@ export function DailyChart({ lang, data, bar, line, height = 220, ariaLabel }) {
 /**
  * Horizontal bars, one series (slot 1): label on the left, value at the bar's tip.
  * rows: [{ key, label, value, note? }] — note is extra text beside the label (e.g. "2 en retard")
+ * stacked: the label always sits above its bar (long labels, such as a product and its shop, in a narrow card)
  */
-export function BarList({ lang, rows, format, emptyText }) {
+export function BarList({ lang, rows, format, emptyText, stacked = false }) {
   const max = Math.max(1, ...rows.map((r) => r.value || 0));
   if (!rows.length) return <p className="py-6 text-center text-sm text-ink-faint">{emptyText}</p>;
   // Bars scale into the space left after the value, so the longest bar ends where the value
@@ -168,7 +169,7 @@ export function BarList({ lang, rows, format, emptyText }) {
       {rows.map((r) => (
         <li
           key={r.key}
-          className="grid grid-cols-1 gap-1 text-sm sm:grid-cols-[minmax(6rem,38%)_minmax(0,1fr)] sm:items-center sm:gap-3"
+          className={`grid grid-cols-1 gap-1 text-sm ${stacked ? '' : 'sm:grid-cols-[minmax(6rem,38%)_minmax(0,1fr)] sm:items-center sm:gap-3'}`}
           title={`${r.label} : ${format ? format(r.value) : compact(r.value, lang)}`}
         >
           <span className="flex min-w-0 items-baseline gap-2">

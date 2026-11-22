@@ -2,11 +2,15 @@ import React from 'react';
 import { Plus } from 'lucide-react';
 import { BrandMark, t } from './ui';
 
-export default function Footer({ lang, onBecomeSeller, onSuggestAddress, onOpenPrivacy }) {
+/**
+ * landmark: this footer is the page's (each page of the film roll carries its own copy, see App.jsx; the
+ * copies on the pages out of sight are hidden from assistive technology).
+ */
+export default function Footer({ lang, landmark = true, onBecomeSeller, onSuggestAddress, onOpenPrivacy }) {
   const tr = t(lang);
 
   return (
-    <footer className="border-t border-ink/10 pb-28 lg:pb-2">
+    <footer role={landmark ? 'contentinfo' : undefined} className="border-t border-ink/10 pb-28 lg:pb-2">
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">
