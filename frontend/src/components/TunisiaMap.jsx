@@ -73,6 +73,21 @@ function FlyTo({ target }) {
   return null;
 }
 
+/**
+ * The map is kept alive while other pages are shown (see App.jsx), hidden at zero size: when it shows again,
+ * or its box changes size, Leaflet measures itself again so the tiles fill it.
+ */
+function KeepSized() {
+  const map = useMap();
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => map.invalidateSize({ pan: false }));
+    ro.observe(map.getContainer());
+    return () => ro.disconnect();
+  }, [map]);
+  return null;
+}
+
 export default function TunisiaMap({ onOpenSubmitModal, lang }) {
   const tr = t(lang);
   const [spots, setSpots] = useState([]);
@@ -321,6 +336,7 @@ export default function TunisiaMap({ onOpenSubmitModal, lang }) {
         <div role="region" aria-label={tr('Carte des adresses. La liste qui suit présente les mêmes lieux.', 'خريطة العناوين. القائمة التالية تعرض نفس الأماكن.')} className="relative z-0 h-[55vh] min-h-[340px] overflow-hidden rounded-2xl border border-canvas-line shadow-[0_8px_24px_-16px_rgba(47,38,29,0.3)] lg:sticky lg:top-24 lg:h-[620px]">
           <MapContainer center={TUNISIA_CENTER} zoom={TUNISIA_ZOOM} scrollWheelZoom className="h-full w-full">
             <FlyTo target={flyTarget} />
+            <KeepSized />
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

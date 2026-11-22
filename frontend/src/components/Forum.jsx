@@ -115,6 +115,8 @@ const queryOf = ({ view, sort, category, q }) => {
 
 // The last list shown, so going back from a question is instant and lands on the same filters
 const listCache = new Map();
+// The last copy of each question opened (with its answers), so going back to one shows it at once
+const threadCache = new Map();
 let lastListQuery = {};
 
 const timeAgo = (iso, lang) => {
@@ -141,7 +143,7 @@ export default function Forum({ lang, threadId, query, onOpenThread, onNavigate 
   return (
     <>
       {threadId ? (
-        <ThreadPage lang={lang} threadId={threadId} onOpenThread={onOpenThread} askSignIn={setPrompt} />
+        <ThreadPage key={threadId} lang={lang} threadId={threadId} onOpenThread={onOpenThread} askSignIn={setPrompt} />
       ) : (
         <ThreadList lang={lang} query={query} onOpenThread={onOpenThread} onNavigate={onNavigate} askSignIn={setPrompt} />
       )}
@@ -1258,8 +1260,13 @@ function ThreadCard({ thread, lang, onOpen, onChange, askSignIn }) {
 function ThreadPage({ lang, threadId, onOpenThread, askSignIn }) {
   const tr = t(lang);
   const { user } = useAuth();
-  const [thread, setThread] = useState(null);
-  const [state, setState] = useState({ loading: true, error: '', missing: false, unavailable: false });
+  // A question opened before (by this account) shows at once, then refreshes quietly
+  const cacheKey = `${user?._id || ''}|${threadId}`;
+  const [thread, setThread] = useState(() => threadCache.get(cacheKey) || null);
+  const [state, setState] = useState(() => ({ loading: !threadCache.has(cacheKey), error: '', missing: false, unavailable: false }));
+  useEffect(() => {
+    if (thread?._id === threadId) threadCache.set(cacheKey, thread);
+  }, [thread, cacheKey, threadId]);
   const [editing, setEditing] = useState(false);
   const [confirm, setConfirm] = useState(null); // { kind: 'thread' } | { kind: 'reply', reply }
   const [busy, setBusy] = useState('');
@@ -1277,11 +1284,14 @@ function ThreadPage({ lang, threadId, onOpenThread, askSignIn }) {
       setState({ loading: false, error: '', missing: false, unavailable: false });
     } catch (err) {
       const status = err?.response?.status;
+      if (status === 404) threadCache.delete(cacheKey);
+      // Offline or a server error with a copy at hand: the copy stays on screen
+      const shown = status !== 404 && thread?._id === threadId;
       setState({
         loading: false,
         missing: status === 404,
         unavailable: unavailable(err),
-        error: status === 404 || unavailable(err) ? '' : errorMessage(err, tr('La discussion n’a pas pu être chargée.', 'تعذر تحميل النقاش.')),
+        error: status === 404 || unavailable(err) || shown ? '' : errorMessage(err, tr('La discussion n’a pas pu être chargée.', 'تعذر تحميل النقاش.')),
       });
     }
   }, [threadId, user?._id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1431,6 +1441,7 @@ function ThreadPage({ lang, threadId, onOpenThread, askSignIn }) {
     try {
       if (target.kind === 'thread') {
         await deleteForumThread(thread._id);
+        threadCache.delete(cacheKey);
         listCache.clear();
         setConfirm(null);
         navigate(pathFor('forum', { query: lastListQuery }), { replace: true });

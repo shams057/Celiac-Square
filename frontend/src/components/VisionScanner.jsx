@@ -86,7 +86,8 @@ const remember = (result, lang) => {
   }
 };
 
-export default function VisionScanner({ onSwitchToSearch, lang }) {
+/** active: false while the page is kept alive behind another one (App.jsx): the live camera is turned off */
+export default function VisionScanner({ onSwitchToSearch, lang, active = true }) {
   const tr = t(lang);
   const [mode, setMode] = useState('product');
   const [liveCamera, setLiveCamera] = useState(false);
@@ -108,6 +109,11 @@ export default function VisionScanner({ onSwitchToSearch, lang }) {
   useEffect(() => {
     preloadBarcodeReader();
   }, []);
+
+  // Off screen, the camera never keeps running
+  useEffect(() => {
+    if (!active) setLiveCamera(false);
+  }, [active]);
 
   const stopCamera = () => {
     const stream = videoRef.current?.srcObject;

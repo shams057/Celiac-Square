@@ -1,7 +1,42 @@
 import axios from 'axios';
-import './session';
+import { SESSION_EVENT } from './session';
 
 const API_BASE = '/api';
+
+// ---------------------------------------------------------------------------------------------
+// Cache of public reads
+// ---------------------------------------------------------------------------------------------
+// Pages ask again for what they showed a moment ago (the map's places, the guide, the marketplace…).
+// A read made recently enough is answered from memory, without the network; a failed read is never kept.
+// What an account changes (a place, a store, a product) clears the matching entries, and so does signing
+// in or out (the marketplace answers members only). The forum keeps its own copies (components/Forum.jsx).
+
+const MINUTE = 60 * 1000;
+const cache = new Map(); // key -> { at, promise }
+
+const remember = (key, ttl, load) => {
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < ttl) return hit.promise;
+  const promise = load().catch((err) => {
+    if (cache.get(key)?.promise === promise) cache.delete(key);
+    throw err;
+  });
+  cache.set(key, { at: Date.now(), promise });
+  return promise;
+};
+
+/** Forgets the cached reads whose key starts with `prefix` (all of them without one) */
+export const forgetCached = (prefix = '') => {
+  for (const key of [...cache.keys()]) if (key.startsWith(prefix)) cache.delete(key);
+};
+
+/** After a successful change: forgets the reads it makes stale, and passes the response on */
+const forgets = (prefix) => (res) => {
+  forgetCached(prefix);
+  return res;
+};
+
+window.addEventListener(SESSION_EVENT, () => forgetCached());
 
 // If the API is not deployed, hosts serve index.html with status 200 for /api/* too.
 // Treat that as an error so screens show "could not load" instead of empty results.
@@ -24,7 +59,7 @@ const adminRequest = async (config) => (await axios(config)).data;
  */
 const withOfflineInfo = (res) => ({ ...res.data, offlineCopy: res.headers?.['x-offline-copy'] || null });
 
-export const fetchSpots = async (filters = {}) => {
+const fetchSpotsLive = async (filters = {}) => {
   const params = new URLSearchParams();
   if (filters.category && filters.category !== 'ALL') params.append('category', filters.category);
   if (filters.city && filters.city !== 'ALL') params.append('city', filters.city);
@@ -35,7 +70,7 @@ export const fetchSpots = async (filters = {}) => {
   return withOfflineInfo(res);
 };
 
-export const fetchCities = async () => {
+const fetchCitiesLive = async () => {
   const res = await axios.get(`${API_BASE}/map/cities`);
   return res.data;
 };
@@ -49,31 +84,31 @@ export const submitSpot = async (spotData) => {
 export const fetchProposals = (status = 'PENDING') =>
   adminRequest({ method: 'get', url: `${API_BASE}/map/proposals?status=${status}` });
 
-export const approveProposal = (id, overrides = {}) =>
+const approveProposalLive = (id, overrides = {}) =>
   adminRequest({ method: 'post', url: `${API_BASE}/map/proposals/${id}/approve`, data: overrides });
 
 export const rejectProposal = (id) =>
   adminRequest({ method: 'post', url: `${API_BASE}/map/proposals/${id}/reject` });
 
-export const createSpot = (spotData) =>
+const createSpotLive = (spotData) =>
   adminRequest({ method: 'post', url: `${API_BASE}/map/spots`, data: spotData });
 
-export const updateSpot = (id, spotData) =>
+const updateSpotLive = (id, spotData) =>
   adminRequest({ method: 'put', url: `${API_BASE}/map/spots/${id}`, data: spotData });
 
-export const deleteSpot = (id) =>
+const deleteSpotLive = (id) =>
   adminRequest({ method: 'delete', url: `${API_BASE}/map/spots/${id}` });
 
-export const toggleSpotVerification = (id, isVerified) =>
+const toggleSpotVerificationLive = (id, isVerified) =>
   adminRequest({ method: 'patch', url: `${API_BASE}/map/spots/${id}/verify`, data: { isVerified } });
 
 // sources: 'local' (the Tunisian guides, instant), 'off' (Open Food Facts, slow and rate limited) or 'all'
-export const searchProducts = async (query = '', sources = 'all') => {
+const searchProductsLive = async (query = '', sources = 'all') => {
   const res = await axios.get(`${API_BASE}/products/search?q=${encodeURIComponent(query)}&sources=${sources}`);
   return res.data;
 };
 
-export const fetchProductByBarcode = async (barcode) => {
+const fetchProductByBarcodeLive = async (barcode) => {
   const res = await axios.get(`${API_BASE}/products/barcode/${encodeURIComponent(barcode)}`);
   return res.data;
 };
@@ -102,7 +137,7 @@ export const isAiUnavailable = (err) => {
   return !err?.response || err.code === 'ECONNABORTED' || status === 502 || status === 503 || status === 504 || status === 429;
 };
 
-export const fetchAtmcProducts = async (filters = {}) => {
+const fetchAtmcProductsLive = async (filters = {}) => {
   const params = new URLSearchParams();
   if (filters.category && filters.category !== 'ALL') params.append('category', filters.category);
   if (filters.status && filters.status !== 'ALL') params.append('status', filters.status);
@@ -112,12 +147,12 @@ export const fetchAtmcProducts = async (filters = {}) => {
   return withOfflineInfo(res);
 };
 
-export const fetchAtmcCategories = async () => {
+const fetchAtmcCategoriesLive = async () => {
   const res = await axios.get(`${API_BASE}/atmc/categories`);
   return res.data;
 };
 
-export const fetchAtmcStats = async () => {
+const fetchAtmcStatsLive = async () => {
   const res = await axios.get(`${API_BASE}/atmc/stats`);
   return res.data;
 };
@@ -145,22 +180,22 @@ export const resetPassword = async ({ accessToken, password }) =>
 
 // Marketplace (signed-in accounts) ------------------------------------------
 
-export const fetchStores = async (type = 'ALL') => (await axios.get(`${API_BASE}/market/stores`, { params: { type } })).data;
+const fetchStoresLive = async (type = 'ALL') => (await axios.get(`${API_BASE}/market/stores`, { params: { type } })).data;
 
-export const fetchStore = async (id) => (await axios.get(`${API_BASE}/market/stores/${id}`)).data;
+const fetchStoreLive = async (id) => (await axios.get(`${API_BASE}/market/stores/${id}`)).data;
 
-export const fetchMarketProducts = async ({ q = '', type = 'ALL', store = '' } = {}) =>
+const fetchMarketProductsLive = async ({ q = '', type = 'ALL', store = '' } = {}) =>
   (await axios.get(`${API_BASE}/market/products`, { params: { q: q || undefined, type, store: store || undefined } })).data;
 
 export const fetchMyStore = async () => (await axios.get(`${API_BASE}/market/me/store`)).data;
 
-export const saveMyStore = async (store) => (await axios.put(`${API_BASE}/market/me/store`, store)).data;
+const saveMyStoreLive = async (store) => (await axios.put(`${API_BASE}/market/me/store`, store)).data;
 
-export const createMyProduct = async (product) => (await axios.post(`${API_BASE}/market/me/products`, product)).data;
+const createMyProductLive = async (product) => (await axios.post(`${API_BASE}/market/me/products`, product)).data;
 
-export const updateMyProduct = async (id, product) => (await axios.put(`${API_BASE}/market/me/products/${id}`, product)).data;
+const updateMyProductLive = async (id, product) => (await axios.put(`${API_BASE}/market/me/products/${id}`, product)).data;
 
-export const deleteMyProduct = async (id) => (await axios.delete(`${API_BASE}/market/me/products/${id}`)).data;
+const deleteMyProductLive = async (id) => (await axios.delete(`${API_BASE}/market/me/products/${id}`)).data;
 
 export const fetchMyApplications = async () => (await axios.get(`${API_BASE}/market/applications/mine`)).data;
 
@@ -172,7 +207,7 @@ export const submitSellerApplication = async (application) =>
 export const fetchSellerApplications = (status = 'PENDING') =>
   adminRequest({ method: 'get', url: `${API_BASE}/admin/seller-applications?status=${status}` });
 
-export const approveSellerApplication = (id) =>
+const approveSellerApplicationLive = (id) =>
   adminRequest({ method: 'post', url: `${API_BASE}/admin/seller-applications/${id}/approve` });
 
 export const rejectSellerApplication = (id) =>
@@ -185,7 +220,7 @@ export const setUserRole = (id, role) => adminRequest({ method: 'patch', url: `$
 
 export const fetchAdminStores = () => adminRequest({ method: 'get', url: `${API_BASE}/admin/stores` });
 
-export const setStoreActive = (id, isActive) =>
+const setStoreActiveLive = (id, isActive) =>
   adminRequest({ method: 'patch', url: `${API_BASE}/admin/stores/${id}`, data: { isActive } });
 
 export const fetchReports = (status = 'OPEN') => adminRequest({ method: 'get', url: `${API_BASE}/admin/reports`, params: { status } });
@@ -197,7 +232,7 @@ export const fetchAuditLog = () => adminRequest({ method: 'get', url: `${API_BAS
 // Orders --------------------------------------------------------------------
 
 /** order: { items: [{ productId, quantity }], customerName, phone, city, address, note, confirmChannel: 'WHATSAPP' | 'PHONE' } */
-export const placeOrder = async (order) => (await axios.post(`${API_BASE}/orders`, order)).data;
+const placeOrderLive = async (order) => (await axios.post(`${API_BASE}/orders`, order)).data;
 
 export const fetchMyOrders = async () => (await axios.get(`${API_BASE}/orders/mine`)).data;
 
@@ -242,7 +277,7 @@ export const unsaveProduct = async (key) => (await axios.delete(`${API_BASE}/me/
 export const fetchMySpotFeedback = async (spotId) => (await axios.get(`${API_BASE}/map/spots/${spotId}/feedback/mine`)).data;
 
 /** answers: { reacted, dedicatedKitchen, staffAware }, each true, false or null */
-export const sendSpotFeedback = async (spotId, answers) => (await axios.put(`${API_BASE}/map/spots/${spotId}/feedback`, answers)).data;
+const sendSpotFeedbackLive = async (spotId, answers) => (await axios.put(`${API_BASE}/map/spots/${spotId}/feedback`, answers)).data;
 
 // Forum ------------------------------------------------------------------
 
@@ -336,3 +371,28 @@ export const errorMessage = (err, fallback) => {
   const message = err?.response?.data?.message;
   return status && status < 500 && typeof message === 'string' && message ? message : fallback;
 };
+
+// Cached reads and the changes that clear them (see the top of this file)
+export const fetchSpots = (...args) => remember(`map:fetchSpots:${JSON.stringify(args)}`, 5 * MINUTE, () => fetchSpotsLive(...args));
+export const fetchCities = (...args) => remember(`map:fetchCities:${JSON.stringify(args)}`, 30 * MINUTE, () => fetchCitiesLive(...args));
+export const searchProducts = (...args) => remember(`products:searchProducts:${JSON.stringify(args)}`, 10 * MINUTE, () => searchProductsLive(...args));
+export const fetchProductByBarcode = (...args) => remember(`products:fetchProductByBarcode:${JSON.stringify(args)}`, 10 * MINUTE, () => fetchProductByBarcodeLive(...args));
+export const fetchAtmcProducts = (...args) => remember(`atmc:fetchAtmcProducts:${JSON.stringify(args)}`, 30 * MINUTE, () => fetchAtmcProductsLive(...args));
+export const fetchAtmcCategories = (...args) => remember(`atmc:fetchAtmcCategories:${JSON.stringify(args)}`, 30 * MINUTE, () => fetchAtmcCategoriesLive(...args));
+export const fetchAtmcStats = (...args) => remember(`atmc:fetchAtmcStats:${JSON.stringify(args)}`, 30 * MINUTE, () => fetchAtmcStatsLive(...args));
+export const fetchStores = (...args) => remember(`market:fetchStores:${JSON.stringify(args)}`, 3 * MINUTE, () => fetchStoresLive(...args));
+export const fetchStore = (...args) => remember(`market:fetchStore:${JSON.stringify(args)}`, 3 * MINUTE, () => fetchStoreLive(...args));
+export const fetchMarketProducts = (...args) => remember(`market:fetchMarketProducts:${JSON.stringify(args)}`, 3 * MINUTE, () => fetchMarketProductsLive(...args));
+export const approveProposal = (...args) => approveProposalLive(...args).then(forgets('map:'));
+export const createSpot = (...args) => createSpotLive(...args).then(forgets('map:'));
+export const updateSpot = (...args) => updateSpotLive(...args).then(forgets('map:'));
+export const deleteSpot = (...args) => deleteSpotLive(...args).then(forgets('map:'));
+export const toggleSpotVerification = (...args) => toggleSpotVerificationLive(...args).then(forgets('map:'));
+export const sendSpotFeedback = (...args) => sendSpotFeedbackLive(...args).then(forgets('map:'));
+export const saveMyStore = (...args) => saveMyStoreLive(...args).then(forgets('market:'));
+export const createMyProduct = (...args) => createMyProductLive(...args).then(forgets('market:'));
+export const updateMyProduct = (...args) => updateMyProductLive(...args).then(forgets('market:'));
+export const deleteMyProduct = (...args) => deleteMyProductLive(...args).then(forgets('market:'));
+export const setStoreActive = (...args) => setStoreActiveLive(...args).then(forgets('market:'));
+export const approveSellerApplication = (...args) => approveSellerApplicationLive(...args).then(forgets('market:'));
+export const placeOrder = (...args) => placeOrderLive(...args).then(forgets('market:'));
