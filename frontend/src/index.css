@@ -422,6 +422,29 @@
   border: none;
 }
 
+/* The film roll (components/filmSwipe.js). A tab bar page out of sight stays laid out but is not drawn, so
+   the roll can bring it in without working out its layout first; it takes no room on the page. */
+.film-parked {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+/* While the roll moves: the strip is its own layer, and glass inside the pages is frosted instead of blurring
+   what is behind it on every frame */
+[data-film-moving] {
+  will-change: transform;
+}
+[data-film-moving] .glass,
+[data-film-moving] .leaflet-bar {
+  background: var(--glass-solid);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 /* People who ask for less transparency get frosted, near-opaque panes */
 @media (prefers-reduced-transparency: reduce) {
   .glass,

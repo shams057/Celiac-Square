@@ -6,9 +6,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  *    or back when the swipe was short. Places with their own sideways gesture keep it (see ownsSwipe).
  *  - Phones: a touch while the roll still moves catches it where it is: a swipe never waits for the last one
  *    to finish. Caught on its way onto a page, the roll lands there at once and the swipe goes on from it.
- *  - Any screen: a tap or click on the tab bar rolls the film there, with a slight motion blur. Over several pages
- *    (Comprendre → Marché) the roll rushes past the pages in between and slows down on the last one.
+ *  - Any screen: a tap or click on the tab bar rolls the film there (with a slight motion blur on large screens).
+ *    Over several pages (Comprendre → Marché) the roll rushes past the pages in between and slows down on the last.
  * Every animation stays under 0.3 s. The order is left to right in both languages, like the tab bar.
+ *
+ * Performance: rolls are handed to the browser as animations (the Web Animations API) on a transform only, so
+ * the compositor runs them even while the page is busy (React drawing the new page, a map loading). A finger
+ * moves the strip directly. The spring is worked out in advance, as keyframes.
  *
  * Positions are counted in frames from the current page: +1 is the next page (to the right), -1 the one before.
  */
@@ -26,8 +30,9 @@ const SPRING = { stiffness: 520, damping: 0.92 };
 const ROLL_ONE = { duration: 230, ease: [0.2, 0.75, 0.25, 1] };
 const ROLL_MANY = { duration: 260, ease: [0.3, 0.6, 0.02, 1] };
 
-// Horizontal blur, in px, per px/ms of speed, and its ceiling ("slight")
-const BLUR = { perSpeed: 0.7, max: 7 };
+// Large screens only: the blur at the roll's fastest, in px. A phone would have to redraw the whole screen
+// blurred on every frame, which it cannot do smoothly
+const BLUR_PX = 2.5;
 
 const clamp = (n, min, max) => Math.min(Math.max(n, min), max);
 
@@ -44,25 +49,36 @@ const frameStep = (main) => {
 const isPhone = () => typeof window !== 'undefined' && window.matchMedia?.(PHONE_QUERY).matches;
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
+/** Where the strip is drawn now, in px (mid-animation included) */
+const drawnX = (el) => {
+  const m = getComputedStyle(el).transform;
+  return m && m !== 'none' ? new DOMMatrixReadOnly(m).m41 : 0;
+};
+
+/**
+ * The release spring from x (frames) at v (frames per second) to target, as evenly spaced positions, one per
+ * 1/120 s, for at most 0.28 s (by then it is within a pixel). It never goes past the frames that exist (lo, hi):
+ * there is nothing beyond them to show.
+ */
+const springPath = (x, v, target, lo, hi) => {
+  const k = SPRING.stiffness;
+  const c = 2 * Math.sqrt(k) * SPRING.damping;
+  const h = 1 / 960;
+  const path = [x];
+  for (let n = 1; n < 34; n += 1) {
+    for (let s = 0; s < 8; s += 1) {
+      v += (-k * (x - target) - c * v) * h;
+      x += v * h;
+    }
+    if (Math.abs(x - target) < 0.003 && Math.abs(v) < 0.05) break;
+    path.push(clamp(x, lo - 0.03, hi + 0.03));
+  }
+  path.push(target);
+  return path;
+};
+
 // Past the first or last page the roll gives a little, then stops
 const rubber = (d) => (d * 0.3) / (1 + d * 2);
-
-/** cubic-bezier(x1, y1, x2, y2) as a function of time (0 to 1) */
-const bezier = (x1, y1, x2, y2) => {
-  const at = (a, b, u) => 3 * a * u * (1 - u) ** 2 + 3 * b * u * u * (1 - u) + u ** 3;
-  return (t) => {
-    if (t <= 0) return 0;
-    if (t >= 1) return 1;
-    let lo = 0;
-    let hi = 1;
-    for (let i = 0; i < 24; i += 1) {
-      const mid = (lo + hi) / 2;
-      if (at(x1, x2, mid) < t) lo = mid;
-      else hi = mid;
-    }
-    return at(y1, y2, (lo + hi) / 2);
-  };
-};
 
 // Elements that keep sideways swipes for themselves: the forum's lists (they swipe the forum's tabs),
 // the map, sliding switches, fields, dialogs, and the floating bars
@@ -84,7 +100,6 @@ export const ownsSwipe = (target) => {
 /**
  * stripRef: the element that moves (the current page, and the frames beside it while the roll moves).
  * frameRef: the element that clips it (its width is one frame).
- * blurRef: the feGaussianBlur of the #film-blur filter.
  * index: the current page's place in the tab bar, or -1 on pages outside it (no roll there).
  * onCommit(i): the roll landed on page i; the caller navigates there, then calls reset() before paint
  *   (after putting the page at its scroll position).
@@ -93,34 +108,23 @@ export const ownsSwipe = (target) => {
  *    { frames: [{ index, slot, real }], offset, top }. slot: frames from the current page (-1, 1, 2…).
  *    Real frames are the pages themselves; the ones rushed past on a long roll are stand-ins.
  *  - pending: the page the roll is heading to (for the tab bar), or -1
- *  - go(i): rolls to page i, as after a tap; false when it does not apply (reduced motion, same page…)
+ *  - go(i): rolls to page i, as after a tap; false when it does not apply (reduced motion, same page…).
+ *    During a roll it lands that roll at once and rolls on to i from there.
  *  - reset(): puts the strip back at rest (or, after a catch, sets up the roll around the new page)
  */
-export function useFilmSwipe({ stripRef, frameRef, blurRef, index, count, onCommit }) {
+export function useFilmSwipe({ stripRef, frameRef, index, count, onCommit }) {
   const [film, setFilm] = useState(null);
   const [pending, setPending] = useState(-1);
   const pos = useRef(0); // where the roll is, in frames from the current page
   const run = useRef(null); // { kind: 'swipe' | 'tap', offset, lo, hi, target }
   const touch = useRef(null);
+  const anim = useRef(null); // the roll's running animations: { move, blur }
   const frame = useRef(0);
   const carry = useRef(null); // a catch that landed the roll: { x } to set up around the new page
+  const queued = useRef(-1); // a tab tapped while the roll moved: rolled to once the roll has landed
+  const goRef = useRef(null);
   const live = useRef({ index, count, onCommit });
   live.current = { index, count, onCommit };
-
-  const setBlur = useCallback(
-    (px) => {
-      const strip = stripRef.current;
-      const node = blurRef.current;
-      if (!strip || !node) return;
-      if (px < 0.3) {
-        strip.style.filter = '';
-        return;
-      }
-      node.setAttribute('stdDeviation', `${px.toFixed(2)} 0`);
-      strip.style.filter = 'url(#film-blur)';
-    },
-    [stripRef, blurRef]
-  );
 
   const paint = useCallback(() => {
     const r = run.current;
@@ -129,10 +133,19 @@ export function useFilmSwipe({ stripRef, frameRef, blurRef, index, count, onComm
     strip.style.transform = `translate3d(${-pos.current * r.offset}px, 0, 0)`;
   }, [stripRef]);
 
-  const stop = () => {
+  /** Stops the roll where it is drawn now (a touch caught it) */
+  const stop = useCallback(() => {
     cancelAnimationFrame(frame.current);
     frame.current = 0;
-  };
+    const a = anim.current;
+    if (!a) return;
+    anim.current = null;
+    const strip = stripRef.current;
+    if (strip && run.current) pos.current = -drawnX(strip) / run.current.offset;
+    a.move.cancel();
+    a.blur?.cancel();
+    paint();
+  }, [stripRef, paint]);
 
   /** A swipe's roll around the current page: the pages on either side, as far as they exist */
   const startSwipe = useCallback(
@@ -169,18 +182,53 @@ export function useFilmSwipe({ stripRef, frameRef, blurRef, index, count, onComm
       strip.style.filter = '';
       delete strip.dataset.filmMoving;
     }
-  }, [stripRef, startSwipe]);
+    const next = queued.current;
+    queued.current = -1;
+    if (next >= 0 && next !== live.current.index && !goRef.current(next)) live.current.onCommit(next);
+  }, [stripRef, startSwipe, stop]);
 
   /** The roll stopped on a whole frame: a new page (the caller navigates), or back on the current one */
   const land = useCallback(
     (at) => {
-      frame.current = 0;
-      setBlur(0);
       setFilm(null);
       if (at !== 0) live.current.onCommit(live.current.index + at);
       else reset();
     },
-    [reset, setBlur]
+    [reset]
+  );
+
+  /**
+   * Hands the roll to the browser: through the positions in `path` (frames), over `duration` ms, then lands on
+   * the last one. The strip is left at that position underneath, so the end needs nothing more.
+   */
+  const animate = useCallback(
+    (path, duration, easing, blur) => {
+      const strip = stripRef.current;
+      const r = run.current;
+      const to = path[path.length - 1];
+      const move = strip.animate(
+        path.map((p) => ({ transform: `translate3d(${-p * r.offset}px, 0, 0)` })),
+        { duration, easing }
+      );
+      const a = { move };
+      if (blur) {
+        a.blur = strip.animate([{ filter: 'blur(0px)' }, { filter: `blur(${BLUR_PX}px)`, offset: 0.3 }, { filter: 'blur(0px)' }], { duration });
+      }
+      anim.current = a;
+      pos.current = to;
+      paint();
+      // A cancelled animation (a touch caught it) rejects instead, and is left alone
+      move.finished.then(
+        () => {
+          if (anim.current !== a) return;
+          anim.current = null;
+          a.blur?.cancel();
+          land(to);
+        },
+        () => {}
+      );
+    },
+    [stripRef, paint, land]
   );
 
   /** After a swipe: springs to `target` (-1, 0 or 1), starting at v0 frames per second */
@@ -194,75 +242,37 @@ export function useFilmSwipe({ stripRef, frameRef, blurRef, index, count, onComm
         land(target);
         return;
       }
-      const k = SPRING.stiffness;
-      const c = 2 * Math.sqrt(k) * SPRING.damping;
       const { lo, hi } = run.current;
-      let x = pos.current;
-      let v = v0;
-      let last = performance.now();
-      const step = (now) => {
-        const dt = Math.min(0.064, (now - last) / 1000);
-        last = now;
-        const n = Math.max(1, Math.ceil(dt / 0.004));
-        const h = dt / n;
-        for (let s = 0; s < n; s += 1) {
-          v += (-k * (x - target) - c * v) * h;
-          x += v * h;
-        }
-        // Never past the frames that exist: there is nothing beyond them to show
-        pos.current = clamp(x, lo - 0.03, hi + 0.03);
-        paint();
-        if (Math.abs(x - target) < 0.002 && Math.abs(v) < 0.02) {
-          pos.current = target;
-          paint();
-          land(target);
-          return;
-        }
-        frame.current = requestAnimationFrame(step);
-      };
-      frame.current = requestAnimationFrame(step);
+      const path = springPath(pos.current, v0, target, lo, hi);
+      animate(path, (path.length - 1) * (1000 / 120), 'linear');
     },
-    [paint, land]
+    [paint, land, animate]
   );
 
-  /** After a tap: a timed roll over `to` frames, with motion blur that follows the speed */
+  /** After a tap: a timed roll over `to` frames (with a slight blur on large screens) */
   const roll = useCallback(
     (to) => {
-      const r = run.current;
       const { duration, ease } = Math.abs(to) > 1 ? ROLL_MANY : ROLL_ONE;
-      const curve = bezier(...ease);
-      let start = 0;
-      let lastX = 0;
-      let lastT = 0;
-      const step = (now) => {
-        if (!start) {
-          start = now;
-          lastT = now;
-        }
-        const t = clamp((now - start) / duration, 0, 1);
-        const x = curve(t) * to;
-        const speed = now > lastT ? (Math.abs(x - lastX) * r.offset) / (now - lastT) : 0; // px per ms
-        lastX = x;
-        lastT = now;
-        pos.current = x;
-        paint();
-        setBlur(t < 1 ? Math.min(BLUR.max, speed * BLUR.perSpeed) : 0);
-        if (t >= 1) {
-          land(to);
-          return;
-        }
-        frame.current = requestAnimationFrame(step);
-      };
-      frame.current = requestAnimationFrame(step);
+      animate([0, to], duration, `cubic-bezier(${ease.join(', ')})`, !isPhone());
     },
-    [paint, land, setBlur]
+    [animate]
   );
 
   /** Rolls to page j, as after a tap on the tab bar. False when the roll does not apply. */
   const go = useCallback(
     (j) => {
       const { index: i, count: n } = live.current;
-      if (reducedMotion() || i < 0 || j < 0 || j >= n || j === i || run.current) return false;
+      if (run.current && j >= 0 && j < n) {
+        // Another tab while the roll moves: this roll lands at once, and the next one starts from there
+        if (carry.current) return true;
+        stop();
+        queued.current = j;
+        pos.current = run.current.target;
+        paint();
+        land(run.current.target);
+        return true;
+      }
+      if (reducedMotion() || i < 0 || j < 0 || j >= n || j === i) return false;
       const side = Math.sign(j - i);
       const steps = Math.abs(j - i);
       const offset = frameStep(frameRef.current);
@@ -279,8 +289,9 @@ export function useFilmSwipe({ stripRef, frameRef, blurRef, index, count, onComm
       frame.current = requestAnimationFrame(() => roll(j - i));
       return true;
     },
-    [frameRef, stripRef, roll]
+    [frameRef, stripRef, roll, stop, paint, land]
   );
+  goRef.current = go;
 
   useEffect(() => {
     // Lets go of a roll that was caught and not dragged: on to the page it is past half way to, else back
@@ -318,7 +329,6 @@ export function useFilmSwipe({ stripRef, frameRef, blurRef, index, count, onComm
       const r = run.current;
       if (r && !carry.current) {
         stop();
-        setBlur(0);
         if (r.kind === 'tap') {
           // A tap's roll: it lands at once (it is nearly there), and this touch starts on the new page
           pos.current = r.target;
@@ -343,7 +353,7 @@ export function useFilmSwipe({ stripRef, frameRef, blurRef, index, count, onComm
       if (!g) return;
       if (e.touches.length !== 1) {
         // A second finger (pinch): let it be
-        if (run.current?.kind === 'swipe' && !frame.current && !carry.current) release();
+        if (run.current?.kind === 'swipe' && !anim.current && !carry.current) release();
         touch.current = null;
         return;
       }
@@ -366,7 +376,7 @@ export function useFilmSwipe({ stripRef, frameRef, blurRef, index, count, onComm
         g.base = pos.current;
       }
       const r = run.current;
-      if (!r || r.kind !== 'swipe' || frame.current) return;
+      if (!r || r.kind !== 'swipe' || anim.current) return;
       // Claims the gesture: no page scroll while the roll moves
       if (e.cancelable) e.preventDefault();
       g.samples.push({ x: t.clientX, t: e.timeStamp });
@@ -382,7 +392,7 @@ export function useFilmSwipe({ stripRef, frameRef, blurRef, index, count, onComm
       touch.current = null;
       unfollow();
       const r = run.current;
-      if (!g || !r || r.kind !== 'swipe' || frame.current || carry.current) return;
+      if (!g || !r || r.kind !== 'swipe' || anim.current || carry.current) return;
       // Caught and let go without moving: the roll goes on to the nearest page
       if (!g.decided) {
         release();
@@ -407,9 +417,16 @@ export function useFilmSwipe({ stripRef, frameRef, blurRef, index, count, onComm
       window.removeEventListener('touchstart', onTouchStart);
       unfollow();
     };
-  }, [paint, spring, land, setBlur, startSwipe]);
+  }, [paint, spring, land, stop, startSwipe]);
 
-  useEffect(() => () => cancelAnimationFrame(frame.current), []);
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(frame.current);
+      anim.current?.move.cancel();
+      anim.current?.blur?.cancel();
+    },
+    []
+  );
 
   return { film, pending, go, reset };
 }

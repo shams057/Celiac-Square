@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { memo, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import Navbar from './components/Navbar';
 import VisionScanner from './components/VisionScanner';
@@ -104,6 +104,15 @@ function PassingFrame({ title }) {
   );
 }
 
+/**
+ * A tab bar page, drawn again only when what it shows changes (`deps`): the roll redraws the app as it starts
+ * and lands, and the pages it carries must not be redrawn then, mid-motion.
+ */
+const KeptPage = memo(
+  ({ children }) => children,
+  (a, b) => a.deps.length === b.deps.length && a.deps.every((d, i) => Object.is(d, b.deps[i]))
+);
+
 /** navigator.onLine, kept up to date */
 function useOnline() {
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine !== false));
@@ -131,7 +140,6 @@ function AppShell() {
   const firstRender = useRef(true);
   const mainRef = useRef(null);
   const stripRef = useRef(null);
-  const blurRef = useRef(null);
   // Set when the film roll has just brought the new page in: it is already in place, so no slide-in
   const filmLanded = useRef(false);
 
@@ -177,7 +185,6 @@ function AppShell() {
   const film = useFilmSwipe({
     stripRef,
     frameRef: mainRef,
-    blurRef,
     index: BAR_TABS.indexOf(BAR_COVERS[activeTab] || activeTab),
     count: BAR_TABS.length,
     onCommit: (i) => {
@@ -234,6 +241,14 @@ function AppShell() {
       }
     });
   }, [activeTab, route.params.storeId, route.params.threadId]);
+
+  // A tab bar page, kept from being drawn again unless its language, its address or (for the scanner's camera)
+  // whether it is shown changes
+  const keptPage = (tab) => {
+    const { params, query } = routeOf(tab);
+    const deps = [lang, JSON.stringify(params), JSON.stringify(query), tab === 'vision' && tab === activeTab];
+    return <KeptPage deps={deps}>{renderPage(tab)}</KeptPage>;
+  };
 
   const handleSwitchToSearch = (query) => goTo('search', { query: query ? { q: query } : undefined });
 
@@ -299,6 +314,8 @@ function AppShell() {
       goTo(tab, options);
       return;
     }
+    // While the roll moves, it takes the tap (it lands, then goes on to this tab)
+    if (film.pending >= 0 && film.go(BAR_TABS.indexOf(tab))) return;
     if (tab === activeTab || BAR_COVERS[activeTab] === tab) {
       if (window.location.pathname + window.location.search === pathFor(tab)) window.scrollTo({ top: 0, behavior: 'smooth' });
       else goTo(tab);
@@ -321,13 +338,6 @@ function AppShell() {
 
       <Navbar activeTab={barTab} setActiveTab={goFromBar} lang={lang} setLang={setLang} />
 
-      {/* The roll's motion blur: horizontal only (its strength is set while the roll moves) */}
-      <svg aria-hidden="true" width="0" height="0" className="absolute">
-        <filter id="film-blur" x="-5%" y="0" width="110%" height="100%" colorInterpolationFilters="sRGB">
-          <feGaussianBlur ref={blurRef} stdDeviation="0 0" />
-        </filter>
-      </svg>
-
       {!online && (
         <div role="status" className="mx-auto mt-1 flex w-[calc(100%-2rem)] max-w-6xl items-start gap-2.5 rounded-2xl bg-status-warning/20 px-4 py-3 text-sm">
           <WifiOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -348,15 +358,15 @@ function AppShell() {
             if (tab === activeTab) {
               return (
                 <div key={tab} data-page-current="">
-                  {renderPage(tab)}
+                  {keptPage(tab)}
                 </div>
               );
             }
             const slot = frameTabs.get(tab);
             return slot === undefined ? (
-              // Kept alive, out of sight
-              <div key={tab} hidden>
-                {renderPage(tab)}
+              // Kept alive, out of sight: still laid out (only not drawn), so the roll can show it at once
+              <div key={tab} inert="" aria-hidden="true" className="film-parked">
+                {keptPage(tab)}
               </div>
             ) : (
               // In the roll: one frame to the side per page (gutters included), lined up so that it lands
@@ -368,7 +378,7 @@ function AppShell() {
                 className="absolute w-full"
                 style={{ top: film.film.top - (scrollMemory.current[tab] || 0), left: slot * film.film.offset }}
               >
-                {renderPage(tab)}
+                {keptPage(tab)}
               </div>
             );
           })}
