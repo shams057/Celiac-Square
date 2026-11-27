@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Check, X, Search, RotateCw } from 'lucide-react';
+import { Check, X, Search, RotateCw, Plus, Pencil } from 'lucide-react';
 import {
   fetchSellerApplications,
   approveSellerApplication,
@@ -13,6 +13,7 @@ import {
 } from '../services/api';
 import { useAuth } from './AuthContext';
 import { t, PageHead, Spinner, Notice, EmptyState, Modal, storeType, StoreLogo } from './ui';
+import BackofficeStoreEditor from './BackofficeStoreEditor';
 
 const APPLICATION_FILTERS = [
   { id: 'PENDING', fr: 'À traiter', ar: 'للمعالجة' },
@@ -233,6 +234,7 @@ function StoresView({ lang, showToast }) {
   const [error, setError] = useState(false);
   const [toToggle, setToToggle] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(null); // null, 'new' or a store id
 
   const load = async () => {
     setError(false);
@@ -261,11 +263,46 @@ function StoresView({ lang, showToast }) {
     }
   };
 
+  if (editing) {
+    return (
+      <BackofficeStoreEditor
+        lang={lang}
+        storeId={editing === 'new' ? null : editing}
+        onBack={() => {
+          setEditing(null);
+          load();
+        }}
+        onChanged={() => {}}
+        showToast={showToast}
+      />
+    );
+  }
+
+  const newStore = (
+    <button type="button" className="btn-primary" onClick={() => setEditing('new')}>
+      <Plus className="h-4 w-4" />
+      {tr('Nouvelle boutique', 'محل جديد')}
+    </button>
+  );
+
   if (error) return <Notice tone="error" title={tr('Les boutiques n’ont pas pu être chargées.', 'تعذر تحميل المحلات.')} action={<button type="button" className="btn-quiet" onClick={load}>{tr('Réessayer', 'إعادة المحاولة')}</button>} />;
   if (!stores) return <Spinner label={tr('Chargement des boutiques…', 'جاري تحميل المحلات…')} />;
-  if (stores.length === 0) return <EmptyState title={tr('Aucune boutique', 'لا توجد محلات')}>{tr('Acceptez une demande de vendeur pour ouvrir la première.', 'اقبل طلب بائع لفتح أول محل.')}</EmptyState>;
+  if (stores.length === 0) {
+    return (
+      <EmptyState title={tr('Aucune boutique', 'لا توجد محلات')} action={newStore}>
+        {tr('Créez-en une ici, ou acceptez une demande de vendeur.', 'أنشئ محلا هنا، أو اقبل طلب بائع.')}
+      </EmptyState>
+    );
+  }
 
   return (
+    <div className="space-y-4">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <p className="text-sm text-ink-soft">
+        {tr('Créez une boutique, modifiez sa fiche et ses produits, ou suspendez-la.', 'أنشئ محلا، عدّل بطاقته ومنتجاته، أو أوقفه.')}
+      </p>
+      {newStore}
+    </div>
     <ul className="divide-y divide-canvas-line/60 overflow-hidden rounded-2xl border border-canvas-line bg-canvas-paper/80">
       {stores.map((s) => (
         <li key={s._id} className="flex items-center gap-3 p-3 sm:gap-4 sm:p-4">
@@ -276,8 +313,15 @@ function StoresView({ lang, showToast }) {
               {tr(storeType(s.type).fr, storeType(s.type).ar)}
               {s.city ? ` · ${s.city}` : ''} · {tr(`${s.productCount} produit${s.productCount > 1 ? 's' : ''}`, `${s.productCount} منتج`)}
             </p>
-            {s.owner && <p className="truncate text-xs text-ink-faint">{s.owner.fullName} · {s.owner.email}</p>}
+            {s.owner ? (
+              <p className="truncate text-xs text-ink-faint">{s.owner.fullName} · {s.owner.email}</p>
+            ) : (
+              <p className="truncate text-xs text-ink-faint">{tr('Gérée par l’équipe', 'يديره الفريق')}</p>
+            )}
           </div>
+          <button type="button" onClick={() => setEditing(s._id)} className="btn-ghost p-2" aria-label={tr(`Modifier ${s.name}`, `تعديل ${s.name}`)}>
+            <Pencil className="h-4 w-4" />
+          </button>
           <button type="button" onClick={() => setToToggle(s)} className={s.isActive ? 'btn-quiet' : 'btn-primary'}>
             {s.isActive ? tr('Suspendre', 'إيقاف') : tr('Réactiver', 'إعادة التفعيل')}
           </button>
@@ -303,6 +347,7 @@ function StoresView({ lang, showToast }) {
         </div>
       </Modal>
     </ul>
+    </div>
   );
 }
 

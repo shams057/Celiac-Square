@@ -174,7 +174,11 @@ function Thumb({ item, onOpen, lang }) {
       className="group relative h-24 w-24 shrink-0 overflow-hidden rounded-lg border border-canvas-line bg-canvas-paper sm:h-28 sm:w-28"
       aria-label={isVideo ? `${tr('Lire la vidéo', 'تشغيل الفيديو')} : ${item.alt}` : `${tr('Agrandir', 'تكبير')} : ${item.alt}`}
     >
-      <img src={isVideo ? item.poster : item.src} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+      {isVideo && !item.poster ? (
+        <video src={item.src} muted preload="metadata" className="h-full w-full object-cover" />
+      ) : (
+        <img src={isVideo ? item.poster : item.src} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+      )}
       {isVideo && (
         <span className="absolute inset-0 flex items-center justify-center bg-black/25">
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-onbright">

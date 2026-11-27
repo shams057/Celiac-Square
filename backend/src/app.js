@@ -17,6 +17,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import meRoutes from './routes/meRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
+import marketAdminRoutes from './routes/marketAdminRoutes.js';
 import orderAdminRoutes from './routes/orderAdminRoutes.js';
 import whatsappRoutes from './routes/whatsappRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
@@ -44,7 +45,7 @@ app.use(normalizeQuery);
 // Marketplace photos travel as data URLs: only the routes that take images accept large bodies.
 // The WhatsApp webhook needs the raw bytes to check Meta's signature
 app.use('/api/whatsapp/webhook', express.raw({ type: '*/*', limit: '1mb' }));
-app.use(['/api/market/me/store', '/api/market/me/products'], express.json({ limit: '8mb' }));
+app.use(['/api/market/me/store', '/api/market/me/products', '/api/admin/market/stores'], express.json({ limit: '8mb' }));
 // Scanner photos (resized in the browser) go to /identify and /ingredients; OCR text to /match
 app.use(['/api/vision/identify', '/api/vision/ingredients'], express.json({ limit: '3mb' }));
 app.use('/api/vision', express.json({ limit: '50kb' }));
@@ -75,6 +76,7 @@ app.use('/api/atmc', atmcRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/market', marketRoutes);
 // Before /api/admin: the order pipeline, the dashboard and forum moderation are open to the team (STAFF), the rest of /api/admin is not
+app.use('/api/admin/market', marketAdminRoutes);
 app.use('/api/admin/orders', orderAdminRoutes);
 app.use('/api/admin/forum', forumAdminRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);

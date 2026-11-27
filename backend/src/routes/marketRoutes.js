@@ -126,6 +126,34 @@ router.get('/me/store', requireSeller, async (req, res) => {
   return res.json({ success: true, data: { ...toStore(store), products: products.map(toMarketProduct) } });
 });
 
+/** Request body to stores columns (shared with the back-office); only fields present are set */
+export const storeFields = (body) => {
+  const row = {};
+  ['name', 'city', 'address', 'phone', 'description'].forEach((f) => {
+    if (body[f] !== undefined) row[f] = clean(body[f]);
+  });
+  if (body.type !== undefined) row.type = clean(body.type).toUpperCase();
+  return row;
+};
+
+/** 400 message for a store row (merged with the existing store, if any), or null */
+export const invalidStore = (row, existing) => {
+  const name = row.name ?? existing?.name;
+  const type = row.type ?? existing?.type;
+  if (!name) return 'Indiquez le nom de la boutique.';
+  if (!STORE_TYPES.includes(type)) return 'Type de boutique inconnu.';
+  return tooLong({
+    nom: [row.name, MAX_LEN.name],
+    ville: [row.city, MAX_LEN.city],
+    adresse: [row.address, MAX_LEN.address],
+    téléphone: [row.phone, MAX_LEN.phone],
+    présentation: [row.description, MAX_LEN.description],
+  });
+};
+
+// The back-office's market routes answer image problems the same way
+export { imageErrors };
+
 /**
  * PUT /api/market/me/store
  * Creates or updates the seller's store. Body: { name, type, city, address, phone, description, logo }
@@ -137,27 +165,13 @@ router.put(
     const existing = await ownStore(req.user.id);
     if (existing && !existing.is_active) return suspended(res);
 
-    const row = {};
-    ['name', 'city', 'address', 'phone', 'description'].forEach((f) => {
-      if (req.body[f] !== undefined) row[f] = clean(req.body[f]);
-    });
-    if (req.body.type !== undefined) row.type = clean(req.body.type).toUpperCase();
-
-    const name = row.name ?? existing?.name;
-    const type = row.type ?? existing?.type;
-    if (!name) return badRequest(res, 'Indiquez le nom de la boutique.');
-    if (!STORE_TYPES.includes(type)) return badRequest(res, 'Type de boutique inconnu.');
-    const long = tooLong({
-      nom: [row.name, MAX_LEN.name],
-      ville: [row.city, MAX_LEN.city],
-      adresse: [row.address, MAX_LEN.address],
-      téléphone: [row.phone, MAX_LEN.phone],
-      présentation: [row.description, MAX_LEN.description],
-    });
-    if (long) return badRequest(res, long);
+    const row = storeFields(req.body);
+    const invalid = invalidStore(row, existing);
+    if (invalid) return badRequest(res, invalid);
 
     const folder = `stores/${req.user.id}`;
-    const logo = await saveImage(req.body.logo, folder);
+    // A logo sent back unchanged is kept as it is
+    const logo = req.body.logo === existing?.logo_url ? undefined : await saveImage(req.body.logo, folder);
     if (logo !== undefined) row.logo_url = logo;
 
     const [saved] = existing
@@ -170,7 +184,7 @@ router.put(
 );
 
 /** Request body to market_products columns; only fields present are set */
-const productFields = (body) => {
+export const productFields = (body) => {
   const row = {};
   if (body.title !== undefined) row.title = clean(body.title);
   if (body.description !== undefined) row.description = clean(body.description);
@@ -180,7 +194,7 @@ const productFields = (body) => {
   return row;
 };
 
-const invalidProduct = (row, creating) => {
+export const invalidProduct = (row, creating) => {
   if ((creating || row.title !== undefined) && !row.title) return 'Indiquez le nom du produit.';
   if (Number.isNaN(row.price)) return 'Prix invalide.';
   return tooLong({ titre: [row.title, MAX_LEN.title], description: [row.description, MAX_LEN.description] });

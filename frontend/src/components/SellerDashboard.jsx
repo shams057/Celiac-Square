@@ -201,7 +201,11 @@ export default function SellerDashboard({ lang }) {
   );
 }
 
-function StoreForm({ lang, store, onSaved }) {
+/**
+ * A store's profile. `save(payload)` defaults to the seller's own store; the back-office passes
+ * its own, and extra fields as children (shown above the save button).
+ */
+export function StoreForm({ lang, store, onSaved, save = saveMyStore, children }) {
   const tr = t(lang);
   const [form, setForm] = useState({
     name: store?.name || '',
@@ -236,7 +240,7 @@ function StoreForm({ lang, store, onSaved }) {
     try {
       const payload = { ...form };
       if (logo !== (store?.logoUrl || '')) payload.logo = logo;
-      const res = await saveMyStore(payload);
+      const res = await save(payload);
       onSaved(res.data);
     } catch (err) {
       setError(errorText(err, tr('La boutique n’a pas pu être enregistrée.', 'تعذر حفظ المحل.')));
@@ -294,6 +298,7 @@ function StoreForm({ lang, store, onSaved }) {
         <label htmlFor="store-description" className="field-label">{tr('Présentation', 'تقديم')}</label>
         <textarea id="store-description" value={form.description} onChange={set('description')} rows={3} maxLength={2000} className="field" />
       </div>
+      {children}
       {error && <Notice tone="error">{error}</Notice>}
       <button type="submit" disabled={busy} className="btn-primary w-full">
         {busy ? tr('Enregistrement…', 'جاري الحفظ…') : tr('Enregistrer', 'حفظ')}
@@ -302,7 +307,8 @@ function StoreForm({ lang, store, onSaved }) {
   );
 }
 
-function ProductForm({ lang, product, onSaved }) {
+/** A product of a store. `create` / `update` default to the seller's own store; the back-office passes its own. */
+export function ProductForm({ lang, product, onSaved, create = createMyProduct, update = updateMyProduct }) {
   const tr = t(lang);
   const [form, setForm] = useState({ ...EMPTY_PRODUCT, ...product, price: product.price ?? '' });
   const [busy, setBusy] = useState(false);
@@ -345,7 +351,7 @@ function ProductForm({ lang, product, onSaved }) {
       isAvailable: form.isAvailable,
     };
     try {
-      const res = product._id ? await updateMyProduct(product._id, payload) : await createMyProduct(payload);
+      const res = product._id ? await update(product._id, payload) : await create(payload);
       onSaved(res.data);
     } catch (err) {
       setError(errorText(err, tr('Le produit n’a pas pu être enregistré.', 'تعذر حفظ المنتج.')));

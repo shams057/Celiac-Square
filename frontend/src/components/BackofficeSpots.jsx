@@ -13,6 +13,7 @@ import {
   errorMessage,
 } from '../services/api';
 import { t, PageHead, Spinner, Notice, EmptyState, Modal, SPOT_CATEGORIES, spotCategory } from './ui';
+import SpotMediaEditor from './SpotMediaEditor';
 
 const PRESET_COORDINATES = [
   { name: 'Tunis', coords: [10.1815, 36.8065] },
@@ -38,6 +39,9 @@ const EMPTY_SPOT_FORM = {
   isVerified: true,
   notes: '',
   submittedBy: 'Backoffice Admin',
+  crossContaminationRisk: false,
+  media: [], // photos, menu pages and videos: { type, src, poster?, kind?, alt, credit? }
+  links: [], // { type, url, label? }
 };
 
 // Map addresses and community proposals. Shown inside the Backoffice, which checks the admin role.
@@ -60,6 +64,7 @@ export default function BackofficeSpots({ lang = 'fr' }) {
   const [formData, setFormData] = useState(EMPTY_SPOT_FORM);
   const [formSubmitting, setFormSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [mediaUploading, setMediaUploading] = useState(false);
 
   const [spotToDelete, setSpotToDelete] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -198,6 +203,9 @@ export default function BackofficeSpots({ lang = 'fr' }) {
       isVerified: Boolean(spot.isVerified),
       notes: spot.notes || '',
       submittedBy: spot.submittedBy || 'Backoffice Admin',
+      crossContaminationRisk: Boolean(spot.crossContaminationRisk),
+      media: spot.media || [],
+      links: spot.links || [],
     });
     setIsModalOpen(true);
   };
@@ -229,6 +237,9 @@ export default function BackofficeSpots({ lang = 'fr' }) {
       isVerified: Boolean(formData.isVerified),
       notes: formData.notes.trim(),
       submittedBy: formData.submittedBy.trim(),
+      crossContaminationRisk: Boolean(formData.crossContaminationRisk),
+      media: formData.media,
+      links: formData.links.map((l) => ({ ...l, url: l.url.trim() })).filter((l) => l.url),
     };
     try {
       const res =
@@ -287,7 +298,11 @@ export default function BackofficeSpots({ lang = 'fr' }) {
     }
   };
 
-  const set = (key) => (e) => setFormData({ ...formData, [key]: e.target.value });
+  // Functional updates: a media upload may finish while the admin is typing
+  const set = (key) => (e) => {
+    const { value } = e.target;
+    setFormData((f) => ({ ...f, [key]: value }));
+  };
   // Categories keep their order: the first one is the main category (marker icon)
   const toggleCategory = (value) =>
     setFormData((f) => ({
@@ -660,12 +675,37 @@ export default function BackofficeSpots({ lang = 'fr' }) {
             <textarea id="bo-notes" maxLength={1000} rows={3} value={formData.notes} onChange={set('notes')} className="field" />
           </div>
 
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-canvas-line bg-canvas-paper px-3.5 py-2.5">
+            <input
+              type="checkbox"
+              checked={formData.crossContaminationRisk}
+              onChange={(e) => {
+                const { checked } = e.target;
+                setFormData((f) => ({ ...f, crossContaminationRisk: checked }));
+              }}
+              className="h-4 w-4 accent-[#4F6B1C]"
+            />
+            <span className="text-[15px]">{tr('Risque de contamination croisée (cuisine partagée avec le gluten)', 'خطر التلوث التبادلي (مطبخ مشترك مع الغلوتين)')}</span>
+          </label>
+
+          <SpotMediaEditor
+            lang={lang}
+            media={formData.media}
+            onMediaChange={(next) => setFormData((f) => ({ ...f, media: typeof next === 'function' ? next(f.media) : next }))}
+            links={formData.links}
+            onLinksChange={(links) => setFormData((f) => ({ ...f, links }))}
+            onBusyChange={setMediaUploading}
+          />
+
           <div className="grid gap-4 sm:grid-cols-2 sm:items-end">
             <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-canvas-line bg-canvas-paper px-3.5 py-2.5">
               <input
                 type="checkbox"
                 checked={formData.isVerified}
-                onChange={(e) => setFormData({ ...formData, isVerified: e.target.checked })}
+                onChange={(e) => {
+                  const { checked } = e.target;
+                  setFormData((f) => ({ ...f, isVerified: checked }));
+                }}
                 className="h-4 w-4 accent-[#4F6B1C]"
               />
               <span className="text-[15px]">{tr('Adresse vérifiée', 'عنوان موثق')}</span>
@@ -680,8 +720,10 @@ export default function BackofficeSpots({ lang = 'fr' }) {
             <button type="button" onClick={() => setIsModalOpen(false)} className="btn-ghost">
               {tr('Annuler', 'إلغاء')}
             </button>
-            <button type="submit" disabled={formSubmitting} className="btn-primary">
-              {formSubmitting
+            <button type="submit" disabled={formSubmitting || mediaUploading} className="btn-primary">
+              {mediaUploading
+                ? tr('Envoi des fichiers…', 'جاري إرسال الملفات…')
+                : formSubmitting
                 ? tr('Enregistrement…', 'جاري الحفظ…')
                 : modalMode === 'create'
                 ? tr('Ajouter l’adresse', 'أضف العنوان')

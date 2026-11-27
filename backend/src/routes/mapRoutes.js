@@ -7,6 +7,7 @@ import { requireUser } from '../middleware/auth.js';
 import { limits } from '../middleware/rateLimit.js';
 import { cached, invalidate } from '../services/cache.js';
 import { audit } from '../services/audit.js';
+import { normalizeMedia, normalizeLinks, createUploadUrl, removeUnusedMedia, MediaError } from '../services/spotMedia.js';
 
 const router = asyncRouter();
 
@@ -81,6 +82,9 @@ const spotFields = (body) => {
   if (body.notes !== undefined) row.notes = clean(body.notes);
   if (body.submittedBy !== undefined) row.submitted_by = clean(body.submittedBy);
   if (body.crossContaminationRisk !== undefined) row.cross_contamination_risk = Boolean(body.crossContaminationRisk);
+  // Photos, videos and links: throw MediaError when malformed (answered as a 400)
+  if (body.media !== undefined) row.media = normalizeMedia(body.media);
+  if (body.links !== undefined) row.links = normalizeLinks(body.links);
   if (validCoords(body.coordinates)) {
     row.lng = Number(body.coordinates[0]);
     row.lat = Number(body.coordinates[1]);
@@ -89,6 +93,16 @@ const spotFields = (body) => {
 };
 
 const invalidateSpots = () => invalidate('map:');
+
+// Media problems are the admin's to fix (400); anything else goes to the error handler
+const mediaErrors = (fn) => async (req, res, next) => {
+  try {
+    return await fn(req, res, next);
+  } catch (error) {
+    if (error instanceof MediaError) return badRequest(res, error.message);
+    throw error;
+  }
+};
 
 const FEEDBACK_QUESTIONS = { reacted: 'reacted', dedicatedKitchen: 'dedicated_kitchen', staffAware: 'staff_aware' };
 
@@ -206,7 +220,7 @@ router.put('/spots/:id/feedback', requireUser, async (req, res) => {
  * POST /api/map/spots
  * Create a spot directly (backoffice). The public goes through /proposals.
  */
-router.post('/spots', requireAdmin, async (req, res) => {
+router.post('/spots', requireAdmin, mediaErrors(async (req, res) => {
   const row = spotFields(req.body);
   if (!row.name || !row.category || row.lng === undefined || !row.city || !row.address) {
     return badRequest(res, 'Veuillez renseigner les champs obligatoires (nom, catégorie, ville, coordonnées, adresse).');
@@ -220,13 +234,13 @@ router.post('/spots', requireAdmin, async (req, res) => {
   invalidateSpots();
   await audit(req, 'spot.create', saved.id, { name: saved.name });
   return res.status(201).json({ success: true, message: 'Lieu enregistré avec succès.', data: toSpot(saved) });
-});
+}));
 
 /**
  * PUT /api/map/spots/:id
  * Update any spot field
  */
-router.put('/spots/:id', requireAdmin, async (req, res) => {
+router.put('/spots/:id', requireAdmin, mediaErrors(async (req, res) => {
   const spot = await findById('spots', req.params.id);
   if (!spot) return res.status(404).json({ success: false, message: 'Lieu introuvable.' });
   const row = spotFields(req.body);
@@ -241,10 +255,11 @@ router.put('/spots/:id', requireAdmin, async (req, res) => {
   }
 
   const [updated] = unwrap(await db().from('spots').update(row).eq('id', spot.id).select());
+  if (row.media !== undefined) await removeUnusedMedia(spot.media, row.media);
   invalidateSpots();
   await audit(req, 'spot.update', spot.id, { fields: Object.keys(row) });
   return res.json({ success: true, message: 'Lieu mis à jour avec succès.', data: toSpot(updated) });
-});
+}));
 
 /**
  * DELETE /api/map/spots/:id
@@ -253,6 +268,7 @@ router.delete('/spots/:id', requireAdmin, async (req, res) => {
   if (!UUID_RE.test(req.params.id)) return res.status(404).json({ success: false, message: 'Lieu introuvable.' });
   const [deleted] = unwrap(await db().from('spots').delete().eq('id', req.params.id).select());
   if (!deleted) return res.status(404).json({ success: false, message: 'Lieu introuvable.' });
+  await removeUnusedMedia(deleted.media);
   invalidateSpots();
   await audit(req, 'spot.delete', deleted.id, { name: deleted.name });
   return res.json({ success: true, message: 'Lieu supprimé définitivement.', data: toSpot(deleted) });
@@ -275,6 +291,16 @@ router.patch('/spots/:id/verify', requireAdmin, async (req, res) => {
     data: toSpot(updated),
   });
 });
+
+/**
+ * POST /api/map/media/upload-url
+ * Body: { contentType, size }. Returns { uploadUrl, publicUrl, type }: the back-office PUTs
+ * the file to uploadUrl, then saves publicUrl in the spot's media list.
+ */
+router.post('/media/upload-url', requireAdmin, mediaErrors(async (req, res) => {
+  const data = await createUploadUrl({ contentType: clean(req.body?.contentType), size: req.body?.size });
+  return res.json({ success: true, data });
+}));
 
 const PROPOSAL_FIELDS = ['name', 'category', 'city', 'address', 'phone', 'speciality', 'hours', 'notes'];
 
@@ -335,7 +361,7 @@ router.get('/proposals', requireAdmin, async (req, res) => {
  * The proposal is claimed first (PENDING -> APPROVED in one conditional update), so a
  * double click or two admins at once cannot publish the same place twice.
  */
-router.post('/proposals/:id/approve', requireAdmin, async (req, res) => {
+router.post('/proposals/:id/approve', requireAdmin, mediaErrors(async (req, res) => {
   const proposal = await findById('spot_proposals', req.params.id);
   if (!proposal) return res.status(404).json({ success: false, message: 'Proposition introuvable.' });
   if (proposal.status !== 'PENDING') return res.status(409).json({ success: false, message: 'Cette proposition a déjà été traitée.' });
@@ -383,7 +409,7 @@ router.post('/proposals/:id/approve', requireAdmin, async (req, res) => {
     await db().from('spot_proposals').update({ status: 'PENDING', reviewed_at: null }).eq('id', proposal.id);
     throw error;
   }
-});
+}));
 
 /**
  * POST /api/map/proposals/:id/reject

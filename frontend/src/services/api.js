@@ -223,6 +223,43 @@ export const fetchAdminStores = () => adminRequest({ method: 'get', url: `${API_
 const setStoreActiveLive = (id, isActive) =>
   adminRequest({ method: 'patch', url: `${API_BASE}/admin/stores/${id}`, data: { isActive } });
 
+// Back-office: marketplace content (admins). Stores with or without a seller, and their products.
+export const fetchAdminStore = (id) => adminRequest({ method: 'get', url: `${API_BASE}/admin/market/stores/${id}` });
+
+const createAdminStoreLive = (store) => adminRequest({ method: 'post', url: `${API_BASE}/admin/market/stores`, data: store });
+
+const updateAdminStoreLive = (id, store) => adminRequest({ method: 'put', url: `${API_BASE}/admin/market/stores/${id}`, data: store });
+
+const createAdminProductLive = (storeId, product) =>
+  adminRequest({ method: 'post', url: `${API_BASE}/admin/market/stores/${storeId}/products`, data: product });
+
+const updateAdminProductLive = (storeId, id, product) =>
+  adminRequest({ method: 'put', url: `${API_BASE}/admin/market/stores/${storeId}/products/${id}`, data: product });
+
+const deleteAdminProductLive = (storeId, id) =>
+  adminRequest({ method: 'delete', url: `${API_BASE}/admin/market/stores/${storeId}/products/${id}` });
+
+// Back-office: photos and videos of map spots. The API signs an upload URL and the browser
+// sends the file straight to Storage (videos are too large to go through the API).
+const putFile = (url, file, onProgress) =>
+  new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', url);
+    xhr.setRequestHeader('Content-Type', file.type);
+    xhr.setRequestHeader('x-upsert', 'false');
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(e.loaded / e.total);
+    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status})`)));
+    xhr.onerror = () => reject(new Error('Upload failed (network)'));
+    xhr.send(file);
+  });
+
+/** Uploads one file (Blob/File) and resolves with { publicUrl, type: 'image' | 'video' } */
+export const uploadSpotMedia = async (file, onProgress) => {
+  const { data } = await adminRequest({ method: 'post', url: `${API_BASE}/map/media/upload-url`, data: { contentType: file.type, size: file.size } });
+  await putFile(data.uploadUrl, file, onProgress);
+  return data;
+};
+
 export const fetchReports = (status = 'OPEN') => adminRequest({ method: 'get', url: `${API_BASE}/admin/reports`, params: { status } });
 
 export const setReportStatus = (id, status) => adminRequest({ method: 'patch', url: `${API_BASE}/admin/reports/${id}`, data: { status } });
@@ -417,5 +454,10 @@ export const createMyProduct = (...args) => createMyProductLive(...args).then(fo
 export const updateMyProduct = (...args) => updateMyProductLive(...args).then(forgets('market:'));
 export const deleteMyProduct = (...args) => deleteMyProductLive(...args).then(forgets('market:'));
 export const setStoreActive = (...args) => setStoreActiveLive(...args).then(forgets('market:'));
+export const createAdminStore = (...args) => createAdminStoreLive(...args).then(forgets('market:'));
+export const updateAdminStore = (...args) => updateAdminStoreLive(...args).then(forgets('market:'));
+export const createAdminProduct = (...args) => createAdminProductLive(...args).then(forgets('market:'));
+export const updateAdminProduct = (...args) => updateAdminProductLive(...args).then(forgets('market:'));
+export const deleteAdminProduct = (...args) => deleteAdminProductLive(...args).then(forgets('market:'));
 export const approveSellerApplication = (...args) => approveSellerApplicationLive(...args).then(forgets('market:'));
 export const placeOrder = (...args) => placeOrderLive(...args).then(forgets('market:'));
